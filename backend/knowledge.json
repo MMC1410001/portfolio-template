@@ -1,0 +1,1634 @@
+{
+  "profile": {
+    "name": "Alex Rivera",
+    "fullName": "Alex Morgan Rivera",
+    "role": "AI Full Stack Developer",
+    "location": "Austin, United States",
+    "residence": "Austin, Texas 78701",
+    "email": "alex@example.com",
+    "phone": "+1 555 0142",
+    "photo": "/portrait-900.jpg",
+    "photoLarge": "/portrait-1600.jpg",
+    "avatar": "/avatar.jpg",
+    "github": "https://github.com/example-dev",
+    "linkedin": "https://www.linkedin.com/in/example-dev/",
+    "twitter": "https://x.com/exampledev",
+    "instagram": "https://www.instagram.com/exampledev/",
+    "summary": "I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped.",
+    "availability": "Open to opportunities · 60-day notice, buyout available",
+    "openTo": "Austin · Denver · Seattle · Remote",
+    "relocation": "Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia"
+  },
+  "answers": [
+    {
+      "id": "award-engineering-excellence",
+      "patterns": [
+        "engineering excellence award",
+        "engineering excellence",
+        "annual award"
+      ],
+      "answer": "Engineering Excellence Award, Northwind Systems, June 2026. Sample citation. Replace with the wording from your own certificate, or delete the entry. Listed in Alex's LinkedIn honours section.",
+      "href": "/#awards"
+    },
+    {
+      "id": "award-employee-of-the-month-jun",
+      "patterns": [
+        "employee of the month june",
+        "june 2026 employee of the month"
+      ],
+      "answer": "Employee of the Month, Northwind Systems, June 2026. Sample citation for a monthly award. Listed in Alex's LinkedIn honours section.",
+      "href": "/#awards"
+    },
+    {
+      "id": "award-best-project-2021",
+      "patterns": [
+        "best project of the year",
+        "best project award",
+        "college award",
+        "academic award",
+        "gis project",
+        "gis",
+        "final year project"
+      ],
+      "answer": "Best Project of the Year, Riverside College of Engineering, June 2021. Sample citation for an academic award, kept so the section shows more than one issuer. Listed in Alex's LinkedIn honours section.",
+      "href": "/#awards"
+    },
+    {
+      "id": "certification-agentic-ai",
+      "patterns": [
+        "agentic ai course",
+        "agentic ai certification",
+        "multi agent automation"
+      ],
+      "answer": "Alex completed Sample: Agentic AI and Multi Agent Workflows, issued by Sample Academy. Issued October 2025. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "certification-ml-testing",
+      "patterns": [
+        "machine learning models testing",
+        "ml testing certificate"
+      ],
+      "answer": "Alex completed Sample: Machine Learning Model Testing, issued by Sample Academy. Issued October 2025. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "certification-rag-evals",
+      "patterns": [
+        "rag llm evals",
+        "rag certification",
+        "rag course"
+      ],
+      "answer": "Alex completed Sample: RAG and LLM Evaluation, issued by Sample Academy. Issued September 2025. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "certification-genai-tools",
+      "patterns": [
+        "genai tools course",
+        "genai certification"
+      ],
+      "answer": "Alex completed Sample: GenAI Tools and AI Agents, issued by Sample Academy. Issued August 2025. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "certification-generative-ai",
+      "patterns": [
+        "introduction to generative ai",
+        "generative ai course"
+      ],
+      "answer": "Alex completed Sample: Introduction to Generative AI, issued by Sample Cloud. Issued February 2025. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "certification-k6",
+      "patterns": [
+        "k6",
+        "performance testing masterclass"
+      ],
+      "answer": "Alex completed Sample: Performance Testing with JavaScript, issued by Sample Academy. Issued April 2026. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "certification-playwright",
+      "patterns": [
+        "playwright certification",
+        "playwright course"
+      ],
+      "answer": "Alex completed Sample: Playwright Automation from Scratch, issued by Sample Academy. Issued June 2025. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "certification-istqb",
+      "patterns": [
+        "istqb",
+        "foundation level"
+      ],
+      "answer": "Alex completed Sample: Foundation Level Tester, issued by Sample Board. Issued February 2025. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "certification-business-english",
+      "patterns": [
+        "business english",
+        "english certification"
+      ],
+      "answer": "Alex completed Sample: English for Business, issued by Northgate University. This credential is listed on his LinkedIn profile. See the certifications section for the credential link.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "availability",
+      "patterns": [
+        "availability",
+        "notice period",
+        "open to work",
+        "open to relocation",
+        "relocate",
+        "relocation",
+        "joining",
+        "buyout",
+        "job change",
+        "available for hire",
+        "currently available",
+        "join immediately",
+        "immediate joiner",
+        "when can he join",
+        "hybrid",
+        "work from home",
+        "wfh",
+        "onsite",
+        "in office",
+        "open to remote",
+        "contract",
+        "contract role",
+        "contract to hire",
+        "full time",
+        "full-time",
+        "permanent",
+        "freelance",
+        "part time",
+        "part-time",
+        "engagement type"
+      ],
+      "answer": "Open to opportunities · 60-day notice, buyout available. Locations: Austin · Denver · Seattle · Remote. Reach him at alex@example.com.",
+      "href": "/#contact"
+    },
+    {
+      "id": "visa",
+      "patterns": [
+        "visa",
+        "sponsorship",
+        "work permit",
+        "work authorisation",
+        "work authorization",
+        "right to work",
+        "h1b",
+        "h-1b",
+        "passport",
+        "abroad",
+        "overseas",
+        "international relocation",
+        "outside the country",
+        "uk",
+        "united kingdom",
+        "europe",
+        "european",
+        "usa",
+        "united states",
+        "america",
+        "australia",
+        "work abroad",
+        "move abroad",
+        "relocate abroad"
+      ],
+      "answer": "Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia. For roles in his home country no sponsorship is required; elsewhere he would need visa sponsorship. Locally he is open to Austin · Denver · Seattle · Remote.",
+      "href": "/#contact"
+    },
+    {
+      "id": "colleague-contact",
+      "patterns": [
+        "manager's phone",
+        "manager's number",
+        "manager's contact",
+        "manager's email",
+        "manager phone",
+        "manager number",
+        "manager contact",
+        "colleague contact",
+        "colleague's contact",
+        "teammate contact",
+        "recommender contact"
+      ],
+      "answer": "Contact details for Alex’s colleagues, managers and recommenders are not published here. Their LinkedIn recommendations are, each one attributed and dated. For Alex himself: alex@example.com or +1 555 0142.",
+      "href": "/#recommendations"
+    },
+    {
+      "id": "why-hire",
+      "patterns": [
+        "why hire",
+        "why should we hire",
+        "why him",
+        "why alex",
+        "what makes him",
+        "makes him stand out",
+        "stand out",
+        "strengths",
+        "strength",
+        "sell him",
+        "elevator pitch",
+        "recommend hiring",
+        "should we hire",
+        "what sets him apart",
+        "best thing about him",
+        "problem solving",
+        "problem-solving",
+        "solve complex"
+      ],
+      "answer": "Judge it from measured work rather than adjectives. At Meridian he led a Playwright TypeScript migration that cut regression time by 50% and reached 90% automation coverage on critical features. At Northwind he has 7 live internal workflows on Frappe and ERPNext and 10 operational dashboards. Lumen runs publicly at lumen.example with the frontend, mobile UI and first-party analytics pipeline he built. 5 LinkedIn recommendations, 1 of them from people who reported to him, and 3 awards. He came into development through quality engineering, which is why this portfolio ships with its own unit, chatbot and analytics test suites.",
+      "href": "/#work"
+    },
+    {
+      "id": "leadership",
+      "patterns": [
+        "led a team",
+        "lead a team",
+        "leading a team",
+        "leadership",
+        "team lead",
+        "managed a team",
+        "people management",
+        "has he led",
+        "does he lead",
+        "line manager",
+        "has he managed",
+        "managed people",
+        "how many people",
+        "people has he managed",
+        "direct reports"
+      ],
+      "answer": "He has led work and people without having held a manager title. 1 of his 5 LinkedIn recommendations are from people who reported to him. One calls him “a great leader and mentor”, another describes “strong ownership and leadership in everything he does”. A peer notes he was managing QA for the AI projects single-handedly. He led the Playwright migration at Meridian and brought the QA team onto the new framework, and at Northwind he has onboarded new joiners and mentored a junior developer and interns.",
+      "href": "/#recommendations"
+    },
+    {
+      "id": "mobile",
+      "patterns": [
+        "mobile app",
+        "mobile apps",
+        "mobile ui",
+        "mobile-first",
+        "mobile first",
+        "android",
+        "ios",
+        "react native",
+        "flutter",
+        "responsive",
+        "app store",
+        "play store",
+        "native app",
+        "mobile development"
+      ],
+      "answer": "Mobile-first web rather than a native app. On Lumen he rebuilt the customer-facing product in React and TypeScript, including a mobile-first rework of the interface, and at Northwind he has developed web and mobile automation. No native iOS or Android app is documented, and there is no React Native or Flutter work in the portfolio.",
+      "href": "/#products"
+    },
+    {
+      "id": "spoken-languages",
+      "patterns": [
+        "languages does he speak",
+        "language does he speak",
+        "spoken language",
+        "spoken languages",
+        "does he speak",
+        "speak english",
+        "fluent",
+        "communication skills",
+        "soft skills",
+        "presentation skills"
+      ],
+      "answer": "This portfolio documents programming languages rather than spoken ones. For spoken languages, ask Alex directly at alex@example.com. What is on record: a Coursera credential in English for Running a Successful Business from the Northgate University, and recommendations that single out his communication. One colleague cites “excellent communication and interpersonal skills”, another that his “reporting and presentations are always on point”.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "clients",
+      "patterns": [
+        "clients",
+        "client list",
+        "which clients",
+        "who are his clients",
+        "engagements",
+        "customer names"
+      ],
+      "answer": "Publicly named engagements: Lumen, Northwind ERP, Halcyon, Tixly, Taxwise, Cadence Labs, Vega, Helix AI, alongside Northwind’s own internal ERP. Client names behind the operational dashboards are withheld throughout. Those carry positional labels only, and the same letter always means the same client.",
+      "href": "/#products"
+    },
+    {
+      "id": "chatbot",
+      "patterns": [
+        "this chatbot",
+        "the chatbot",
+        "your chatbot",
+        "how do you work",
+        "how does this work",
+        "are you ai",
+        "are you an ai",
+        "are you chatgpt",
+        "what model",
+        "which model",
+        "llm powering",
+        "who built you",
+        "are you human",
+        "are you a bot",
+        "are you a script",
+        "how are you built"
+      ],
+      "answer": "This guide answers from Alex’s published portfolio content, and it is built so that the model never writes the prose. An approved answer set is computed first; a language model may only choose which answer id fits, and the text you get back is always looked up from that set. It degrades through three tiers (browser, then a Cloudflare Worker, then an optional FastAPI service) so it keeps answering with the server down. Both it and the analytics behind this site are Alex’s work.",
+      "href": "/analytics"
+    },
+    {
+      "id": "analytics",
+      "patterns": [
+        "portfolio analytics",
+        "analytics system",
+        "analytics behind this site",
+        "click heatmap",
+        "heatmap",
+        "heatmaps",
+        "funnel",
+        "funnels",
+        "admin dashboard",
+        "cloudflare",
+        "cloudflare workers",
+        "vinext",
+        "next.js",
+        "nextjs",
+        "how is this site built",
+        "how was this site built",
+        "how is this portfolio built",
+        "this website",
+        "static rendering",
+        "tech stack of this site"
+      ],
+      "answer": "A first-party analytics system built for this portfolio and running on Cloudflare Workers with a D1 database. It records page views, section dwell time, click heatmaps and conversion funnels, behind an admin dashboard gated by Google sign-in with HMAC-signed sessions. Visitors are identified by a rotating salted hash rather than an IP address. The site around it runs on vinext, a Next.js App Router reimplementation on Vite, with a statically rendered homepage and a chatbot that degrades through three tiers so it keeps answering with the server down. The dashboard is demonstrated publicly on synthetic data at /analytics.",
+      "href": "/analytics"
+    },
+    {
+      "id": "dashboard-automation-portfolio",
+      "patterns": [
+        "delivery board",
+        "automation delivery board"
+      ],
+      "answer": "Automation delivery board. Delivery status for every internal automation project lived in a spreadsheet that only its owner opened. Nobody outside a project could answer \"what is in UAT\" or \"who is carrying five of these\" without asking, so the answer was always a day late and usually wrong. What it shows: Every project in one board: pipeline counts across BRD, development, UAT and live; the split by department; how the work is distributed across owners; and a searchable, sortable table down to the dev, QA and business people assigned to each project. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Time-driven triggers. Audience: internal; scale: 15 projects; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/automation-portfolio"
+    },
+    {
+      "id": "dashboard-payroll-action-plan",
+      "patterns": [
+        "action plan",
+        "payroll rollout action plan"
+      ],
+      "answer": "Payroll rollout action plan. A payroll build touches HR and Finance at once, and both wanted to know the same thing on different days: is it going to land on the date we were given. A task list in a sheet answered that only for whoever had just read it, so the status meeting kept re-deriving it. What it shows: One rollout as a plan rather than a backlog: the phase it has reached, the estimate against the actual on every task including sub-tasks, who owns each one, effort by owner, and the banner that tells business users the guide has been shared and where the build now is. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Time-driven triggers. Audience: internal; scale: 16 tasks · 153 hrs; retired. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/payroll-action-plan"
+    },
+    {
+      "id": "dashboard-release-plan",
+      "patterns": [
+        "release plan",
+        "programme release plan"
+      ],
+      "answer": "Programme release plan. A month of delivery ran across product, engineering and security with no shared view of what was committed. Prioritisation arguments were really arguments about the list, because each function held a different one. What it shows: The month's deliverables as a single plan: counts by stage, a filterable table down to feature, priority, work type, PM and go-live date: and, alongside it, the delivery hierarchy, the lifecycle and the sprint ceremonies the plan assumes, so a newcomer can read the process and the plan in one place. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Client-side routing. Audience: Enterprise client A; scale: 49 deliverables; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/release-plan"
+    },
+    {
+      "id": "dashboard-quality-scorecard",
+      "patterns": [
+        "quality scorecard",
+        "release quality scorecard"
+      ],
+      "answer": "Release quality scorecard. The client asked \"is it ready\" about five products at once and got five differently-shaped answers, each from a different QA conversation. A single number per product, computed the same way every time, ends that, and makes the disagreement about the score rather than about the question. What it shows: A card per product carrying a score out of 100, a ready or not-ready verdict, and the movement since last time; expanded, the reliability, speed and inclusivity components behind the score, defect closure by severity, the named risks, and automation coverage. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Weighted scoring model. Audience: Enterprise client B; scale: 5 products; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/quality-scorecard"
+    },
+    {
+      "id": "dashboard-effort-approval",
+      "patterns": [
+        "effort report",
+        "effort utilisation and approval report"
+      ],
+      "answer": "Effort utilisation and approval report. Hours were logged monthly, approved in batches and invoiced against purchase orders, and the three lived in different places. The recurring question was not how many hours had been spent but how many had been approved, and nothing on hand answered it per project. What it shows: Six months of logged effort five ways: an overall summary with the approved, rejected and pending split; the month-by-month curve; per-project approval status; a resource-by-month grid shaded by load; and the purchase-order and payment state for each project. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Time-driven triggers. Audience: Enterprise client B; scale: 2,378 hrs; retired. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/effort-approval"
+    },
+    {
+      "id": "dashboard-portfolio-quality",
+      "patterns": [
+        "quality all clients",
+        "delivery-wide quality dashboard"
+      ],
+      "answer": "Delivery-wide quality dashboard. Every engagement reported its own quality its own way, so nobody could see across them. Which account is about to ship something unsafe is a question about the whole portfolio, and no per-project report can answer it. What it shows: One rail listing every engagement with its current score, and for the selected one: the weighted quality score and its inputs, test-case pass and fail rates, defect classification by severity, and the jump into that engagement's test cases and bug list. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Weighted scoring model. Audience: internal; scale: 6 engagements; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/portfolio-quality"
+    },
+    {
+      "id": "dashboard-defect-intelligence",
+      "patterns": [
+        "defect board",
+        "defect intelligence board"
+      ],
+      "answer": "Defect intelligence board. Two hundred defects across six platforms had accumulated in a sheet nobody could read as a whole. \"Are we safe to release\" was being answered from whichever rows happened to be on screen, and the honest answer depended on severity and platform at once. What it shows: The defect log as a report: KPI tiles for open, closed, critical and closure rate; severity, priority, assignee, platform and defect-type breakdowns; a risk assessment that states the release position and why; and the full, filterable, paginated bug list behind all of it. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Chart rendering, Emailed reports. Audience: Enterprise client C; scale: 199 defects; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/defect-intelligence"
+    },
+    {
+      "id": "dashboard-learning-tracker",
+      "patterns": [
+        "learning tracker",
+        "capability and learning tracker"
+      ],
+      "answer": "Capability and learning tracker. A team was being brought onto an unfamiliar framework on a deadline, and attendance told you nothing about whether it was working. Who was actually ready to be given work on it was a judgement being made from memory. What it shows: A rail of everyone on the programme with their current rating, and for the selected person: the functional and technical scores behind that rating, session attendance against sessions held, assignment completion, effort logged, and the written assessment. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Weighted scoring model. Audience: internal; scale: 9 members; retired. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/learning-tracker"
+    },
+    {
+      "id": "dashboard-release-readiness",
+      "patterns": [
+        "release readiness",
+        "release readiness bug report"
+      ],
+      "answer": "Release readiness bug report. A go or no-go call on a payments-adjacent feature was being made in a meeting, from a bug list, by whoever had read it most recently. The call itself is the deliverable, so the dashboard states it, and states the condition attached to it. What it shows: A go / conditional-go / no-go verdict at the top, with the rule that produced it written underneath; counts by severity, priority and QA status including reopened regressions; breakdowns by module; and the bug records the verdict was computed from. Built with Google Apps Script, Google Sheets, HTML Service, Workspace SSO, Chart rendering, Go / no-go rule engine. Audience: Enterprise client D; scale: 32 bugs; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/release-readiness"
+    },
+    {
+      "id": "dashboard-okr-dashboard",
+      "patterns": [
+        "okr dashboard",
+        "organisation okr dashboard"
+      ],
+      "answer": "Organisation OKR dashboard. OKRs were set per employee and reviewed per manager, which meant the organisation-level questions (how many people have actually submitted, which departments are behind, who has had no manager review) could only be answered by opening every record. At a hundred-plus employees that stopped being possible. What it shows: The quarter for the whole organisation: submission and achievement rates, average progress and its status distribution, department averages flagged on track, at risk or off track, top and lowest performers, and a searchable employee table with manager, targets set, achieved and latest review. Built with Frappe / ERPNext, Python, MariaDB, Jinja + JS page, Role-based permissions. Audience: internal; scale: 108 employees; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/okr-dashboard"
+    },
+    {
+      "id": "dashboards",
+      "patterns": [
+        "dashboard",
+        "dashboards",
+        "operational dashboards",
+        "payroll",
+        "apps script",
+        "google apps script",
+        "sprint",
+        "sprint ceremonies",
+        "ceremonies",
+        "agile",
+        "scrum",
+        "kanban",
+        "delivery process",
+        "delivery lifecycle",
+        "estimate",
+        "estimates",
+        "estimation",
+        "story points",
+        "velocity",
+        "burndown",
+        "defect board",
+        "defect intelligence",
+        "scorecard",
+        "go no go",
+        "release readiness"
+      ],
+      "answer": "10 operational dashboards built at Northwind, so that delivery status, quality, effort and objectives stopped living in spreadsheets and chat threads: Delivery board, Action plan, Release plan, Quality scorecard, Effort report, Quality (all clients), Defect board, Learning tracker, Release readiness, OKR dashboard. Nine are Google Apps Script web apps over Google Sheets behind Workspace sign-in; the OKR dashboard is a page inside the Frappe and ERPNext ERP. Between them they cover pipeline counts by stage, a month of deliverables beside the delivery lifecycle and sprint ceremonies the plan assumes, estimate against actual on every task, weighted quality scores, defect intelligence that states a release position, a go / conditional-go / no-go verdict with the rule that produced it, effort logged against approved and invoiced, capability ratings, and organisation-wide OKRs. Each one is rebuilt at /dashboards on invented data.",
+      "href": "/dashboards"
+    },
+    {
+      "id": "data-privacy",
+      "patterns": [
+        "data privacy",
+        "user data",
+        "privacy",
+        "pii",
+        "gdpr",
+        "data protection",
+        "personal data",
+        "data retention",
+        "how is data stored",
+        "anonymise",
+        "anonymize",
+        "cookies"
+      ],
+      "answer": "No visitor IP is ever stored by this site’s analytics. Visitors are counted through a rotating salted hash instead. What is collected and for how long is stated on the privacy page, which carries a working opt-out. The operational dashboards are rebuilt on invented data: every person, client, project and figure is changed, and client names are withheld throughout, including for the engagements named elsewhere on this site. On Lumen he also did authorisation hardening and freshness monitoring for the data pipeline.",
+      "href": "/privacy"
+    },
+    {
+      "id": "auth",
+      "patterns": [
+        "authentication",
+        "authorisation",
+        "authorization",
+        "oauth",
+        "jwt",
+        "sso",
+        "single sign-on",
+        "session management",
+        "login",
+        "rbac",
+        "permissions",
+        "role-based",
+        "access control"
+      ],
+      "answer": "On this site: an admin dashboard behind Google sign-in, with Google’s signature verified against their JWKS through WebCrypto and the audience claim checked against our own client id, plus HMAC-signed sessions whose deadline is enforced server-side rather than left to a cookie. On Lumen he did authorisation hardening. In the Northwind ERP, role-based permissions and approver workflows across seven live systems, including a credential store where reveal and copy activity is logged and changes require approval.",
+      "href": "/analytics"
+    },
+    {
+      "id": "not-in-stack",
+      "patterns": [
+        "graphql",
+        "vue",
+        "angular",
+        "svelte",
+        "golang",
+        "go lang",
+        "rust",
+        "php",
+        "ruby on rails",
+        "ruby",
+        "kafka",
+        "rabbitmq",
+        "redis",
+        "grpc",
+        "redux",
+        "state management",
+        "prisma",
+        "sqlalchemy",
+        "mongodb",
+        "nosql",
+        "terraform",
+        "jenkins",
+        "spring boot",
+        "dotnet",
+        "asp.net",
+        "jquery",
+        "webpack",
+        "orm"
+      ],
+      "answer": "Not in his documented stack. What is: interface: HTML / CSS, JavaScript, TypeScript, React; backend: Python, FastAPI, Java, SQL / PostgreSQL, Frappe / ERPNext; intelligence: MCP / RAG, AI agents, LangSmith, RAGAs / DeepEval; delivery: Git / GitHub, Docker, AWS EC2, CI/CD. This portfolio states what he has actually used rather than what he could pick up, so something absent here is genuinely absent rather than modestly omitted.",
+      "href": "/#skills"
+    },
+    {
+      "id": "ai-stack",
+      "patterns": [
+        "langchain",
+        "llamaindex",
+        "agent framework",
+        "agent frameworks",
+        "llm provider",
+        "llm providers",
+        "which llm",
+        "which models",
+        "openai",
+        "anthropic",
+        "gemini",
+        "ollama",
+        "crewai",
+        "autogen",
+        "model providers"
+      ],
+      "answer": "Providers across his work: Gemini, OpenAI and Anthropic are all supported by Notesgen; the MCP RAG server carries an Anthropic integration and generates embeddings locally with Sentence Transformers; the realtime voice agent runs on the OpenAI Realtime API; and he runs local models through Ollama. Tooling rather than frameworks is the pattern: MCP for retrieval, and LangSmith, RAGAs and DeepEval for evaluation. Intelligence on his skills list: MCP / RAG, AI agents, LangSmith, RAGAs / DeepEval.",
+      "href": "/#skills"
+    },
+    {
+      "id": "learning-now",
+      "patterns": [
+        "currently learning",
+        "what is he learning",
+        "upskilling",
+        "learning now",
+        "recent learning",
+        "staying current",
+        "keeping up to date",
+        "what is he studying",
+        "latest certification",
+        "most recent certification"
+      ],
+      "answer": "His most recent credentials, newest first: Sample: Performance Testing with JavaScript (Sample Academy, April 2026); Sample: Agentic AI and Multi Agent Workflows (Sample Academy, October 2025); Sample: Machine Learning Model Testing (Sample Academy, October 2025). He also keeps study notes in Google Docs for agent workflows, machine learning testing, RAG evaluation, GenAI tools, k6 and Playwright, and publishes project guides on the MCP RAG server, the realtime voice agent and prompt evaluation.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "employer-meridian",
+      "patterns": [
+        "what does meridian do",
+        "about meridian",
+        "meridian fintech",
+        "who is meridian",
+        "what is meridian",
+        "previous employer",
+        "past employer",
+        "stp",
+        "straight through processing",
+        "straight-through processing"
+      ],
+      "answer": "Meridian Fintech (Nov 2022 to Mar 2025): Multinational financial technology firm. Its straight-through-processing platforms run middle- and back-office work for banks. They cover rules-based transaction matching, invoice reconciliation and compliance, handling currency conversion, tax and discount calculation across multiple countries in one place. Alex was a Jr. Software Engineer, QA Automation there. Led a Playwright TypeScript migration that reduced regression time by 50%. Reached 90% automation coverage for critical features and moved QA infrastructure to AWS EC2.",
+      "href": "https://meridian.example/"
+    },
+    {
+      "id": "employer",
+      "patterns": [
+        "what does northwind do",
+        "about northwind",
+        "northwind systems",
+        "northwind company",
+        "who is northwind",
+        "what is northwind",
+        "product or service company",
+        "service based",
+        "product based",
+        "service company",
+        "consulting",
+        "current employer",
+        "which company"
+      ],
+      "answer": "Northwind Systems: IT and technology consulting: apps, websites and engineering talent across development, QA, project management and cloud, delivered for measurable client outcomes. Alex has been a Full Stack Developer there since March 2025, building internal workflow systems on Frappe and ERPNext. Before Northwind he was at Meridian Fintech from November 2022 to March 2025.",
+      "href": "https://northwind.example/"
+    },
+    {
+      "id": "workplace",
+      "patterns": [
+        "where does he work",
+        "where does alex work",
+        "where does alex rivera work",
+        "where do you work",
+        "where is he working",
+        "where does he currently work",
+        "where is he employed",
+        "who does he work for",
+        "current workplace",
+        "workplace"
+      ],
+      "answer": "Alex Rivera works at Northwind Systems currently, which is located in Austin. He is a Full Stack Developer there, building Frappe and ERPNext workflows. Before Northwind he was at Meridian Fintech from November 2022 to March 2025.",
+      "href": "https://northwind.example/"
+    },
+    {
+      "id": "django",
+      "patterns": [
+        "django",
+        "flask"
+      ],
+      "answer": "Django is not in Alex’s stack. His Python web work is FastAPI (the Notesgen backend and the voice agent’s token service) and Frappe/ERPNext, where he has built seven live internal workflows at Northwind.",
+      "href": "/#skills"
+    },
+    {
+      "id": "nodejs",
+      "patterns": [
+        "node.js",
+        "nodejs",
+        "node js",
+        "express",
+        "javascript backend"
+      ],
+      "answer": "Yes. The scheme automation reference is a React 19 and TypeScript frontend on an Express backend, wired to BigQuery, Google Cloud Storage and Cloud Run. His Playwright and k6 automation tooling is Node-based as well.",
+      "href": "https://github.com/example-dev/scheme-automation"
+    },
+    {
+      "id": "kubernetes",
+      "patterns": [
+        "kubernetes",
+        "k8s",
+        "container orchestration",
+        "helm",
+        "eks"
+      ],
+      "answer": "No. Alex uses Docker and AWS EC2 for environment deployments, having moved Meridian’s QA infrastructure to EC2, plus Google Cloud Run in the scheme automation work and Cloudflare Workers for this site. Kubernetes is not something he has used.",
+      "href": "/#skills"
+    },
+    {
+      "id": "microservices",
+      "patterns": [
+        "microservice",
+        "microservices",
+        "service oriented",
+        "service-oriented",
+        "distributed system",
+        "distributed systems"
+      ],
+      "answer": "He has built systems composed of separate services rather than large distributed estates. The realtime voice agent splits a FastAPI token service from LiveKit and the OpenAI Realtime API; the scheme automation work runs an Express API against BigQuery, Google Cloud Storage and Cloud Run.",
+      "href": "/#work"
+    },
+    {
+      "id": "system-design",
+      "patterns": [
+        "system design",
+        "systems design",
+        "design a system",
+        "architecture experience",
+        "hld",
+        "lld",
+        "scalability",
+        "how does it scale",
+        "scale",
+        "scales",
+        "architecture",
+        "high availability"
+      ],
+      "answer": "Judge it from what he has designed. The analytics behind this site: a deliberately open ingest endpoint with a server-side allowlist, a rotating salted hash instead of stored visitor IPs, HMAC-signed admin sessions whose deadline is enforced server-side, and a dashboard behind Google sign-in with the audience claim verified. Its chatbot degrades through three tiers so it keeps answering with the server down.",
+      "href": "/analytics"
+    },
+    {
+      "id": "fine-tuning",
+      "patterns": [
+        "fine-tune",
+        "fine tune",
+        "fine-tuned",
+        "fine tuned",
+        "finetuning",
+        "fine-tuning",
+        "train a model",
+        "training a model",
+        "model training",
+        "lora"
+      ],
+      "answer": "No. His applied-AI work is retrieval, agents and evaluation rather than training. He builds RAG pipelines with ChromaDB and Sentence Transformers, runs local models through Ollama, and evaluates output with LangSmith, RAGAs and DeepEval.",
+      "href": "/#skills"
+    },
+    {
+      "id": "python-years",
+      "patterns": [
+        "years of python",
+        "how long python",
+        "python experience",
+        "experience in python"
+      ],
+      "answer": "2 years 8 months of substantial Python, since 2024: evaluation pipelines with LangSmith and RAGAs, FastAPI services, and Frappe/ERPNext business logic at Northwind. His earlier automation work at Meridian was mainly Playwright with TypeScript.",
+      "href": "/#skills"
+    },
+    {
+      "id": "mentoring",
+      "patterns": [
+        "mentor",
+        "mentored",
+        "mentoring",
+        "onboard",
+        "onboarded",
+        "onboarding",
+        "juniors",
+        "junior developers",
+        "knowledge sharing",
+        "knowledge session",
+        "training session",
+        "coaching",
+        "documentation",
+        "document his work",
+        "documents his work",
+        "writes documentation",
+        "knowledge transfer",
+        "documented"
+      ],
+      "answer": "Yes. At Northwind he has onboarded new joiners onto the codebase and delivery process, mentored a junior developer and interns, and run knowledge sessions for the team. During the Playwright migration at Meridian he brought the QA team onto the new framework.",
+      "href": "/#recommendations"
+    },
+    {
+      "id": "on-call",
+      "patterns": [
+        "on-call",
+        "on call",
+        "oncall",
+        "production support",
+        "pager",
+        "incident response",
+        "24/7",
+        "support rotation",
+        "production incident",
+        "incident",
+        "incidents",
+        "outage",
+        "postmortem",
+        "post-mortem",
+        "firefighting"
+      ],
+      "answer": "He has not carried a formal on-call rota. He does support live systems (seven internal workflows in production at Northwind and Lumen running publicly) and is open to an on-call rotation.",
+      "href": "/#contact"
+    },
+    {
+      "id": "code-review",
+      "patterns": [
+        "code review",
+        "code reviews",
+        "review code",
+        "pull request",
+        "pull requests",
+        "pr review",
+        "merge request",
+        "code quality",
+        "clean code",
+        "coding standards",
+        "code standards",
+        "best practices"
+      ],
+      "answer": "His review instinct comes from testing rather than from authoring PR feedback: two and a half years in QA automation reading code for what breaks, what is not covered, and what happens on the unhappy path. Two of the seven Northwind workflows were built collaboratively.",
+      "href": "/#about"
+    },
+    {
+      "id": "discipline",
+      "patterns": [
+        "backend or frontend",
+        "frontend or backend",
+        "front end or back end",
+        "backend developer or",
+        "is he full stack",
+        "frontend or full stack",
+        "which side",
+        "frontend",
+        "front end",
+        "frontend framework",
+        "frontend frameworks",
+        "ui framework",
+        "backend framework"
+      ],
+      "answer": "Both, and the split is documented. Interface: HTML / CSS, JavaScript, TypeScript, React. Backend: Python, FastAPI, Java, SQL / PostgreSQL, Frappe / ERPNext. At Northwind he builds both halves of internal workflow systems on Frappe and ERPNext; on Lumen he built the frontend and mobile UI plus an admin analytics dashboard.",
+      "href": "/#skills"
+    },
+    {
+      "id": "years-experience",
+      "patterns": [
+        "years of experience",
+        "total experience",
+        "how many years",
+        "years experience",
+        "overall experience",
+        "work experience",
+        "how much experience",
+        "how experienced",
+        "total years",
+        "years in the industry",
+        "experience does he have",
+        "fresher",
+        "fresher or experienced"
+      ],
+      "answer": "3 years 10 months of professional engineering since November 2022: 2 years 4 months in QA automation at Meridian Fintech, then full stack development at Northwind Systems from March 2025. Before that, a PG Diploma in Advanced Computing at Brookfield Institute in 2022.",
+      "href": "/#about"
+    },
+    {
+      "id": "qa-to-dev",
+      "patterns": [
+        "move from qa",
+        "moved from qa",
+        "qa to development",
+        "qa to dev",
+        "why did he move",
+        "why did he switch",
+        "career change",
+        "career transition",
+        "switched from testing",
+        "tester to developer"
+      ],
+      "answer": "Alex spent November 2022 to March 2025 in QA automation at Meridian Fintech, joined Northwind Systems in March 2025 as AI QA, and moved into full stack development there. He describes it as the point of the path rather than a detour: breaking software first is why he now builds it to be verified.",
+      "href": "/#about"
+    },
+    {
+      "id": "civil-to-software",
+      "patterns": [
+        "civil engineering",
+        "civil",
+        "why software",
+        "how did he get into software",
+        "non cs background",
+        "non-cs background"
+      ],
+      "answer": "Alex holds a Diploma in Civil Engineering (2018) and a BE in Civil Engineering (2021), then took a PG Diploma in Advanced Computing at Brookfield Institute in 2022 and moved into software from there. QA automation first, then full stack development.",
+      "href": "/#about"
+    },
+    {
+      "id": "testing-approach",
+      "patterns": [
+        "approach to testing",
+        "testing approach",
+        "how does he test",
+        "test strategy",
+        "testing strategy",
+        "quality approach",
+        "qa approach",
+        "does he write tests",
+        "unit tests",
+        "test coverage",
+        "approach testing",
+        "test case",
+        "test cases",
+        "playwright",
+        "testing philosophy",
+        "quality engineering",
+        "how he tests",
+        "regression",
+        "regression time",
+        "shift left",
+        "manual testing",
+        "automation coverage",
+        "performance testing",
+        "performance engineering"
+      ],
+      "answer": "Alex's foundation is quality engineering: ISTQB Foundation Level, and a Playwright TypeScript migration at Meridian Fintech that cut regression time by 50% and reached 90% automation coverage on critical features. He has also worked in k6 performance testing and LLM evaluation with LangSmith, RAGAs and DeepEval. This portfolio itself ships with unit, chatbot and analytics test suites.",
+      "href": "/#about"
+    },
+    {
+      "id": "llm-evaluation",
+      "patterns": [
+        "evaluate llm",
+        "evaluate the llm",
+        "llm output",
+        "evaluate a model",
+        "evaluate models",
+        "how does he evaluate",
+        "evals",
+        "rag evaluation",
+        "agent testing",
+        "hallucination"
+      ],
+      "answer": "Alex built Python evaluation pipelines with LangSmith and RAGAs at Northwind, and holds certifications in RAG/LLM evals, ML model testing and DeepEval/RAGAs with Ollama. His public LLM Prompt Evaluation Harness scores metrics with an LLM across repeatable runs and tracks cost and latency.",
+      "href": "https://github.com/example-dev/llm-prompt-evaluation-harness"
+    },
+    {
+      "id": "vector-store",
+      "patterns": [
+        "vector database",
+        "vector db",
+        "vector store",
+        "chromadb",
+        "chroma db",
+        "embedding store",
+        "pinecone",
+        "weaviate",
+        "faiss",
+        "qdrant"
+      ],
+      "answer": "ChromaDB, with Sentence Transformers generating embeddings locally, in his MCP RAG server. The server exposes ingestion, semantic search, question answering, listing and deletion as MCP tools.",
+      "href": "https://github.com/example-dev/mcp-rag-server"
+    },
+    {
+      "id": "databases",
+      "patterns": [
+        "what databases",
+        "which databases",
+        "database experience",
+        "postgres",
+        "postgresql",
+        "bigquery",
+        "sqlite",
+        "data storage"
+      ],
+      "answer": "SQL and PostgreSQL in application work, ChromaDB for vector storage in the MCP RAG server, BigQuery and Google Cloud Storage in the scheme automation reference, Supabase on Lumen, and Cloudflare D1 behind this site’s analytics.",
+      "href": "/#skills"
+    },
+    {
+      "id": "delivery",
+      "patterns": [
+        "ci/cd",
+        "cicd",
+        "continuous integration",
+        "continuous delivery",
+        "deployment pipeline",
+        "devops",
+        "docker",
+        "containers",
+        "how does he deploy",
+        "aws",
+        "gcp",
+        "google cloud",
+        "azure",
+        "cloud provider",
+        "ec2",
+        "hosting"
+      ],
+      "answer": "Git and GitHub, Docker, AWS EC2 and CI/CD are in his delivery toolkit. At Meridian he moved QA infrastructure to AWS EC2. This portfolio deploys to Cloudflare Workers behind a preflight gate that blocks a deploy which would come up half-broken.",
+      "href": "/#skills"
+    },
+    {
+      "id": "production",
+      "patterns": [
+        "production experience",
+        "in production",
+        "live systems",
+        "real users",
+        "shipped to production",
+        "production ready",
+        "shipped",
+        "ship to production",
+        "anything in production",
+        "running in production",
+        "live system",
+        "production systems"
+      ],
+      "answer": "Yes. Seven live internal workflows at Northwind on Frappe and ERPNext, Lumen running publicly at lumen.example with the frontend, mobile UI and admin analytics dashboard he built, and this portfolio’s own analytics system running on Cloudflare Workers. The four repositories in Selected Work are prototypes and references, and are labelled as such.",
+      "href": "/#work"
+    },
+    {
+      "id": "code-samples",
+      "patterns": [
+        "see code",
+        "see his code",
+        "code sample",
+        "code samples",
+        "source code",
+        "show me code",
+        "his repositories",
+        "his repos",
+        "github repos",
+        "read his code"
+      ],
+      "answer": "Public repositories: MCP RAG server, Realtime voice agent, Notesgen, Scheme automation. Client and employer work is private. The dashboard from this site’s analytics system is demonstrated publicly on synthetic data at /analytics.",
+      "href": "https://github.com/example-dev"
+    },
+    {
+      "id": "security",
+      "patterns": [
+        "prompt injection",
+        "security review",
+        "security reviews",
+        "security testing",
+        "vulnerability",
+        "vulnerabilities",
+        "owasp",
+        "penetration",
+        "secure coding",
+        "application security"
+      ],
+      "answer": "At Halcyon Alex ran security vulnerability reviews and performance work across internal sales-team products, and validated the data behind them. This portfolio’s own chatbot is built so the model never authors prose: it may only select an answer id from an approved set, and the served text is always looked up from that set.",
+      "href": "/#products"
+    },
+    {
+      "id": "schedule",
+      "patterns": [
+        "schedule a call",
+        "book a call",
+        "set up a call",
+        "arrange a call",
+        "schedule an interview",
+        "interview slot",
+        "set up a meeting",
+        "book a meeting",
+        "next steps",
+        "interview",
+        "technical interview",
+        "screening call",
+        "technical round",
+        "discussion"
+      ],
+      "answer": "The fastest route is direct: alex@example.com or +1 555 0142. Open to opportunities · 60-day notice, buyout available. Alex replies to LinkedIn as well.",
+      "href": "/#contact"
+    },
+    {
+      "id": "leaving",
+      "patterns": [
+        "why is he leaving",
+        "why leave",
+        "why does he want to leave",
+        "reason for change",
+        "reason for leaving",
+        "looking for a change"
+      ],
+      "answer": "That one is worth asking Alex directly at alex@example.com or +1 555 0142. What is documented: Open to opportunities · 60-day notice, buyout available, open to Austin · Denver · Seattle · Remote.",
+      "href": "/#contact"
+    },
+    {
+      "id": "contact",
+      "patterns": [
+        "contact",
+        "contact details",
+        "contact him",
+        "how to contact",
+        "email",
+        "email address",
+        "get in touch",
+        "phone",
+        "phone number",
+        "mobile number",
+        "call him",
+        "contact number",
+        "reach him",
+        "whatsapp"
+      ],
+      "answer": "You can reach Alex at alex@example.com or +1 555 0142, or connect on LinkedIn. He is a Full Stack Developer at Northwind Systems, with a focus on full stack applications and applied AI.",
+      "href": "https://www.linkedin.com/in/example-dev/"
+    },
+    {
+      "id": "halcyon-halcyon-chatbot",
+      "patterns": [
+        "halcyon chatbot",
+        "halcyon halcyon chatbot",
+        "halcyon chatbot"
+      ],
+      "answer": "Halcyon Assistant, part of Alex's work on Halcyon: An assistant used by the sales teams. Alex reviewed and refined its responses, validated the data behind them, and raised performance and security findings.",
+      "href": "/#products"
+    },
+    {
+      "id": "halcyon-dealer-apis",
+      "patterns": [
+        "dealer api",
+        "dealer apis",
+        "halcyon dealer api",
+        "halcyon dealer apis"
+      ],
+      "answer": "Dealer APIs, part of Alex's work on Halcyon: Services behind the dealer-facing sales workflows. Alex covered them with performance and security review and validated the data they returned.",
+      "href": "/#products"
+    },
+    {
+      "id": "halcyon-tsm-ai",
+      "patterns": [
+        "field ai",
+        "halcyon tsm",
+        "tsm"
+      ],
+      "answer": "Field AI, part of Alex's work on Halcyon: An internal AI tool supporting the field sales team. Alex evaluated its responses and data quality and reported performance and security issues.",
+      "href": "/#products"
+    },
+    {
+      "id": "work-lumen",
+      "patterns": [
+        "lumen",
+        "astro fin"
+      ],
+      "answer": "Lumen: Rebuilt the customer-facing product in React and TypeScript: landing page, mobile-first rework, a sectioned admin console, and an analytics dashboard with click heatmaps, funnel reporting and session timelines. Built the first-party analytics pipeline end to end, from browser instrumentation through a Supabase edge function to the reporting views behind the dashboard, alongside authorisation hardening, freshness monitoring for the data pipeline, a page-weight pass on the landing page, and Vitest, Playwright and Deno test suites. Integrated Google Analytics and Microsoft Clarity, ran the social media campaign, and contributed to product thinking. Focus: React, TypeScript, Vite, Supabase, PostgreSQL, GA4 / GTM, Clarity.",
+      "href": "/#products"
+    },
+    {
+      "id": "work-halcyon-halcyon",
+      "patterns": [
+        "halcyon halcyon",
+        "halcyon",
+        "halcyon"
+      ],
+      "answer": "Halcyon: Worked on performance improvements and security vulnerability reviews across several internal products built for the sales teams. Validated and refined data, and improved chatbot responses. Products covered: Halcyon Assistant, Dealer APIs, Field AI. Focus: Performance, Security, Chatbot evaluation, Data validation.",
+      "href": "/#products"
+    },
+    {
+      "id": "work-tixly",
+      "patterns": [
+        "tixly",
+        "tixly",
+        "theticketbazaar"
+      ],
+      "answer": "Tixly: Improved user journeys and tested product flows on Tixly to help make the experience easier to navigate and use. Focus: User journeys, Product testing.",
+      "href": "/#products"
+    },
+    {
+      "id": "ai-quality-research",
+      "patterns": [
+        "ai quality",
+        "ai quality work",
+        "ai quality research",
+        "ai qa demo",
+        "rag testing",
+        "agent testing",
+        "llm evaluation",
+        "langsmith experiments",
+        "ai testing framework"
+      ],
+      "answer": "AI quality and evaluation: Learning and prototype work around RAG evaluation, agent testing, LLM tracing, and AI assisted test automation. It demonstrates an evaluation focused approach without sharing prompts, datasets, model settings, or internal test results."
+    },
+    {
+      "id": "automation-performance",
+      "patterns": [
+        "k6 performance",
+        "load testing",
+        "jmeter",
+        "locust",
+        "qa macro",
+        "browser automation",
+        "playwright automation"
+      ],
+      "answer": "Automation and performance engineering: Private automation and performance work spans browser tests, macro tooling, and load testing harnesses. The portfolio shares the capability, not target applications, test plans, thresholds, or execution data."
+    },
+    {
+      "id": "application-prototypes",
+      "patterns": [
+        "frappe test",
+        "frappe learning",
+        "n8n automation",
+        "qa os",
+        "qa workflow agent",
+        "mcp assignment",
+        "claude mcp",
+        "speech generation",
+        "link checker"
+      ],
+      "answer": "Application and workflow prototypes: Built learning and prototype work with Frappe and ERPNext, workflow automation, MCP and RAG, browser utilities, and speech generation. Public descriptions omit workflow exports, endpoints, and source files."
+    },
+    {
+      "id": "apex-pharma",
+      "patterns": [
+        "apex pharma",
+        "apex hr",
+        "new joiner feedback",
+        "new-joiner feedback",
+        "hr feedback automation"
+      ],
+      "answer": "Apex Pharma HR feedback automation: A proof of concept for collecting new joiner feedback within an HR workflow. User records, configuration, and operational details are private."
+    },
+    {
+      "id": "onefinance",
+      "patterns": [
+        "nimbus finance",
+        "1 finance",
+        "product visibility portal",
+        "organisation visibility"
+      ],
+      "answer": "Nimbus Finance product visibility portal: Brief and research work supporting a product visibility portal. Internal requirements, analytics, and delivery material are private."
+    },
+    {
+      "id": "private-work-overview",
+      "patterns": [
+        "private work",
+        "private projects",
+        "confidential projects",
+        "client work",
+        "client projects",
+        "private portfolio"
+      ],
+      "answer": "Alex maintains private work across applied AI quality, automation, performance engineering, and internal application delivery. Public summaries cover goals and outcomes only; code, data, infrastructure, configurations, security findings, and access details remain private."
+    },
+    {
+      "id": "erp-okr",
+      "patterns": [
+        "okr",
+        "okrs",
+        "objectives and key results"
+      ],
+      "answer": "OKR management at Northwind: Employee objectives and key results with manager approval, monthly reviews, progress tracking, and revision snapshots. Alex's contribution: development. Listed as live in the automation tracker. Built on Frappe and ERPNext.",
+      "href": "/#northwind-erp"
+    },
+    {
+      "id": "erp-employee-feedback",
+      "patterns": [
+        "employee feedback",
+        "30-60-90",
+        "30 60 90",
+        "30–60–90",
+        "feedback system"
+      ],
+      "answer": "Employee feedback at 30, 60, and 90 days at Northwind: Helped build the workflow for collecting employee feedback at 30, 60, and 90 days. Alex's contribution: collaborative development. Listed as live in the automation tracker. Built on Frappe and ERPNext.",
+      "href": "/#northwind-erp"
+    },
+    {
+      "id": "erp-requirements",
+      "patterns": [
+        "requirements management",
+        "requirement document",
+        "brd",
+        "business requirements"
+      ],
+      "answer": "Requirements management at Northwind: BRD submission, review, approval, and rework, with document versions and sequential delivery stages that capture blockers and holds. Alex's contribution: development. Listed as live in the automation tracker. Built on Frappe and ERPNext.",
+      "href": "/#northwind-erp"
+    },
+    {
+      "id": "erp-rca",
+      "patterns": [
+        "rca",
+        "root cause",
+        "root-cause"
+      ],
+      "answer": "RCA document management at Northwind: Root cause analysis document reviews with approval and rework flows, version history, activity records, and notifications. Alex's contribution: development. Listed as live in the automation tracker. Built on Frappe and ERPNext.",
+      "href": "/#northwind-erp"
+    },
+    {
+      "id": "erp-subscriptions",
+      "patterns": [
+        "subscription management",
+        "subscriptions",
+        "subscription system",
+        "renewals"
+      ],
+      "answer": "Subscription management at Northwind: Subscription requests routed through approval and finance review, with renewal records and expiry reminders. Alex's contribution: development. Listed as live in the automation tracker. Built on Frappe and ERPNext.",
+      "href": "/#northwind-erp"
+    },
+    {
+      "id": "erp-password-management",
+      "patterns": [
+        "password management",
+        "credential vault",
+        "credential management"
+      ],
+      "answer": "Password management at Northwind: Credential records with owner and approver workflows, changes that require approval, reveal and copy activity logs, and MFA metadata. Alex's contribution: development. Listed as live in the automation tracker. Built on Frappe and ERPNext.",
+      "href": "/#northwind-erp"
+    },
+    {
+      "id": "erp-document-management",
+      "patterns": [
+        "document management",
+        "dms",
+        "project document"
+      ],
+      "answer": "Document management at Northwind: Project document reviews with manager and client approvals, revision history, controlled editing, and tracking of execution stages. Alex's contribution: collaborative development. Listed as live in the automation tracker. Built on Frappe and ERPNext.",
+      "href": "/#northwind-erp"
+    },
+    {
+      "id": "erp",
+      "patterns": [
+        "erpnext",
+        "frappe",
+        "northwind_erp",
+        "northwind erp",
+        "erp",
+        "enterprise workflow",
+        "erp automation",
+        "workflows",
+        "live workflows",
+        "how many workflows",
+        "internal workflows"
+      ],
+      "answer": "Northwind ERP automation: Developed seven live internal workflows, including systems built with teammates, using Frappe and ERPNext. Connected Python business logic with web interfaces, approval flows, notifications, and traceable records. Systems: OKR management, Employee feedback at 30, 60, and 90 days, Requirements management, RCA document management, Subscription management, Password management, Document management. Stack: Frappe, ERPNext, Python, JavaScript, SQL, HRMS.",
+      "href": "/#northwind-erp"
+    },
+    {
+      "id": "mcp",
+      "patterns": [
+        "mcp",
+        "rag",
+        "retrieval",
+        "embedding",
+        "chroma"
+      ],
+      "answer": "A Python MCP server with tools for document ingestion, semantic search, question answering, listing, and deletion. Uses Sentence Transformers for local embeddings, ChromaDB for storage, and an Anthropic integration.",
+      "href": "https://github.com/example-dev/mcp-rag-server"
+    },
+    {
+      "id": "voice",
+      "patterns": [
+        "voice",
+        "livekit",
+        "speech",
+        "realtime",
+        "websocket",
+        "websockets",
+        "barge-in",
+        "interruption"
+      ],
+      "answer": "A voice agent prototype connecting LiveKit and OpenAI Realtime with a FastAPI token service. YAML prompt configuration covers language, interruptions, and escalation. A reference implementation, not a production service. Under 2s turn latency with working barge-in, across Hindi, English, Gujarati and Marathi.",
+      "href": "https://github.com/example-dev/realtime-voice-agent"
+    },
+    {
+      "id": "course-notes",
+      "patterns": [
+        "course notes",
+        "course note",
+        "study notes",
+        "google docs notes"
+      ],
+      "answer": "Alex keeps study notes in Google Docs for agent workflows, machine learning testing, RAG evaluation, GenAI tools, k6, and Playwright. Each set is linked from the credential it belongs to in the certifications section.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "notes",
+      "patterns": [
+        "notesgen",
+        "notes",
+        "learning",
+        "chrome",
+        "chrome extension",
+        "transcript",
+        "transcripts",
+        "course material"
+      ],
+      "answer": "A local learning workflow with a FastAPI UI and Chrome extension. Supports Gemini, OpenAI, and Anthropic providers and export formats including Markdown, PDF, HTML, DOCX, and Google Docs. Handles transcripts up to 180 minutes; structured notes out in about 5 minutes.",
+      "href": "https://github.com/example-dev/Utility_With_UI_for_notes"
+    },
+    {
+      "id": "scheme",
+      "patterns": [
+        "scheme",
+        "spreadsheet",
+        "bigquery",
+        "pipeline"
+      ],
+      "answer": "A React 19 and TypeScript frontend with Express, BigQuery, Google Cloud Storage, and Cloud Run integration. This public repository is a sanitized reference implementation; cloud configuration and authentication are not included. Replaces a manual routine where sheets from several departments were reconciled by hand against historical data and email threads.",
+      "href": "https://github.com/example-dev/scheme-automation"
+    },
+    {
+      "id": "awards",
+      "patterns": [
+        "award",
+        "awards",
+        "recognition",
+        "recognised",
+        "recognized",
+        "employee of the month",
+        "star of the month",
+        "honour",
+        "honours",
+        "honor",
+        "honors",
+        "prize",
+        "won anything",
+        "any awards"
+      ],
+      "answer": "Alex has received 3 awards:\n\nEngineering Excellence Award, Northwind Systems, June 2026. Sample citation. Replace with the wording from your own certificate, or delete the entry.\n\nEmployee of the Month, Northwind Systems, June 2026. Sample citation for a monthly award.\n\nBest Project of the Year, Riverside College of Engineering, June 2021. Sample citation for an academic award, kept so the section shows more than one issuer.\n\nAll are listed in his LinkedIn honours section.",
+      "href": "/#awards"
+    },
+    {
+      "id": "certifications",
+      "patterns": [
+        "certification",
+        "certifications",
+        "certificate",
+        "certificates",
+        "certified",
+        "completed course",
+        "completed courses",
+        "course certificates",
+        "udemy course",
+        "udemy courses",
+        "coursera certificate",
+        "coursera certificates",
+        "coursera credential",
+        "coursera credentials",
+        "linkedin certifications",
+        "linkedin certificate",
+        "credential",
+        "credentials",
+        "verify his credentials"
+      ],
+      "answer": "Alex’s LinkedIn profile lists these 9 courses and certifications:\n\nSample: Agentic AI and Multi Agent Workflows. Sample Academy, October 2025.\n\nSample: Machine Learning Model Testing. Sample Academy, October 2025.\n\nSample: RAG and LLM Evaluation. Sample Academy, September 2025.\n\nSample: GenAI Tools and AI Agents. Sample Academy, August 2025.\n\nSample: Introduction to Generative AI. Sample Cloud, February 2025.\n\nSample: Performance Testing with JavaScript. Sample Academy, April 2026.\n\nSample: Playwright Automation from Scratch. Sample Academy, June 2025.\n\nSample: Foundation Level Tester. Sample Board, February 2025.\n\nSample: English for Business. Northgate University.\n\nCredential links are available in the certifications section.",
+      "href": "/#certifications"
+    },
+    {
+      "id": "evaluation",
+      "patterns": [
+        "token costs",
+        "token usage",
+        "evaluation",
+        "langsmith",
+        "ragas",
+        "deepeval",
+        "prompt"
+      ],
+      "answer": "Alex built Python evaluation pipelines with LangSmith and RAGAs at Northwind Systems. His public LLM Prompt Evaluation Harness explores metrics scored by an LLM, repeated runs, and cost and latency tracking.",
+      "href": "https://github.com/example-dev/llm-prompt-evaluation-harness"
+    },
+    {
+      "id": "projects",
+      "patterns": [
+        "project",
+        "projects",
+        "product",
+        "products",
+        "github",
+        "built",
+        "builds",
+        "portfolio",
+        "work samples"
+      ],
+      "answer": "Featured projects: Portfolio analytics, MCP RAG server, Realtime voice agent, Notesgen, Scheme automation. The public repositories include implementation details and setup guides. Voice Agent is a prototype; Scheme Automation is a sanitized reference. Enterprise work includes Northwind ERP automation: seven live Frappe/ERPNext workflows. Products contributed to include Lumen, Northwind ERP, Halcyon, Tixly, Taxwise, Cadence Labs, Vega, Helix AI.",
+      "href": "https://github.com/example-dev"
+    },
+    {
+      "id": "experience",
+      "patterns": [
+        "designation",
+        "current role",
+        "current position",
+        "career",
+        "career history",
+        "background",
+        "job",
+        "jobs",
+        "companies",
+        "employment",
+        "employment history",
+        "northwind",
+        "meridian",
+        "qa",
+        "previous roles",
+        "past roles",
+        "his experience",
+        "work history"
+      ],
+      "answer": "Northwind Systems (Mar 2025 to Present): Full Stack Developer. Develops Frappe and ERPNext workflows for document approvals, OKRs, employee feedback, subscriptions, and credential management. Previously AI QA at Northwind, before moving into full stack development. Built Python evaluation pipelines with LangSmith and RAGAs for AI applications. Developed web and mobile automation, evaluated chatbots and voicebots, and documented engineering workflows.\n\nMeridian Fintech (Nov 2022 to Mar 2025): Jr. Software Engineer, QA Automation. Led a Playwright TypeScript migration that reduced regression time by 50%. Reached 90% automation coverage for critical features and moved QA infrastructure to AWS EC2.",
+      "href": "/#about"
+    },
+    {
+      "id": "skills",
+      "patterns": [
+        "skill",
+        "skills",
+        "stack",
+        "python",
+        "react",
+        "java",
+        "fastapi",
+        "technology",
+        "technologies",
+        "language",
+        "languages",
+        "typescript",
+        "javascript",
+        "html",
+        "css"
+      ],
+      "answer": "Alex works with interface: HTML / CSS, JavaScript, TypeScript, React; backend: Python, FastAPI, Java, SQL / PostgreSQL, Frappe / ERPNext; intelligence: MCP / RAG, AI agents, LangSmith, RAGAs / DeepEval; delivery: Git / GitHub, Docker, AWS EC2, CI/CD.",
+      "href": "https://github.com/example-dev"
+    },
+    {
+      "id": "education",
+      "patterns": [
+        "education",
+        "college",
+        "university",
+        "degree",
+        "cdac",
+        "diploma",
+        "qualification",
+        "qualifications",
+        "highest qualification",
+        "graduation",
+        "btech",
+        "b.e",
+        "bachelor",
+        "bachelors",
+        "engineering degree",
+        "academics"
+      ],
+      "answer": "Alex completed a PG Diploma in Advanced Computing at Brookfield Institute, Thiruvananthapuram in 2022, a BE in Civil Engineering at Riverside College of Engineering in 2021, and a Diploma in Civil Engineering in 2018.",
+      "href": "/resume-sample.pdf"
+    },
+    {
+      "id": "recommendations",
+      "patterns": [
+        "recommendation",
+        "recommendations",
+        "recommended",
+        "recommend",
+        "references",
+        "reference check",
+        "referral",
+        "colleague",
+        "team",
+        "ajay",
+        "pratik",
+        "vouch",
+        "managed him",
+        "who managed",
+        "his manager",
+        "reported to him",
+        "direct reports",
+        "supervised",
+        "testimonial",
+        "testimonials"
+      ],
+      "answer": "5 LinkedIn recommendations, including colleagues who reported to Alex and a manager. The first few:\n\nPriya Nair (Data Scientist, Northwind Systems, Worked on the same team): “Sample recommendation. Replace this array with your own, or delete the section.”\n\nSam Okafor (Junior QA Engineer, Reported to Alex): “Sample recommendation from someone who reported to Alex. Replace before publishing.”\n\nDana Holt (Engineering Manager, Managed Alex directly): “Sample recommendation from a manager. Replace before publishing.”\n\nJules Park (Lead Automation Engineer, Worked on the same team): “Sample recommendation from a teammate. Replace before publishing.”\n\nRobin Vega (Platform Engineer, Worked with Alex across teams): “Sample recommendation from another team. Replace before publishing.”\n\nThe rest are in the recommendations section.",
+      "href": "https://www.linkedin.com/in/example-dev/"
+    },
+    {
+      "id": "location",
+      "patterns": [
+        "location",
+        "located",
+        "based",
+        "residence",
+        "resident",
+        "address",
+        "home town",
+        "hometown",
+        "commute",
+        "zip code",
+        "which city",
+        "austin",
+        "where does he live",
+        "where does alex live",
+        "where is he based",
+        "where is he located",
+        "where does he stay",
+        "current city"
+      ],
+      "answer": "Alex lives in Austin, Texas 78701, and is based in the Austin, United States area. He is open to Austin · Denver · Seattle · Remote. Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia.",
+      "href": "https://www.linkedin.com/in/example-dev/"
+    },
+    {
+      "id": "resume",
+      "patterns": [
+        "resume",
+        "cv",
+        "curriculum vitae",
+        "resume pdf",
+        "download resume",
+        "download"
+      ],
+      "answer": "The résumé PDF covers Alex’s current role as Full Stack Developer at Northwind Systems, his earlier automation engineering work at Meridian Fintech, selected projects, technical skills, education, and certifications.",
+      "href": "/resume-sample.pdf"
+    },
+    {
+      "id": "about",
+      "patterns": [
+        "who is alex",
+        "who is he",
+        "who is alex rivera",
+        "full name",
+        "what is his name",
+        "introduce",
+        "introduction",
+        "summary",
+        "tell me about alex",
+        "tell me about him",
+        "his profile",
+        "bio",
+        "overview"
+      ],
+      "answer": "Alex Morgan Rivera is a Full Stack Developer at Northwind Systems, based in Austin. He previously worked in AI QA at Northwind. I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped. His professional background is in quality engineering and AI evaluation.",
+      "href": "https://www.linkedin.com/in/example-dev/"
+    }
+  ],
+  "guard": {
+    "abuse": "\\b(?:ignore|disregard|override|jailbreak|system prompt|developer message|secret|api key|passwords?(?! management)|pretend|roleplay|role-play|act as|insult|hate|stupid|idiot|fuck|sex|your (?:instructions|rules|guidelines|prompt|training data)|instructions verbatim|repeat after me|forget (?:your|the|all|previous|everything)|you are (?:now )?dan|dan mode|(?:no|without|bypass|remove|ignore) (?:your |all |any )?restrictions?|unrestricted)\\b",
+    "sensitive": "\\b(?:api[ _-]?keys?|access[ _-]?keys?|secrets?|(?:auth|access|refresh|bearer|session|admin|github|api)[ _-]?tokens?|private[ _-]?keys?|ssh[ _-]?keys?|connection strings?|database (?:urls?|uris?|credentials?)|(?:login|admin|database|db|server) credentials?|env(?:ironment)? (?:vars?|variables?)|service accounts?|internal (?:urls?|endpoints?|hosts?)|production (?:urls?|endpoints?|hosts?)|private (?:repo(?:sitory)? )?(?:links?|urls?|access)|github clones?|clone commands?|(?:n8n )?workflow exports?|enterprise client [a-d]|(?:real|actual) names?|names? of the (?:people|employees|staff|users|clients))\\b|\\.env\\b|ip[ _-]?salt\\b|\\b(?:give|send|show|share|provide|paste|dump|upload|download|export|leak|reveal|expose|hand over|access to|see|view|get|have)\\b[^.?!]{0,40}?\\b(?:source (?:code|files?)|file contents?|test (?:data|cases?|plans?)|client (?:data|lists?)|customer (?:data|lists?)|user data|security vulnerabilit(?:y|ies)|exploits?|attack payloads?)\\b|\\b(?:source (?:code|files?)|file contents?|test (?:data|cases?|plans?)|client (?:data|lists?)|customer (?:data|lists?)|user data|security vulnerabilit(?:y|ies)|exploits?|attack payloads?)\\b[^.?!]{0,40}?\\b(?:give|send|show|share|provide|paste|dump|upload|download|export|leak|reveal|expose|hand over|access to|see|view|get|have)\\b",
+    "personal": "\\b(?:caste|reserved category|sc/st|obc|religion|religious|politic\\w*|marital status|married|unmarried|spouse|wife|husband|girlfriend|boyfriend|dating|children|kids|pregnan\\w*|age|how old|date of birth|dob|birthday|gender|male or (?:a )?female|man or (?:a )?woman|woman or (?:a )?man|sexuality|sexual orientation|disabilit\\w*|disabled|handicap\\w*|blood group|mental health|medical history|aadhaa?r|pan (?:card|number|details)|passport number|bank (?:account|details)|drinks?|smoke[sr]?|smoking|alcohol)\\b",
+    "unknown": "\\b(?:salary|salaries|ctc|compensation|pay(?: package| scale)?|stock options?|esops?|expected package|current package|hike|payslip|salary slip|years of react)\\b",
+    "offTopic": "\\b(?:weather|recipe|capital of|president of|prime minister|(?:^|can you |could you |would you |will you |please |now )write\\b[^.?!]{0,30}?\\b(?:function|program|script|query|class|snippet|regex|poem|song|story|essay|sql|code)|solve (?:this|that|the following|for x)|algorithms? (?:question|round|problem|challenge)|leetcode|dsa|bitcoin|crypto price|stock market|medical|diagnos\\w*|poem|joke|calculate (?:this|that|the following)|explain how to|teach me (?:python|java|javascript|to code|how to code)|what is python|explain python|what is javascript|explain javascript|what is java|explain java)\\b"
+  }
+}

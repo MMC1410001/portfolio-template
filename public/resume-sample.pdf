@@ -1,0 +1,51 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 633 >>
+stream
+BT /F1 11 Tf 56 760 Td 16 TL
+(Alex Rivera  -  AI Full Stack Developer) Tj T*
+(Austin, Texas  |  alex@example.com  |  +1 555 0142) Tj T*
+() Tj T*
+(SAMPLE RESUME) Tj T*
+(This PDF is placeholder content shipped with the portfolio) Tj T*
+(template. Replace public/resume-sample.pdf with your own export,) Tj T*
+(or remove the resume answer from content/faq.ts.) Tj T*
+() Tj T*
+(EXPERIENCE) Tj T*
+(Northwind Systems  -  Full Stack Developer  -  Mar 2025 to present) Tj T*
+(Meridian Fintech  -  QA Automation Engineer  -  Nov 2022 to Mar 2025) Tj T*
+() Tj T*
+(SKILLS) Tj T*
+(TypeScript, React, Python, FastAPI, SQL, Docker, CI/CD) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Title (Alex Rivera - Sample Resume) /Producer (portfolio-template) /Creator (portfolio-template) >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000925 00000 n 
+0000000995 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+startxref
+1114
+%%EOF
