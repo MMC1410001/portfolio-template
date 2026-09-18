@@ -1,0 +1,96 @@
+# Nightly analytics retention sweep.
+#
+# Deletion in this repo is pull-based: there is nowhere to attach a Cloudflare
+# Cron Trigger, because vinext's worker entry exports only `fetch` and the
+# generated wrangler.json ships empty `triggers`. See lib/analytics/retention.ts.
+#
+# Without this workflow, pruning fires on an admin dashboard load or on roughly
+# 1 ingest request in 500 — which at portfolio traffic means a mean gap of over
+# a week, and never at all in a quiet month. Click coordinates and chatbot
+# question text are promised gone in 30 days on /privacy, so "eventually" is
+# not good enough.
+#
+# `retention-sweep` calls sweep() directly rather than sweepIfDue(), so it
+# ignores the once-a-day claim gate and always does the work.
+#
+# ── Setup ──────────────────────────────────────────────────────────────────
+#   Settings -> Secrets and variables -> Actions
+#     Secret   ADMIN_TOKEN   the same value the deployed site has (>= 32 chars)
+#     Variable SITE_URL      optional, only if the domain changes from the default
+#
+# ── Known limitation ───────────────────────────────────────────────────────
+# GitHub disables scheduled workflows in public repositories after ~60 days
+# with no commit activity, and emails first. If that happens, push anything or
+# re-enable the workflow; `workflow_dispatch` below runs it by hand meanwhile.
+name: Analytics retention
+
+on:
+  schedule:
+    # 20:30 UTC = 02:00 IST, matching the IST day boundary the reports bucket on.
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+# The sweep is idempotent, but `retention-sweep` bypasses the claim gate that
+# normally stops two isolates deleting 5,000 rows in parallel. Serialise here
+# so a manual run during a scheduled one cannot do that.
+concurrency:
+  group: analytics-retention
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Sweep expired analytics rows
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://portfolio-template.example.workers.dev' }}
+        run: |
+          set -euo pipefail
+
+          # Checked explicitly: an empty Bearer would get the same 404 as a
+          # wrong URL, and the log would send you looking in the wrong place.
+          if [ -z "${ADMIN_TOKEN}" ]; then
+            echo "::error::ADMIN_TOKEN secret is not set. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          # The admin API answers 404 for any unauthorised caller by design, so
+          # a 404 here means a bad token OR a bad URL — never "route missing".
+          http_status=$(curl -sS -o response.json -w '%{http_code}' \
+            --max-time 60 --retry 2 --retry-delay 15 --retry-connrefused \
+            -X POST "${SITE_URL}/api/admin/analytics" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d '{"action":"retention-sweep"}')
+
+          if [ "${http_status}" != "200" ]; then
+            echo "::error::Sweep failed with HTTP ${http_status}. A 404 means the ADMIN_TOKEN does not match the deployed site, or SITE_URL is wrong."
+            head -c 500 response.json || true
+            exit 1
+          fi
+
+          cat response.json
+
+          # Surfaced in the run summary so a month of sweeps is readable
+          # without opening logs — and so a stuck backlog is visible. `events`
+          # or `clickPoints` sitting at 5000 every night means the sweep is
+          # hitting MAX_DELETES_PER_SWEEP and the backlog is not draining.
+          {
+            echo '### Analytics retention sweep'
+            echo
+            echo '| Target | Rows changed |'
+            echo '| --- | --- |'
+            jq -r '"| Events (180d) | \(.events) |",
+                   "| Click points (30d) | \(.clickPoints) |",
+                   "| Question text (30d) | \(.questionText) |",
+                   "| Chat health (365d) | \(.chatHealth) |",
+                   "| Rate-limit windows | \(.budget) |"' response.json
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if [ "$(jq -r '.events' response.json)" = "5000" ]; then
+            echo "::warning::Events hit MAX_DELETES_PER_SWEEP (5000). There is a backlog draining at 5000 rows/day."
+          fi

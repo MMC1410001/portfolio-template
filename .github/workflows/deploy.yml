@@ -1,0 +1,105 @@
+# Deploy to Cloudflare Workers on push to main.
+#
+# This is the piece that removes the OpenAI dependency end to end: the repo
+# already built a Worker, but publishing it was OpenAI's pipeline. With this,
+# `git push` deploys.
+#
+# ── Setup ──────────────────────────────────────────────────────────────────
+#   Settings -> Secrets and variables -> Actions
+#     Secret  CLOUDFLARE_API_TOKEN   "Edit Cloudflare Workers" template at
+#                                    dash.cloudflare.com/profile/api-tokens
+#     Secret  CLOUDFLARE_ACCOUNT_ID  from `wrangler whoami`, or the dashboard URL
+#
+# Runtime secrets (ANALYTICS_IP_SALT, ADMIN_TOKEN) are NOT set here. They live
+# on the Worker via `wrangler secret put`, set once by hand. Passing them
+# through CI would mean a second copy of each in a second place, for no gain —
+# a deploy does not need to know them.
+#
+# ── Deliberately manual-gated on the first run ─────────────────────────────
+# `environment: production` means the first deploy waits for approval if you
+# add a required reviewer to that environment in repo settings. Worth doing
+# until you have seen one deploy succeed.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  # Superseded pushes are cancelled: two concurrent `wrangler deploy` runs
+  # would race to publish, and the winner is whichever finishes last rather
+  # than whichever is newer.
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the engines floor in README: `node --experimental-strip-types`
+          # is used by the unit tests and the demo seeder.
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # The gate that actually catches things. `npm run lint` is NOT run: it
+      # has a dozen pre-existing failures in generated shadcn output, so it
+      # cannot be a pass/fail check here. See CLAUDE.md.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Units only. test:chat and test:analytics replay against a live server,
+      # which CI has no reason to stand up for a deploy.
+      - name: Unit tests
+        run: npm run test:units
+
+      # Blocks the deploy if a link in content/portfolio.ts is broken for
+      # visitors — a Restricted Google Doc or a dead URL. Deliberately narrow
+      # about what counts as broken: hosts behind bot protection (Udemy,
+      # LinkedIn, Coursera) are shape-checked only, a no-response is a warning,
+      # and a 403 from Google warns rather than fails, because a shared CI
+      # runner IP is far likelier to be rate limited than a laptop.
+      #
+      # If external hosts ever do cause a false failure here, move this step
+      # into a scheduled workflow instead — link rot is a property of time, not
+      # of a deploy, so a daily check would serve nearly as well.
+      - name: Check external links
+        run: npm run check:links
+
+      # Fails on a placeholder database_id, a missing runtime secret, or
+      # TRUST_PLATFORM_AUTH_HEADER being set — see scripts/preflight-deploy.mjs
+      # for why each of those deploys "successfully" and then misbehaves.
+      - name: Preflight
+        run: npm run preflight
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Build
+        run: npm run build
+
+      # Migrations before the deploy, not after: the new Worker may read a
+      # column the old schema lacks, and every statement in migrations/ is
+      # `IF NOT EXISTS`, so applying them early is safe for the running one.
+      - name: Apply D1 migrations
+        run: npm run db:migrate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy
+        run: npx wrangler deploy --config dist/server/wrangler.json
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

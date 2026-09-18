@@ -1,0 +1,107 @@
+// Cloudflare Workers config — the deploy target that does not depend on
+// OpenAI Sites.
+//
+// ── Wrangler edits this file. Check `git diff` after running it. ───────────
+// Some `wrangler d1 …` subcommands rewrite this config. Addressing a database
+// by its *name* rather than its binding — `wrangler d1 info
+// portfolio-analytics` — makes wrangler helpfully append a binding for it.
+// That happened once already and added a second `d1_databases` entry,
+// `portfolio_analytics`, carrying `"remote": true`. It also reformats the file.
+//
+// The entry was removed, and it is worth knowing why it mattered rather than
+// being merely untidy. `"remote": true` points a binding at the **production**
+// database during local development, and `lib/analytics/db.ts` falls back to a
+// duck-typed scan of `env` when it cannot find `ANALYTICS_DB` by name — so a
+// stray remote handle sitting in `env` is one lookup away from `npm run dev`
+// writing real rows into production analytics.
+//
+// Prefer the binding name in wrangler commands (`ANALYTICS_DB`, not
+// `portfolio-analytics`), which is what the npm scripts already do.
+//
+// ── What this file replaced ────────────────────────────────────────────────
+// The bindings used to be declared inline in `vite.config.ts`, with the D1
+// binding *name* read from `.openai/hosting.json` and the database id left as
+// a placeholder that OpenAI's deploy pipeline substituted. That worked, and it
+// meant the repo could only be deployed by them. Bindings now live here, which
+// is where `@cloudflare/vite-plugin` and every `wrangler` subcommand look by
+// default — so `wrangler d1 migrations apply`, `wrangler dev` and
+// `wrangler deploy` all read the same declaration.
+//
+// `vite.config.ts` still honours `.openai/hosting.json` when that file is
+// present, so the existing Sites deployment keeps working during the
+// transition. Delete the file and the repo is pure Cloudflare.
+//
+// ── Remaining first-deploy steps ───────────────────────────────────────────
+// The database is created and migrated. What is left:
+//   1. npm run deploy                        (the Worker must exist first)
+//   2. wrangler secret put ANALYTICS_IP_SALT
+//      wrangler secret put ADMIN_TOKEN
+//   3. npm run deploy                        (now the preflight can check them)
+//
+// README.md has the full walkthrough. Analytics record nothing between steps 1
+// and 3 — that is expected, not a failure.
+//
+// ── Account id ─────────────────────────────────────────────────────────────
+// Deliberately not set here. `wrangler login` covers local use, and CI should
+// pass CLOUDFLARE_ACCOUNT_ID — an account id committed to a public repo is not
+// a secret, but it is one more thing to get stale.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "portfolio-template",
+
+  // Pinned, not floating. `@cloudflare/vite-plugin` otherwise derives this
+  // from the locally installed workerd, so two machines could build Workers
+  // with different runtime semantics from the same commit.
+  "compatibility_date": "2026-09-07",
+
+  // vinext's server needs it: `lib/analytics/*` reaches bindings through
+  // `cloudflare:workers`, and the RSC runtime uses Node built-ins.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The Worker entry. `@cloudflare/vite-plugin` rewrites this to the bundled
+  // `index.js` in `dist/server/` at build time.
+  "main": "vinext/server/fetch-handler",
+
+  "observability": { "enabled": true },
+
+  // Exactly ONE entry. See the note at the top of this file before adding a
+  // second, and never one with `"remote": true`.
+  "d1_databases": [
+    {
+      // Must stay `ANALYTICS_DB`: `lib/analytics/db.ts` looks the binding up
+      // by this name before falling back to a duck-typed scan of `env`.
+      "binding": "ANALYTICS_DB",
+      "database_name": "portfolio-analytics",
+
+      // From `wrangler d1 create portfolio-analytics`. Not a secret — a D1 id
+      // names a database, it does not grant access to one; reaching it still
+      // requires an authenticated account that owns it.
+      //
+      // Local `wrangler dev` and `vite dev` ignore this value entirely
+      // (Miniflare keys its SQLite file off the binding name), so a wrong one
+      // fails only at deploy time. `npm run deploy` checks it is not the
+      // placeholder for exactly that reason.
+      "database_id": "00000000-0000-4000-8000-000000000000",
+
+      // Relative to this file. The generated dist config points at
+      // `../../migrations`, which resolves to the same folder from
+      // `dist/server/`. ANALYTICS.md explains why `migrations/` and `drizzle/`
+      // both exist and why neither is authoritative.
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Static output from `npm run build`. Paths are rewritten by the plugin.
+  "assets": { "directory": "dist/client" },
+
+  // Left empty on purpose. Everything the app reads — ANALYTICS_IP_SALT,
+  // ADMIN_TOKEN, ADMIN_EMAILS, TRUST_PLATFORM_AUTH_HEADER — is either a secret
+  // (`wrangler secret put`) or environment-specific, and a committed value
+  // would be both wrong and, for the first two, a disclosure.
+  //
+  // TRUST_PLATFORM_AUTH_HEADER in particular must NOT be set here. It tells
+  // the admin gate to believe an `oai-authenticated-user-email` request
+  // header, which is only safe behind an ingress that strips inbound copies.
+  // Cloudflare does not. See lib/analytics/admin-auth.ts.
+  "vars": {}
+}

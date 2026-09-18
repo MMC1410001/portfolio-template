@@ -1,0 +1,59 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/.vinext/
+/out/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local environment
+.env*
+# What `wrangler dev` reads for local secrets — .env.local is for `vinext dev`
+# and wrangler never looks at it. Ignored here because the natural contents are
+# ANALYTICS_IP_SALT and ADMIN_TOKEN, and `.env*` above does not match this name.
+.dev.vars*
+
+# deployment and generated files
+.vercel
+next-env.d.ts
+/dist/
+/.wrangler/
+/outputs/
+/work/
+
+# Allow documented examples; never real credentials.
+!.env.example
+!backend/.env.example
+__pycache__/
+*.pyc
+.venv/
+*.tsbuildinfo
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# The source workbook for the /dashboards showcase, if you keep one. A real
+# one carries Apps Script deployment ids and Sheet ids; the showcase publishes
+# sanitised recreations, never the links themselves, and
+# tests/dashboards.test.ts fails if one ever reaches content/.
+/Dashboard collection links.xlsx
