@@ -154,6 +154,36 @@ Only publish information that is safe for a public portfolio. Do not add credent
 
 The default chatbot has no external dependency. It answers from the approved facts in `content/faq.ts` and does not need configuration.
 
+### NVIDIA NIM matching (no extra service)
+
+The Worker can ask a model which documented answer fits, with no Python
+service to host. Set one secret:
+
+```sh
+wrangler secret put NIM_API_KEY --name portfolio-template   # nvapi-... from build.nvidia.com
+```
+
+Locally, put `NIM_API_KEY` in `.env.local` and restart `npm run dev`.
+
+`NIM_MODEL` is optional and defaults to `openai/gpt-oss-20b`, which answers in
+about a second. Confirm any replacement against your own key first: most
+models on `integrate.api.nvidia.com` are either not enabled for a given
+account (an instant 404) or cold start past the 6s timeout.
+
+Two limits on what the model is allowed to do, both deliberate:
+
+- **It only sees questions no pattern matched.** A documented match is already
+  correct, and the patterns in `content/faq.ts` are tuned against the exact
+  questions in `tests/chat-cases.json`; a model overruling one can only
+  regress. Every guard runs before it, so a sensitive, abusive, personal or
+  off-topic question never leaves the Worker.
+- **It returns an answer id, never prose.** It is sent the approved answer ids
+  and their patterns as data, and the text served to the visitor is looked up
+  from `content/faq.ts` by the id it names. An id that is not in the set is
+  treated as no answer, and the visitor gets the built-in reply.
+
+Answers matched this way are labelled `AI · grounded in portfolio`.
+
 ### Optional FastAPI service
 
 Use this only if you want to run the Python service locally or deploy it separately.

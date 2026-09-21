@@ -24,6 +24,19 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Nothing here reaches the built Worker. No markdown is imported by the
+    # app, and assets/ is where source media is conventionally kept in this
+    # repo: committed as a backup rather than served. A push that touches
+    # only these does not need a deploy, and GitHub Actions minutes are
+    # metered on private repositories -- the deploy nobody asked for is the
+    # one that exhausts the allowance before the one you needed.
+    #
+    # A push that mixes ignored and non-ignored paths still runs.
+    paths-ignore:
+      - '**.md'
+      - 'assets/**'
+      - '.gitignore'
+      - '.env.example'
   workflow_dispatch:
 
 concurrency:
@@ -56,6 +69,11 @@ jobs:
       # The gate that actually catches things. `npm run lint` is NOT run: it
       # has a dozen pre-existing failures in generated shadcn output, so it
       # cannot be a pass/fail check here. See CLAUDE.md.
+      #
+      # `npm run check:links` used to run here too. It is now weekly, in
+      # .github/workflows/links.yml — link rot is a property of time, not of a
+      # deploy, and 25 network fetches per push is not what a metered Actions
+      # allowance should be spent on.
       - name: Typecheck
         run: npm run typecheck
 
@@ -63,19 +81,6 @@ jobs:
       # which CI has no reason to stand up for a deploy.
       - name: Unit tests
         run: npm run test:units
-
-      # Blocks the deploy if a link in content/portfolio.ts is broken for
-      # visitors — a Restricted Google Doc or a dead URL. Deliberately narrow
-      # about what counts as broken: hosts behind bot protection (Udemy,
-      # LinkedIn, Coursera) are shape-checked only, a no-response is a warning,
-      # and a 403 from Google warns rather than fails, because a shared CI
-      # runner IP is far likelier to be rate limited than a laptop.
-      #
-      # If external hosts ever do cause a false failure here, move this step
-      # into a scheduled workflow instead — link rot is a property of time, not
-      # of a deploy, so a daily check would serve nearly as well.
-      - name: Check external links
-        run: npm run check:links
 
       # Fails on a placeholder database_id, a missing runtime secret, or
       # TRUST_PLATFORM_AUTH_HEADER being set — see scripts/preflight-deploy.mjs
