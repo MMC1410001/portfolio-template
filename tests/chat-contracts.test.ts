@@ -124,3 +124,51 @@ test('the question limit is one number, shared by client and server', () => {
   assert.match(chat, /aria-invalid=\{tooLong/);
   assert.match(chat, /role="alert"/);
 });
+
+test('the chat panel is non-modal, and stays open while the page is used', () => {
+  // The point of the floating panel is that a visitor can scroll and click
+  // the page with it open. Three settings make that true and each one alone
+  // is not enough: modal={false} lifts the focus trap, scroll lock and
+  // pointer blocking; disablePointerDismissal stops a non-modal dialog
+  // closing on the first outside press, which would shut the panel the
+  // instant they clicked the thing they opened it to ask about; and the
+  // backdrop has to go, because modal={false} still renders one over a page
+  // the visitor is meant to keep reading.
+  const chat = read('components/portfolio/Chat.tsx');
+  assert.match(chat, /<Sheet open=\{open\} modal=\{false\} disablePointerDismissal/);
+  assert.match(chat, /<SheetContent showOverlay=\{false\}/);
+  const sheet = read('components/ui/sheet.tsx');
+  assert.match(sheet, /\{showOverlay && <SheetOverlay \/>\}/);
+});
+
+test('the transcript scrolls itself and not the page behind it', () => {
+  // scrollIntoView walks every scrollable ancestor including the document.
+  // That was invisible while the sheet was modal and the page was locked;
+  // non-modal it drags the page behind the panel on every reply.
+  const chat = read('components/portfolio/Chat.tsx');
+  // A call, not the word: the comment explaining this rule mentions it.
+  assert.ok(
+    !/\.scrollIntoView\(/.test(chat),
+    'use box.scrollTo / scrollTop so only the transcript moves',
+  );
+  assert.match(chat, /el\.scrollTo\(\{ *top:/);
+});
+
+test('opening the chat does not cancel the reveal countdown', () => {
+  // The bug: <Chat onOpen={() => setAutoplay(false)} />. That reads as
+  // "pause while they are busy" and is not — nothing ever sets autoplay back
+  // to true, so opening the chat within the first three seconds cancelled
+  // the theme change permanently. REVEAL_CONFIG's comment states the rule
+  // this broke: only a hidden tab pauses the clock.
+  const portfolio = read('components/portfolio/Portfolio.tsx');
+  // Non-greedy to the first `/>`, NOT a negated character class: the first
+  // version of this used [^/>]* and stopped dead at the `>` inside the
+  // arrow function `()=>`, so it never saw the call it exists to catch and
+  // passed with the bug reintroduced. Caught by mutation-testing it.
+  const chatEl = /<Chat\b[\s\S]*?\/>/.exec(portfolio);
+  assert.ok(chatEl, '<Chat> is not rendered by Portfolio.tsx');
+  assert.ok(
+    !chatEl[0].includes('setAutoplay'),
+    `opening the chat must not touch the reveal clock: ${chatEl[0]}`,
+  );
+});

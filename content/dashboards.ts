@@ -209,6 +209,20 @@ export const dashboards: Dashboard[] = [
     status: 'active',
   },
   {
+    id: 'uptime-monitoring',
+    name: 'Uptime and health monitoring',
+    short: 'Uptime monitoring',
+    tagline: 'Know it broke before the client does.',
+    metric: '44 monitors',
+    client: null,
+    purpose:
+      'An outage was discovered by whoever happened to open the application, which on a weekend meant the client found it first and the conversation started from behind. There was also no answer to "how often does this actually go down", so reliability was argued from memory.',
+    shows:
+      'Every monitored application as a group — its frontend, its API and the services behind it — with a heartbeat bar, 30-day uptime, current response time and certificate expiry; the check interval, retry count and failing-monitor recheck interval per monitor; and the log of state changes with the reason each one fired.',
+    stack: ['Uptime Kuma', 'Docker', 'HTTP / keyword / TCP checks', 'Google Chat webhook'],
+    status: 'active',
+  },
+  {
     id: 'okr-dashboard',
     name: 'Organisation OKR dashboard',
     short: 'OKR dashboard',
