@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test:chat": "node tests/chat.mjs",
     "test:analytics": "node tests/analytics.mjs",
-    "test:units": "node --experimental-strip-types --no-warnings --import ./tests/register-hooks.mjs --test tests/analytics.test.ts tests/dashboards.test.ts tests/awards.test.ts tests/faq.test.ts",
+    "test:units": "node --experimental-strip-types --no-warnings --import ./tests/register-hooks.mjs --test tests/analytics.test.ts tests/dashboards.test.ts tests/awards.test.ts tests/faq.test.ts tests/nim.test.ts",
     "test": "npm run test:units && npm run test:chat && npm run test:analytics",
     "seed:demo": "node --experimental-strip-types --no-warnings --import ./tests/register-hooks.mjs scripts/seed-analytics-demo.ts",
     "preflight": "node scripts/preflight-deploy.mjs",

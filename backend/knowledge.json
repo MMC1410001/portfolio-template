@@ -340,7 +340,7 @@
         "are you a script",
         "how are you built"
       ],
-      "answer": "This guide answers from Alex’s published portfolio content, and it is built so that the model never writes the prose. An approved answer set is computed first; a language model may only choose which answer id fits, and the text you get back is always looked up from that set. It degrades through three tiers (browser, then a Cloudflare Worker, then an optional FastAPI service) so it keeps answering with the server down. Both it and the analytics behind this site are Alex’s work.",
+      "answer": "This guide answers from Alex’s published portfolio content, and it is built so that the model never writes the prose. An approved answer set is computed first; a language model may only choose which answer id fits, and the text you get back is always looked up from that set. It degrades through three tiers so it keeps answering with the server down: the browser answers on its own if the Worker is unreachable, the Cloudflare Worker asks an NVIDIA NIM model which documented answer fits when no pattern matches, and an optional FastAPI service can do the same with Gemini. Both it and the analytics behind this site are Alex’s work.",
       "href": "/analytics"
     },
     {

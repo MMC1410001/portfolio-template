@@ -120,6 +120,15 @@ export default function PrivacyPage() {
           that happens the site keeps only the length of what you typed and the
           reason it was dropped.
         </p>
+        <p>
+          When no approved answer matches what you asked, and only then, the
+          question is sent to NVIDIA&rsquo;s hosted model service so a model can
+          say which of my documented answers fits. The model is sent the list of
+          answer names, never the answers themselves, and it can only return one
+          of those names: the reply you read is always my own text, looked up by
+          that name. Nothing else about you goes with the question, and a
+          question stopped by the screening above is never sent.
+        </p>
       </section>
 
       <section>

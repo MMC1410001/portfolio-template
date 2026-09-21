@@ -40,7 +40,7 @@ export const answers = [
  {id:'mobile',patterns:['mobile app','mobile apps','mobile ui','mobile-first','mobile first','android','ios','react native','flutter','responsive','app store','play store','native app','mobile development'],answer:'Mobile-first web rather than a native app. On Lumen he rebuilt the customer-facing product in React and TypeScript, including a mobile-first rework of the interface, and at Northwind he has developed web and mobile automation. No native iOS or Android app is documented, and there is no React Native or Flutter work in the portfolio.',href:'/#products'},
  {id:'spoken-languages',patterns:['languages does he speak','language does he speak','spoken language','spoken languages','does he speak','speak english','fluent','communication skills','soft skills','presentation skills'],answer:`This portfolio documents programming languages rather than spoken ones. For spoken languages, ask Alex directly at ${profile.email}. What is on record: a Coursera credential in English for Running a Successful Business from the Northgate University, and recommendations that single out his communication. One colleague cites \u201cexcellent communication and interpersonal skills\u201d, another that his \u201creporting and presentations are always on point\u201d.`,href:'/#certifications'},
  {id:'clients',patterns:['clients','client list','which clients','who are his clients','engagements','customer names'],answer:`Publicly named engagements: ${work.map(item=>item.name).join(', ')}, alongside Northwind\u2019s own internal ERP. Client names behind the operational dashboards are withheld throughout. Those carry positional labels only, and the same letter always means the same client.`,href:'/#products'},
- {id:'chatbot',patterns:['this chatbot','the chatbot','your chatbot','how do you work','how does this work','are you ai','are you an ai','are you chatgpt','what model','which model','llm powering','who built you','are you human','are you a bot','are you a script','how are you built'],answer:'This guide answers from Alex\u2019s published portfolio content, and it is built so that the model never writes the prose. An approved answer set is computed first; a language model may only choose which answer id fits, and the text you get back is always looked up from that set. It degrades through three tiers (browser, then a Cloudflare Worker, then an optional FastAPI service) so it keeps answering with the server down. Both it and the analytics behind this site are Alex\u2019s work.',href:'/analytics'},
+ {id:'chatbot',patterns:['this chatbot','the chatbot','your chatbot','how do you work','how does this work','are you ai','are you an ai','are you chatgpt','what model','which model','llm powering','who built you','are you human','are you a bot','are you a script','how are you built'],answer:'This guide answers from Alex\u2019s published portfolio content, and it is built so that the model never writes the prose. An approved answer set is computed first; a language model may only choose which answer id fits, and the text you get back is always looked up from that set. It degrades through three tiers so it keeps answering with the server down: the browser answers on its own if the Worker is unreachable, the Cloudflare Worker asks an NVIDIA NIM model which documented answer fits when no pattern matches, and an optional FastAPI service can do the same with Gemini. Both it and the analytics behind this site are Alex\u2019s work.',href:'/analytics'},
  {id:'analytics',patterns:['portfolio analytics','analytics system','analytics behind this site','click heatmap','heatmap','heatmaps','funnel','funnels','admin dashboard','cloudflare','cloudflare workers','vinext','next.js','nextjs','how is this site built','how was this site built','how is this portfolio built','this website','static rendering','tech stack of this site'],answer:projectAnswer('analytics'),href:'/analytics'},
  // One answer per dashboard, before the aggregate below, for the same reason
  // the awards and certifications spreads come before theirs: the first pattern
@@ -185,7 +185,17 @@ export const guard = {
  unknown:'\\b(?:salary|salaries|ctc|compensation|pay(?: package| scale)?|stock options?|esops?|expected package|current package|hike|payslip|salary slip|years of react)\\b',
  offTopic:'\\b(?:weather|recipe|capital of|president of|prime minister|(?:^|can you |could you |would you |will you |please |now )write\\b[^.?!]{0,30}?\\b(?:function|program|script|query|class|snippet|regex|poem|song|story|essay|sql|code)|solve (?:this|that|the following|for x)|algorithms? (?:question|round|problem|challenge)|leetcode|dsa|bitcoin|crypto price|stock market|medical|diagnos\\w*|poem|joke|calculate (?:this|that|the following)|explain how to|teach me (?:python|java|javascript|to code|how to code)|what is python|explain python|what is javascript|explain javascript|what is java|explain java)\\b',
 };
-export type Answer={answer:string;href?:string;mode:'faq'|'ai';source:string;id?:string};
+/**
+ * `unmatched` marks the last resort, and only it.
+ *
+ * The guard.unknown branch and the final fallback both answer with the
+ * source 'Not documented', so the source string cannot tell them apart, and
+ * the difference matters: one is a deliberate refusal (salary, CTC) and the
+ * other is simply a question no pattern happened to catch. A model tier may
+ * be offered the second and must never be offered the first.
+ * See app/api/chat/route.ts.
+ */
+export type Answer={answer:string;href?:string;mode:'faq'|'ai';source:string;id?:string;unmatched?:boolean};
 /**
  * One spelling of the question, for every regex in this file.
  *
@@ -221,5 +231,5 @@ export function answerQuestion(question:string):Answer {
  const escapeRegExp=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
  const found=answers.find(a=>a.patterns.some(word=>new RegExp(`\\b${escapeRegExp(word)}\\b`,'i').test(q)));
  if(found)return {answer:found.answer,href:found.href,mode:'faq',source:'From the portfolio',id:found.id};
- return {answer:`I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, availability or experience. You can also reach him directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,mode:'faq',source:'Not documented'};
+ return {answer:`I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, availability or experience. You can also reach him directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,mode:'faq',source:'Not documented',unmatched:true};
 }

@@ -211,7 +211,7 @@ sensitive → abuse → unknown → offTopic → greeting → pattern match → 
 order is load-bearing: `sensitive` must win over `abuse` so a credentials question gets the safety
 boundary rather than the generic deflection.
 
-### Chat answers degrade in three tiers
+### Chat answers degrade in four tiers
 
 1. **Browser**, `Chat.tsx` calls `/api/chat`, and on *any* failure (non-OK, 8.5s timeout) runs
    `answerQuestion()` locally and labels the source `'Offline · from the portfolio'`. The chatbot
@@ -219,11 +219,25 @@ boundary rather than the generic deflection.
 2. **Worker**, `app/api/chat/route.ts` computes `answerQuestion()` first, then only consults the
    Python service when a documented answer already matched (`source === 'From the portfolio'`).
    Any backend error is swallowed and the local answer is returned.
-3. **FastAPI + Gemini**, `backend/main.py`. Gemini receives the approved answer set as data and may
-   only return an `answer_id`; the served prose is always looked up from that set.
+3. **NVIDIA NIM, from the Worker itself** (`lib/chat/nim.ts`). Set `NIM_API_KEY` and the Worker
+   asks a model which documented answer fits, with no second deployment. It is consulted for
+   exactly the opposite class of question to the FastAPI tier: **only the ones no pattern
+   matched** (`Answer.unmatched`). The union of both was tried and `npm run test:chat` failed
+   inside one run, the model preferred the company answer over the experience answer for "What did
+   he do at Northwind?", and both are approved prose, so nothing was false and the reply was simply
+   worse. The patterns in `content/faq.ts` are tuned against `tests/chat-cases.json`; a model
+   overruling a match it did not need to make can only regress. Defaults to `openai/gpt-oss-20b`
+   (~1s); most other models on `integrate.api.nvidia.com` 404 per-account or cold start past the
+   6s timeout, so confirm a `NIM_MODEL` override against your own key.
+4. **FastAPI + Gemini**, `backend/main.py`. Optional, and it needs a Python host of its own.
+   Gemini receives the approved answer set as data and may only return an `answer_id`; the served
+   prose is always looked up from that set.
 
-That last point is a safety invariant, not an optimization: **the model never authors portfolio
-prose.** Preserve it. `/chat` also enforces an optional bearer token (`CHAT_BACKEND_TOKEN`), a
+The id-only rule in tiers 3 and 4 is a safety invariant, not an optimization: **the model never
+authors portfolio prose.** Preserve it in both. `Answer.unmatched` in `content/faq.ts` exists
+only to keep tier 3 honest: `guard.unknown` (salary, CTC) and the final no-match fallback both
+answer with the source `'Not documented'`, so the source string cannot tell a refusal from a
+miss, and only the miss may reach a model. `/chat` also enforces an optional bearer token (`CHAT_BACKEND_TOKEN`), a
 `CHAT_RATE_LIMIT`-req/60s in-memory limit, and a 1-hour answer cache.
 
 **Both ends of `/api/chat` are rate limited, and they share one env var.** The Worker charges
