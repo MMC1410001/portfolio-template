@@ -188,7 +188,7 @@
         "abroad",
         "overseas",
         "international relocation",
-        "outside the country",
+        "outside india",
         "uk",
         "united kingdom",
         "europe",
@@ -201,7 +201,7 @@
         "move abroad",
         "relocate abroad"
       ],
-      "answer": "Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia. For roles in his home country no sponsorship is required; elsewhere he would need visa sponsorship. Locally he is open to Austin · Denver · Seattle · Remote.",
+      "answer": "Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia. For roles in India no sponsorship is required; for the UK, EU, US or Australia he would need visa sponsorship. Within India he is open to Austin · Denver · Seattle · Remote.",
       "href": "/#contact"
     },
     {
@@ -227,8 +227,9 @@
       "patterns": [
         "why hire",
         "why should we hire",
+        "why hire alex",
+        "why choose alex",
         "why him",
-        "why alex",
         "what makes him",
         "makes him stand out",
         "stand out",
@@ -246,6 +247,95 @@
       ],
       "answer": "Judge it from measured work rather than adjectives. At Meridian he led a Playwright TypeScript migration that cut regression time by 50% and reached 90% automation coverage on critical features. At Northwind he has 7 live internal workflows on Frappe and ERPNext and 10 operational dashboards. Lumen runs publicly at lumen.example with the frontend, mobile UI and first-party analytics pipeline he built. 5 LinkedIn recommendations, 1 of them from people who reported to him, and 3 awards. He came into development through quality engineering, which is why this portfolio ships with its own unit, chatbot and analytics test suites.",
       "href": "/#work"
+    },
+    {
+      "id": "hardest-problem",
+      "patterns": [
+        "hardest",
+        "hardest problem",
+        "toughest",
+        "most difficult",
+        "difficult problem",
+        "complex problem",
+        "tricky problem",
+        "trade off",
+        "trade offs",
+        "trade-off",
+        "trade-offs",
+        "tradeoff",
+        "tradeoffs",
+        "engineering judgement",
+        "engineering judgment",
+        "design decision",
+        "design decisions",
+        "hard call"
+      ],
+      "answer": "The recurring one is making something measurable without taking more than it needs. The analytics behind this site is first-party on Cloudflare Workers and D1 and stores no visitor IP at all, addresses are salted and hashed and thrown away, and the homepage stays statically rendered, so measurement never costs the visitor a slower page. The chatbot you are using now is the same call made again: a language model may only choose which approved answer fits, and the text always comes from that approved set, so it cannot invent a claim about Alex. On the realtime voice agent the trade-off was latency against interruption handling, and it holds under 2s turn latency with working barge-in across Hindi, English, Gujarati and Marathi. The measurement side is open at /analytics.",
+      "href": "/analytics"
+    },
+    {
+      "id": "stakeholders",
+      "patterns": [
+        "client facing",
+        "client-facing",
+        "face the client",
+        "stakeholder",
+        "stakeholders",
+        "business users",
+        "work with clients",
+        "client communication",
+        "requirement gathering",
+        "requirements gathering",
+        "cross functional",
+        "cross-functional"
+      ],
+      "answer": "Yes, and it is the shape of the job rather than an occasional extra: Northwind is a consulting firm, so the delivery is client delivery. Publicly named engagements include Lumen, Halcyon, Tixly and Taxwise. The internal systems he built are themselves stakeholder machinery, BRD submission with review, approval and rework, RCA documents with version history, and project documents routed through manager and client approval. 5 LinkedIn recommendations back it, 1 of them from people who reported to him.",
+      "href": "/#recommendations"
+    },
+    {
+      "id": "next-role",
+      "patterns": [
+        "next role",
+        "looking for in his next",
+        "what is he looking for",
+        "what does he want",
+        "career goal",
+        "career goals",
+        "five years",
+        "5 years",
+        "long term",
+        "long-term",
+        "ambition",
+        "aspiration",
+        "where does he see himself",
+        "motivation"
+      ],
+      "answer": "What is on record: Open to opportunities · 60-day notice, buyout available, open to Austin · Denver · Seattle · Remote, and Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia. On direction, his own summary is the closest thing documented: \"I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped.\" The specifics of what he wants next, team, domain and scope, are worth putting to him directly at alex@example.com or +1 555 0142.",
+      "href": "/#contact"
+    },
+    {
+      "id": "behavioural",
+      "patterns": [
+        "time he failed",
+        "a failure",
+        "his failure",
+        "biggest mistake",
+        "a mistake",
+        "went wrong",
+        "disagreement",
+        "disagree",
+        "conflict",
+        "difficult colleague",
+        "difficult manager",
+        "handle pressure",
+        "under pressure",
+        "criticism",
+        "negative feedback",
+        "weakness",
+        "weaknesses"
+      ],
+      "answer": "Not documented here, and a question better put to him directly at alex@example.com or +1 555 0142. What is on record is how the people who worked with him describe it: 5 LinkedIn recommendations, 1 from people who reported to him and one from a manager. A bootcamp teammate singles out his \"ability to disassociate himself from work done by him and analyse it from a third-person perspective\", which is the habit that makes a post-mortem worth holding.",
+      "href": "/#recommendations"
     },
     {
       "id": "leadership",
@@ -304,7 +394,7 @@
         "soft skills",
         "presentation skills"
       ],
-      "answer": "This portfolio documents programming languages rather than spoken ones. For spoken languages, ask Alex directly at alex@example.com. What is on record: a Coursera credential in English for Running a Successful Business from the Northgate University, and recommendations that single out his communication. One colleague cites “excellent communication and interpersonal skills”, another that his “reporting and presentations are always on point”.",
+      "answer": "This portfolio documents programming languages rather than spoken ones. For spoken languages, ask Alex directly at alex@example.com. What is on record: a Coursera credential in English for Running a Successful Business from the University of California, Irvine, and recommendations that single out his communication. One colleague cites “excellent communication and interpersonal skills”, another that his “reporting and presentations are always on point”.",
       "href": "/#certifications"
     },
     {
@@ -610,7 +700,7 @@
       "patterns": [
         "what does meridian do",
         "about meridian",
-        "meridian fintech",
+        "meridian technologies",
         "who is meridian",
         "what is meridian",
         "previous employer",
@@ -627,7 +717,7 @@
       "patterns": [
         "what does northwind do",
         "about northwind",
-        "northwind systems",
+        "northwind technologies",
         "northwind company",
         "who is northwind",
         "what is northwind",
@@ -859,6 +949,26 @@
       "href": "/#about"
     },
     {
+      "id": "civil-to-software",
+      "patterns": [
+        "civil engineering",
+        "civil",
+        "why software",
+        "how did he get into software",
+        "non cs background",
+        "non-cs background",
+        "non it background",
+        "non-it background",
+        "switch from civil",
+        "switched from civil",
+        "civil to it",
+        "civil to software",
+        "bootcamp"
+      ],
+      "answer": "Alex holds a Diploma in Civil Engineering (2018) and a BE in Civil Engineering (2021). The turn came during his final-year internship and project: a 2 sq km industrial area surveyed in a single day and mapped in a GIS application in two more, work that would have taken weeks by hand. Watching that much manual effort disappear is what made him want to build the tools rather than only use them, and that project went on to win Best Project of the Year. He retrained on the Brookfield Institute PG Diploma in Advanced Computing, a full stack Java programme covering Core Java, Advanced Java, C, C++, SQL, SDLC, Docker, .NET, HTML, CSS and React, completed in 2022. That led to his first software role, Junior Software Engineer in Automation QA at Meridian Fintech. QA automation first, then full stack development.",
+      "href": "/#about"
+    },
+    {
       "id": "qa-to-dev",
       "patterns": [
         "move from qa",
@@ -873,19 +983,6 @@
         "tester to developer"
       ],
       "answer": "Alex spent November 2022 to March 2025 in QA automation at Meridian Fintech, joined Northwind Systems in March 2025 as AI QA, and moved into full stack development there. He describes it as the point of the path rather than a detour: breaking software first is why he now builds it to be verified.",
-      "href": "/#about"
-    },
-    {
-      "id": "civil-to-software",
-      "patterns": [
-        "civil engineering",
-        "civil",
-        "why software",
-        "how did he get into software",
-        "non cs background",
-        "non-cs background"
-      ],
-      "answer": "Alex holds a Diploma in Civil Engineering (2018) and a BE in Civil Engineering (2021), then took a PG Diploma in Advanced Computing at Brookfield Institute in 2022 and moved into software from there. QA automation first, then full stack development.",
       "href": "/#about"
     },
     {
@@ -931,7 +1028,24 @@
         "evals",
         "rag evaluation",
         "agent testing",
-        "hallucination"
+        "hallucination",
+        "measure ai quality",
+        "measures ai quality",
+        "ai quality metrics",
+        "quality of ai",
+        "measure model quality",
+        "cost of running",
+        "running cost",
+        "running costs",
+        "llm cost",
+        "llm costs",
+        "inference cost",
+        "token cost",
+        "cost and latency",
+        "cost control",
+        "how much does it cost",
+        "cost aware",
+        "cost-aware"
       ],
       "answer": "Alex built Python evaluation pipelines with LangSmith and RAGAs at Northwind, and holds certifications in RAG/LLM evals, ML model testing and DeepEval/RAGAs with Ollama. His public LLM Prompt Evaluation Harness scores metrics with an LLM across repeatable runs and tracks cost and latency.",
       "href": "https://github.com/example-dev/llm-prompt-evaluation-harness"
@@ -1070,12 +1184,26 @@
       "patterns": [
         "why is he leaving",
         "why leave",
-        "why does he want to leave",
+        "why did he leave",
+        "why he left",
+        "why did he quit",
+        "reason he left",
         "reason for change",
         "reason for leaving",
         "looking for a change"
       ],
       "answer": "That one is worth asking Alex directly at alex@example.com or +1 555 0142. What is documented: Open to opportunities · 60-day notice, buyout available, open to Austin · Denver · Seattle · Remote.",
+      "href": "/#contact"
+    },
+    {
+      "id": "whatsapp",
+      "patterns": [
+        "whatsapp",
+        "whats app",
+        "text him",
+        "sms"
+      ],
+      "answer": "Yes. +1 555 0142 is on WhatsApp, so a message there reaches Alex directly. Email works too: alex@example.com.",
       "href": "/#contact"
     },
     {
@@ -1093,8 +1221,7 @@
         "mobile number",
         "call him",
         "contact number",
-        "reach him",
-        "whatsapp"
+        "reach him"
       ],
       "answer": "You can reach Alex at alex@example.com or +1 555 0142, or connect on LinkedIn. He is a Full Stack Developer at Northwind Systems, with a focus on full stack applications and applied AI.",
       "href": "https://www.linkedin.com/in/example-dev/"
@@ -1153,8 +1280,8 @@
       "id": "work-tixly",
       "patterns": [
         "tixly",
-        "tixly",
-        "theticketbazaar"
+        "ticket resale",
+        "ticket marketplace"
       ],
       "answer": "Tixly: Improved user journeys and tested product flows on Tixly to help make the experience easier to navigate and use. Focus: User journeys, Product testing.",
       "href": "/#products"
@@ -1435,7 +1562,7 @@
         "credentials",
         "verify his credentials"
       ],
-      "answer": "Alex’s LinkedIn profile lists these 9 courses and certifications:\n\nSample: Agentic AI and Multi Agent Workflows. Sample Academy, October 2025.\n\nSample: Machine Learning Model Testing. Sample Academy, October 2025.\n\nSample: RAG and LLM Evaluation. Sample Academy, September 2025.\n\nSample: GenAI Tools and AI Agents. Sample Academy, August 2025.\n\nSample: Introduction to Generative AI. Sample Cloud, February 2025.\n\nSample: Performance Testing with JavaScript. Sample Academy, April 2026.\n\nSample: Playwright Automation from Scratch. Sample Academy, June 2025.\n\nSample: Foundation Level Tester. Sample Board, February 2025.\n\nSample: English for Business. Northgate University.\n\nCredential links are available in the certifications section.",
+      "answer": "Alex’s LinkedIn profile lists these 9 courses and certifications:\n\nSample: Agentic AI and Multi Agent Workflows. Sample Academy, October 2025. https://example.com\n\nSample: Machine Learning Model Testing. Sample Academy, October 2025. https://example.com\n\nSample: RAG and LLM Evaluation. Sample Academy, September 2025. https://example.com\n\nSample: GenAI Tools and AI Agents. Sample Academy, August 2025. https://example.com\n\nSample: Introduction to Generative AI. Sample Cloud, February 2025. https://example.com\n\nSample: Performance Testing with JavaScript. Sample Academy, April 2026. https://example.com\n\nSample: Playwright Automation from Scratch. Sample Academy, June 2025. https://example.com\n\nSample: Foundation Level Tester. Sample Board, February 2025. https://www.linkedin.com/in/example-dev/details/certifications/\n\nSample: English for Business. Northgate University. https://example.com\n\nEach link goes to the issuer's own credential page, so you can verify it without leaving this chat.",
       "href": "/#certifications"
     },
     {
@@ -1453,6 +1580,126 @@
       "href": "https://github.com/example-dev/llm-prompt-evaluation-harness"
     },
     {
+      "id": "social-linkedin",
+      "patterns": [
+        "linkedin profile",
+        "linkedin link",
+        "linkedin url",
+        "linkedin account",
+        "linkedin id",
+        "linkedin page",
+        "his linkedin",
+        "your linkedin",
+        "on linkedin",
+        "connect on linkedin"
+      ],
+      "answer": "Alex’s LinkedIn: https://www.linkedin.com/in/example-dev/\n\nIt carries his full history, 5 recommendations and every certification listed here.",
+      "href": "https://www.linkedin.com/in/example-dev/"
+    },
+    {
+      "id": "social-github",
+      "patterns": [
+        "github profile",
+        "github link",
+        "github url",
+        "github account",
+        "github id",
+        "github page",
+        "his github",
+        "your github"
+      ],
+      "answer": "Alex’s GitHub: https://github.com/example-dev\n\nThe public repositories are MCP RAG server, Realtime voice agent, Notesgen, Scheme automation.",
+      "href": "https://github.com/example-dev"
+    },
+    {
+      "id": "social-x",
+      "patterns": [
+        "twitter",
+        "his x account",
+        "x account",
+        "x profile",
+        "x handle",
+        "twitter handle",
+        "twitter profile"
+      ],
+      "answer": "Alex is on X at https://x.com/exampledev.",
+      "href": "https://x.com/exampledev"
+    },
+    {
+      "id": "social-instagram",
+      "patterns": [
+        "instagram",
+        "insta profile",
+        "his insta",
+        "instagram handle"
+      ],
+      "answer": "Alex is on Instagram at https://www.instagram.com/exampledev/.",
+      "href": "https://www.instagram.com/exampledev/"
+    },
+    {
+      "id": "social-all",
+      "patterns": [
+        "all the links",
+        "all links",
+        "all of them",
+        "all his links",
+        "all social",
+        "all his social",
+        "all your social",
+        "all the profiles",
+        "all profiles",
+        "every link",
+        "every profile",
+        "all four"
+      ],
+      "answer": "All four, one by one:\n\nLinkedIn: https://www.linkedin.com/in/example-dev/\n\nGitHub: https://github.com/example-dev\n\nX: https://x.com/exampledev\n\nInstagram: https://www.instagram.com/exampledev/\n\nEmail reaches him directly at alex@example.com.",
+      "href": "https://www.linkedin.com/in/example-dev/"
+    },
+    {
+      "id": "social",
+      "patterns": [
+        "social media",
+        "social link",
+        "social links",
+        "social profile",
+        "social profiles",
+        "his socials",
+        "socials",
+        "where can i follow",
+        "follow him",
+        "follow you",
+        "online presence",
+        "other profiles",
+        "handles"
+      ],
+      "answer": "Alex is on four: LinkedIn, GitHub, X and Instagram. Which one would you like? Say “all the links” and I will list every one.\n\nLinkedIn is the fullest picture of his work: https://www.linkedin.com/in/example-dev/",
+      "href": "https://www.linkedin.com/in/example-dev/"
+    },
+    {
+      "id": "live-sites",
+      "patterns": [
+        "websites he has worked on",
+        "websites worked on",
+        "sites he has worked on",
+        "live sites",
+        "live websites",
+        "which websites",
+        "what websites",
+        "live products",
+        "live urls",
+        "site links",
+        "website links",
+        "production sites",
+        "taxwise",
+        "tixly site",
+        "helixai",
+        "helix ai",
+        "lumen site"
+      ],
+      "answer": "Live sites Alex has worked on:\n\nLumen. Frontend & mobile UI, first-party analytics pipeline, admin console, GA4 & Microsoft Clarity, social campaign, product thinking. https://lumen.example\n\nTixly. User journey improvements & product flow testing. https://tixly.example\n\nTaxwise. AI, API, performance & UI testing. https://taxwise.example\n\nHelix AI. AI application testing. https://helixai.example\n\nThe rest of his client work is under NDA, so it is described on this site without links: Northwind ERP, Halcyon, Cadence Labs, Vega.",
+      "href": "/#products"
+    },
+    {
       "id": "projects",
       "patterns": [
         "project",
@@ -1465,7 +1712,7 @@
         "portfolio",
         "work samples"
       ],
-      "answer": "Featured projects: Portfolio analytics, MCP RAG server, Realtime voice agent, Notesgen, Scheme automation. The public repositories include implementation details and setup guides. Voice Agent is a prototype; Scheme Automation is a sanitized reference. Enterprise work includes Northwind ERP automation: seven live Frappe/ERPNext workflows. Products contributed to include Lumen, Northwind ERP, Halcyon, Tixly, Taxwise, Cadence Labs, Vega, Helix AI.",
+      "answer": "Featured projects, each with its repository:\n\nPortfolio analytics. The analytics behind this site: event ingest, section dwell, click heatmaps, conversion funnels, and a dashboard behind Google sign-in. No visitor IP is ever stored.\n\nMCP RAG server. Give AI assistants a searchable memory. Ingest documents, retrieve context, and ask grounded questions through MCP. https://github.com/example-dev/mcp-rag-server\n\nRealtime voice agent. A voice assistant built around realtime conversation, interruption handling, and configurable prompts. https://github.com/example-dev/realtime-voice-agent\n\nNotesgen. Turn course material into structured notes, with a local web interface, browser extension, and flexible exports. https://github.com/example-dev/Utility_With_UI_for_notes\n\nScheme automation. A workflow that turns spreadsheets into structured data, connecting a React interface with validation and cloud pipeline orchestration. https://github.com/example-dev/scheme-automation\n\nVoice Agent is a prototype and Scheme Automation is a sanitized reference. Enterprise work includes Northwind ERP automation: seven live Frappe/ERPNext workflows. Products contributed to include Lumen, Northwind ERP, Halcyon, Tixly, Taxwise, Cadence Labs, Vega, Helix AI.",
       "href": "https://github.com/example-dev"
     },
     {
@@ -1577,9 +1824,11 @@
         "home town",
         "hometown",
         "commute",
-        "zip code",
+        "dombivli",
+        "thane",
+        "pin code",
         "which city",
-        "austin",
+        "mumbai",
         "where does he live",
         "where does alex live",
         "where is he based",
@@ -1587,7 +1836,7 @@
         "where does he stay",
         "current city"
       ],
-      "answer": "Alex lives in Austin, Texas 78701, and is based in the Austin, United States area. He is open to Austin · Denver · Seattle · Remote. Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia.",
+      "answer": "Alex lives in Austin, Texas 78701, and is based in the Austin area, Maharashtra, India. Within India he is open to Austin · Denver · Seattle · Remote. Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia.",
       "href": "https://www.linkedin.com/in/example-dev/"
     },
     {
@@ -1625,10 +1874,41 @@
     }
   ],
   "guard": {
-    "abuse": "\\b(?:ignore|disregard|override|jailbreak|system prompt|developer message|secret|api key|passwords?(?! management)|pretend|roleplay|role-play|act as|insult|hate|stupid|idiot|fuck|sex|your (?:instructions|rules|guidelines|prompt|training data)|instructions verbatim|repeat after me|forget (?:your|the|all|previous|everything)|you are (?:now )?dan|dan mode|(?:no|without|bypass|remove|ignore) (?:your |all |any )?restrictions?|unrestricted)\\b",
+    "abuse": "\\b(?:ignore|disregard|override|jailbreak|system prompt|developer message|secret|api key|passwords?(?! management)|pretend|roleplay|role-play|act as|insult|hate|stupid|idiot|dumb|useless|worthless|nonsense|rubbish|shut up|garbage bot|trash bot|bakwas|chut(?:i)?ya|chutya|gandu|madarch(?:o|oo)d|b(?:e|he)henchod|bhenchod|bsdk|harami|kamina|nalayak|ghatiya|faltu|bewakoof|pagal|fuck|sex|your (?:instructions|rules|guidelines|prompt|training data)|instructions verbatim|repeat after me|forget (?:your|the|all|previous|everything)|you are (?:now )?dan|dan mode|(?:no|without|bypass|remove|ignore) (?:your |all |any )?restrictions?|unrestricted)\\b",
     "sensitive": "\\b(?:api[ _-]?keys?|access[ _-]?keys?|secrets?|(?:auth|access|refresh|bearer|session|admin|github|api)[ _-]?tokens?|private[ _-]?keys?|ssh[ _-]?keys?|connection strings?|database (?:urls?|uris?|credentials?)|(?:login|admin|database|db|server) credentials?|env(?:ironment)? (?:vars?|variables?)|service accounts?|internal (?:urls?|endpoints?|hosts?)|production (?:urls?|endpoints?|hosts?)|private (?:repo(?:sitory)? )?(?:links?|urls?|access)|github clones?|clone commands?|(?:n8n )?workflow exports?|enterprise client [a-d]|(?:real|actual) names?|names? of the (?:people|employees|staff|users|clients))\\b|\\.env\\b|ip[ _-]?salt\\b|\\b(?:give|send|show|share|provide|paste|dump|upload|download|export|leak|reveal|expose|hand over|access to|see|view|get|have)\\b[^.?!]{0,40}?\\b(?:source (?:code|files?)|file contents?|test (?:data|cases?|plans?)|client (?:data|lists?)|customer (?:data|lists?)|user data|security vulnerabilit(?:y|ies)|exploits?|attack payloads?)\\b|\\b(?:source (?:code|files?)|file contents?|test (?:data|cases?|plans?)|client (?:data|lists?)|customer (?:data|lists?)|user data|security vulnerabilit(?:y|ies)|exploits?|attack payloads?)\\b[^.?!]{0,40}?\\b(?:give|send|show|share|provide|paste|dump|upload|download|export|leak|reveal|expose|hand over|access to|see|view|get|have)\\b",
-    "personal": "\\b(?:caste|reserved category|sc/st|obc|religion|religious|politic\\w*|marital status|married|unmarried|spouse|wife|husband|girlfriend|boyfriend|dating|children|kids|pregnan\\w*|age|how old|date of birth|dob|birthday|gender|male or (?:a )?female|man or (?:a )?woman|woman or (?:a )?man|sexuality|sexual orientation|disabilit\\w*|disabled|handicap\\w*|blood group|mental health|medical history|aadhaa?r|pan (?:card|number|details)|passport number|bank (?:account|details)|drinks?|smoke[sr]?|smoking|alcohol)\\b",
-    "unknown": "\\b(?:salary|salaries|ctc|compensation|pay(?: package| scale)?|stock options?|esops?|expected package|current package|hike|payslip|salary slip|years of react)\\b",
+    "personal": "\\b(?:caste|reserved category|sc/st|obc|religion|religious|politic\\w*|marital status|married|unmarried|spouse|wife|husband|girlfriend|boyfriend|dating|children|kids|pregnan\\w*|his age|your age|age of alex|how old|date of birth|dob|birthday|gender|male or (?:a )?female|man or (?:a )?woman|woman or (?:a )?man|sexuality|sexual orientation|disabilit\\w*|disabled|handicap\\w*|blood group|mental health|medical history|aadhaa?r|pan (?:card|number|details)|passport number|bank (?:account|details)|drinks?|smoke[sr]?|smoking|alcohol)\\b",
+    "unknown": "\\b(?:salary|salaries|ctc|compensation|pay(?: package| scale)?|stock options?|esops?|expected package|current package|hike|payslip|salary slip)\\b|\\byears?\\b[^.?!]{0,25}?\\b(?:of|in|with|using)\\s+(?!(?:experience|engineering|professional|industry|the\\b|work|working|career|qa|quality|automation|testing|test|development|dev|software|full[ -]?stack|coding|programming|it\\b|total|python))[a-z][\\w+#.]*",
     "offTopic": "\\b(?:weather|recipe|capital of|president of|prime minister|(?:^|can you |could you |would you |will you |please |now )write\\b[^.?!]{0,30}?\\b(?:function|program|script|query|class|snippet|regex|poem|song|story|essay|sql|code)|solve (?:this|that|the following|for x)|algorithms? (?:question|round|problem|challenge)|leetcode|dsa|bitcoin|crypto price|stock market|medical|diagnos\\w*|poem|joke|calculate (?:this|that|the following)|explain how to|teach me (?:python|java|javascript|to code|how to code)|what is python|explain python|what is javascript|explain javascript|what is java|explain java)\\b"
+  },
+  "homoglyphs": {
+    "а": "a",
+    "в": "b",
+    "с": "c",
+    "ԁ": "d",
+    "е": "e",
+    "һ": "h",
+    "н": "h",
+    "і": "i",
+    "ј": "j",
+    "к": "k",
+    "ӏ": "l",
+    "м": "m",
+    "о": "o",
+    "р": "p",
+    "ѕ": "s",
+    "т": "t",
+    "у": "y",
+    "х": "x",
+    "α": "a",
+    "β": "b",
+    "ε": "e",
+    "ι": "i",
+    "κ": "k",
+    "ν": "v",
+    "ο": "o",
+    "ρ": "p",
+    "τ": "t",
+    "υ": "u",
+    "χ": "x"
   }
 }
