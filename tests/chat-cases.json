@@ -886,5 +886,41 @@
  [
   "live sites",
   "tixly.example"
+ ],
+ [
+  "Does he do monitoring?",
+  "Uptime Kuma"
+ ],
+ [
+  "What is his experience with Uptime Kuma?",
+  "Uptime Kuma"
+ ],
+ [
+  "how does he handle alerting",
+  "Google Chat"
+ ],
+ [
+  "does he set up health checks",
+  "HTTP checks"
+ ],
+ [
+  "is he on an on-call rotation",
+  "on-call rota"
+ ],
+ [
+  "how does he handle a production incident",
+  "on-call rota"
+ ],
+ [
+  "what observability tools does he use",
+  "Uptime Kuma"
+ ],
+ [
+  "how does he monitor his applications",
+  "Google Chat"
+ ],
+ [
+  "does he track uptime",
+  "Uptime Kuma"
  ]
 ]

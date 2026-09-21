@@ -36,6 +36,7 @@ import { PortfolioQualityBoard } from './PortfolioQualityBoard';
 import { QualityScorecard } from './QualityScorecard';
 import { ReleasePlanBoard } from './ReleasePlanBoard';
 import { ReleaseReadinessBoard } from './ReleaseReadinessBoard';
+import { UptimeBoard } from './UptimeBoard';
 
 const RECREATIONS: Record<string, () => React.ReactElement> = {
   'automation-portfolio': PortfolioBoard,
@@ -48,6 +49,7 @@ const RECREATIONS: Record<string, () => React.ReactElement> = {
   'learning-tracker': LearningTracker,
   'release-readiness': ReleaseReadinessBoard,
   'okr-dashboard': OkrBoard,
+  'uptime-monitoring': UptimeBoard,
 };
 
 export function DashboardDetail({ dashboard }: { dashboard: Dashboard }) {

@@ -41,14 +41,21 @@ function SheetContent({
   children,
   side = 'right',
   showCloseButton = true,
+  showOverlay = true,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: 'top' | 'right' | 'bottom' | 'left';
   showCloseButton?: boolean;
+  /**
+   * Off for a non-modal sheet. A `modal={false}` Dialog still renders this
+   * backdrop, which dims and blurs a page the visitor is meant to keep
+   * using. Chat.tsx is the caller that needs that.
+   */
+  showOverlay?: boolean;
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      {showOverlay && <SheetOverlay />}
       <SheetPrimitive.Popup
         data-slot="sheet-content"
         data-side={side}

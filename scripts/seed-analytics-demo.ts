@@ -210,7 +210,7 @@ const VIEWPORTS: Record<string, readonly [number, number][]> = {
  * private. A showcase should not model the shape of a leak.
  */
 const PLACES = [
-  [['Austin', 'Maharashtra', 'IN', 'Reliance Jio Infocomm'], 26],
+  [['Austin', 'Texas', 'US', 'Spectrum'], 26],
   [['Pune', 'Maharashtra', 'IN', 'Bharti Airtel'], 9],
   [['Bengaluru', 'Karnataka', 'IN', 'ACT Fibernet'], 11],
   [['Delhi', 'Delhi', 'IN', 'Bharti Airtel'], 7],

@@ -17,7 +17,7 @@
     "summary": "I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped.",
     "availability": "Open to opportunities · 60-day notice, buyout available",
     "openTo": "Austin · Denver · Seattle · Remote",
-    "relocation": "Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia"
+    "relocation": "Holds a valid passport; open to sponsored relocation to the UK, EU, Canada or Australia"
   },
   "answers": [
     {
@@ -188,7 +188,7 @@
         "abroad",
         "overseas",
         "international relocation",
-        "outside india",
+        "outside the us",
         "uk",
         "united kingdom",
         "europe",
@@ -201,7 +201,7 @@
         "move abroad",
         "relocate abroad"
       ],
-      "answer": "Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia. For roles in India no sponsorship is required; for the UK, EU, US or Australia he would need visa sponsorship. Within India he is open to Austin · Denver · Seattle · Remote.",
+      "answer": "Holds a valid passport; open to sponsored relocation to the UK, EU, Canada or Australia. For roles in the US no sponsorship is required; for the UK, EU or Australia he would need visa sponsorship. Within the US he is open to Austin · Denver · Seattle · Remote.",
       "href": "/#contact"
     },
     {
@@ -245,7 +245,7 @@
         "problem-solving",
         "solve complex"
       ],
-      "answer": "Judge it from measured work rather than adjectives. At Meridian he led a Playwright TypeScript migration that cut regression time by 50% and reached 90% automation coverage on critical features. At Northwind he has 7 live internal workflows on Frappe and ERPNext and 10 operational dashboards. Lumen runs publicly at lumen.example with the frontend, mobile UI and first-party analytics pipeline he built. 5 LinkedIn recommendations, 1 of them from people who reported to him, and 3 awards. He came into development through quality engineering, which is why this portfolio ships with its own unit, chatbot and analytics test suites.",
+      "answer": "Judge it from measured work rather than adjectives. At Meridian he led a Playwright TypeScript migration that cut regression time by 50% and reached 90% automation coverage on critical features. At Northwind he has 7 live internal workflows on Frappe and ERPNext and 11 operational dashboards. Lumen runs publicly at lumen.example with the frontend, mobile UI and first-party analytics pipeline he built. 5 LinkedIn recommendations, 1 of them from people who reported to him, and 3 awards. He came into development through quality engineering, which is why this portfolio ships with its own unit, chatbot and analytics test suites.",
       "href": "/#work"
     },
     {
@@ -310,7 +310,7 @@
         "where does he see himself",
         "motivation"
       ],
-      "answer": "What is on record: Open to opportunities · 60-day notice, buyout available, open to Austin · Denver · Seattle · Remote, and Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia. On direction, his own summary is the closest thing documented: \"I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped.\" The specifics of what he wants next, team, domain and scope, are worth putting to him directly at alex@example.com or +1 555 0142.",
+      "answer": "What is on record: Open to opportunities · 60-day notice, buyout available, open to Austin · Denver · Seattle · Remote, and Holds a valid passport; open to sponsored relocation to the UK, EU, Canada or Australia. On direction, his own summary is the closest thing documented: \"I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped.\" The specifics of what he wants next, team, domain and scope, are worth putting to him directly at alex@example.com or +1 555 0142.",
       "href": "/#contact"
     },
     {
@@ -542,6 +542,15 @@
       "href": "/dashboards/release-readiness"
     },
     {
+      "id": "dashboard-uptime-monitoring",
+      "patterns": [
+        "uptime monitoring",
+        "uptime and health monitoring"
+      ],
+      "answer": "Uptime and health monitoring. An outage was discovered by whoever happened to open the application, which on a weekend meant the client found it first and the conversation started from behind. There was also no answer to \"how often does this actually go down\", so reliability was argued from memory. What it shows: Every monitored application as a group — its frontend, its API and the services behind it — with a heartbeat bar, 30-day uptime, current response time and certificate expiry; the check interval, retry count and failing-monitor recheck interval per monitor; and the log of state changes with the reason each one fired. Built with Uptime Kuma, Docker, HTTP / keyword / TCP checks, Google Chat webhook. Audience: internal; scale: 44 monitors; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "href": "/dashboards/uptime-monitoring"
+    },
+    {
       "id": "dashboard-okr-dashboard",
       "patterns": [
         "okr dashboard",
@@ -579,7 +588,7 @@
         "go no go",
         "release readiness"
       ],
-      "answer": "10 operational dashboards built at Northwind, so that delivery status, quality, effort and objectives stopped living in spreadsheets and chat threads: Delivery board, Action plan, Release plan, Quality scorecard, Effort report, Quality (all clients), Defect board, Learning tracker, Release readiness, OKR dashboard. Nine are Google Apps Script web apps over Google Sheets behind Workspace sign-in; the OKR dashboard is a page inside the Frappe and ERPNext ERP. Between them they cover pipeline counts by stage, a month of deliverables beside the delivery lifecycle and sprint ceremonies the plan assumes, estimate against actual on every task, weighted quality scores, defect intelligence that states a release position, a go / conditional-go / no-go verdict with the rule that produced it, effort logged against approved and invoiced, capability ratings, and organisation-wide OKRs. Each one is rebuilt at /dashboards on invented data.",
+      "answer": "11 operational dashboards built at Northwind, so that delivery status, quality, effort and objectives stopped living in spreadsheets and chat threads: Delivery board, Action plan, Release plan, Quality scorecard, Effort report, Quality (all clients), Defect board, Learning tracker, Release readiness, Uptime monitoring, OKR dashboard. Nine are Google Apps Script web apps over Google Sheets behind Workspace sign-in; the OKR dashboard is a page inside the Frappe and ERPNext ERP. Between them they cover pipeline counts by stage, a month of deliverables beside the delivery lifecycle and sprint ceremonies the plan assumes, estimate against actual on every task, weighted quality scores, defect intelligence that states a release position, a go / conditional-go / no-go verdict with the rule that produced it, effort logged against approved and invoiced, capability ratings, and organisation-wide OKRs. Each one is rebuilt at /dashboards on invented data.",
       "href": "/dashboards"
     },
     {
@@ -653,7 +662,7 @@
         "webpack",
         "orm"
       ],
-      "answer": "Not in his documented stack. What is: interface: HTML / CSS, JavaScript, TypeScript, React; backend: Python, FastAPI, Java, SQL / PostgreSQL, Frappe / ERPNext; intelligence: MCP / RAG, AI agents, LangSmith, RAGAs / DeepEval; delivery: Git / GitHub, Docker, AWS EC2, CI/CD. This portfolio states what he has actually used rather than what he could pick up, so something absent here is genuinely absent rather than modestly omitted.",
+      "answer": "Not in his documented stack. What is: interface: HTML / CSS, JavaScript, TypeScript, React; backend: Python, FastAPI, Java, SQL / PostgreSQL, Frappe / ERPNext; intelligence: MCP / RAG, AI agents, LangSmith, RAGAs / DeepEval; delivery: Git / GitHub, Docker, AWS EC2, CI/CD, Uptime Kuma. This portfolio states what he has actually used rather than what he could pick up, so something absent here is genuinely absent rather than modestly omitted.",
       "href": "/#skills"
     },
     {
@@ -1302,6 +1311,31 @@
       "answer": "AI quality and evaluation: Learning and prototype work around RAG evaluation, agent testing, LLM tracing, and AI assisted test automation. It demonstrates an evaluation focused approach without sharing prompts, datasets, model settings, or internal test results."
     },
     {
+      "id": "uptime-monitoring",
+      "patterns": [
+        "uptime kuma",
+        "uptime monitoring",
+        "uptime",
+        "health check",
+        "health checks",
+        "health monitoring",
+        "monitoring",
+        "monitor",
+        "observability",
+        "downtime",
+        "alerting",
+        "alerts",
+        "incident alerting",
+        "status page",
+        "sla",
+        "availability",
+        "synthetic monitoring",
+        "google chat alerts",
+        "gchat alerts"
+      ],
+      "answer": "Uptime and health monitoring: Set up and runs Uptime Kuma as the monitoring layer across the applications he works on, covering both halves of each one: HTTP checks on frontends and API endpoints, and TCP and port checks on the services behind them, grouped per application so a parent monitor reports the whole stack. Failures raise a Google Chat notification through an incoming webhook, with retry counts and a shorter recheck interval on a failing monitor so a single slow response does not page anyone and a real outage is confirmed within minutes. Certificate expiry and response-time trends are tracked on the same dashboard. The portfolio shares the setup and the reasoning, not the monitored hosts, their names, or their availability data."
+    },
+    {
       "id": "automation-performance",
       "patterns": [
         "k6 performance",
@@ -1344,7 +1378,6 @@
       "id": "onefinance",
       "patterns": [
         "nimbus finance",
-        "1 finance",
         "product visibility portal",
         "organisation visibility"
       ],
@@ -1759,7 +1792,7 @@
         "html",
         "css"
       ],
-      "answer": "Alex works with interface: HTML / CSS, JavaScript, TypeScript, React; backend: Python, FastAPI, Java, SQL / PostgreSQL, Frappe / ERPNext; intelligence: MCP / RAG, AI agents, LangSmith, RAGAs / DeepEval; delivery: Git / GitHub, Docker, AWS EC2, CI/CD.",
+      "answer": "Alex works with interface: HTML / CSS, JavaScript, TypeScript, React; backend: Python, FastAPI, Java, SQL / PostgreSQL, Frappe / ERPNext; intelligence: MCP / RAG, AI agents, LangSmith, RAGAs / DeepEval; delivery: Git / GitHub, Docker, AWS EC2, CI/CD, Uptime Kuma.",
       "href": "https://github.com/example-dev"
     },
     {
@@ -1769,7 +1802,7 @@
         "college",
         "university",
         "degree",
-        "cdac",
+        "brookfield",
         "diploma",
         "qualification",
         "qualifications",
@@ -1782,7 +1815,7 @@
         "engineering degree",
         "academics"
       ],
-      "answer": "Alex completed a PG Diploma in Advanced Computing at Brookfield Institute, Thiruvananthapuram in 2022, a BE in Civil Engineering at Riverside College of Engineering in 2021, and a Diploma in Civil Engineering in 2018.",
+      "answer": "Alex completed a PG Diploma in Advanced Computing at Brookfield Institute, Denver in 2022, a BE in Civil Engineering at Riverside College of Engineering in 2021, and a Diploma in Civil Engineering in 2018.",
       "href": "/resume-sample.pdf"
     },
     {
@@ -1824,11 +1857,10 @@
         "home town",
         "hometown",
         "commute",
-        "dombivli",
-        "thane",
+        "austin",
+        "texas",
         "pin code",
         "which city",
-        "mumbai",
         "where does he live",
         "where does alex live",
         "where is he based",
@@ -1836,7 +1868,7 @@
         "where does he stay",
         "current city"
       ],
-      "answer": "Alex lives in Austin, Texas 78701, and is based in the Austin area, Maharashtra, India. Within India he is open to Austin · Denver · Seattle · Remote. Holds a valid passport; open to sponsored relocation to the UK, EU, US or Australia.",
+      "answer": "Alex lives in Austin, Texas 78701, and is based in the greater Austin area. He is open to Austin · Denver · Seattle · Remote. Holds a valid passport; open to sponsored relocation to the UK, EU, Canada or Australia.",
       "href": "https://www.linkedin.com/in/example-dev/"
     },
     {
