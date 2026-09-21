@@ -171,7 +171,7 @@ export const work: WorkItem[] = [
   {id:'halcyon-dealer-apis',name:'Dealer APIs',aliases:['dealer api','dealer apis','halcyon dealer api','halcyon dealer apis'],description:'Services behind the dealer-facing sales workflows. Alex covered them with performance and security review and validated the data they returned.'},
   {id:'halcyon-tsm-ai',name:'Field AI',aliases:['field ai','halcyon tsm','tsm'],description:'An internal AI tool supporting the field sales team. Alex evaluated its responses and data quality and reported performance and security issues.'},
  ]},
- {id:'tixly',name:'Tixly',category:'Ticket resale marketplace',group:'quality',role:'User journey improvements & product flow testing',href:'https://tixly.example',aliases:['tixly','tixly','theticketbazaar'],description:'Improved user journeys and tested product flows on Tixly to help make the experience easier to navigate and use.',stack:['User journeys','Product testing']},
+ {id:'tixly',name:'Tixly',category:'Ticket resale marketplace',group:'quality',role:'User journey improvements & product flow testing',href:'https://tixly.example',aliases:['tixly','ticket resale','ticket marketplace'],description:'Improved user journeys and tested product flows on Tixly to help make the experience easier to navigate and use.',stack:['User journeys','Product testing']},
  {id:'taxwise',name:'Taxwise',category:'AI tax filing',group:'quality',role:'AI, API, performance & UI testing',href:'https://taxwise.example'},
  {id:'cadencelabs',name:'Cadence Labs',category:'Meeting intelligence',group:'quality',role:'Voice, transcription & summarization testing',href:null},
  {id:'vega',name:'Vega',category:'Enterprise AI assistant',group:'quality',role:'AI agent & chatbot evaluation',href:null},

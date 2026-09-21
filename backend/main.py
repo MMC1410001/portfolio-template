@@ -51,7 +51,15 @@ def _normalise(question: str) -> str:
     folded = ''.join(c for c in decomposed if not unicodedata.combining(c))
     for curly in ('\u2018', '\u2019', '\u201b'):
         folded = folded.replace(curly, "'")
-    return folded.strip().lower()
+    lowered = folded.lower()
+    # Cyrillic and Greek letters drawn identically to ASCII ones. NFKD leaves
+    # them alone, correctly, so the guards never saw them. The table is the
+    # one in content/faq.ts, carried here by scripts/sync-knowledge.mjs, and
+    # is applied AFTER lowercasing so it only has to hold the lowercase forms.
+    homoglyphs = DATA.get('homoglyphs') or {}
+    if homoglyphs:
+        lowered = ''.join(homoglyphs.get(c, c) for c in lowered)
+    return lowered.strip()
 
 def faq(question: str) -> dict:
     q = _normalise(question)

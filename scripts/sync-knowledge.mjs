@@ -15,5 +15,5 @@ const faqSource=(await readFile(new URL('../content/faq.ts',import.meta.url),'ut
  .replace("from './dashboards'",`from '${dashboardsUrl}'`);
 const faqJs=ts.transpileModule(faqSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const faq=await import(`data:text/javascript;base64,${Buffer.from(faqJs).toString('base64')}`);
-await writeFile(new URL('../backend/knowledge.json',import.meta.url),JSON.stringify({profile:data.profile,answers:faq.answers,guard:faq.guard},null,2)+'\n');
+await writeFile(new URL('../backend/knowledge.json',import.meta.url),JSON.stringify({profile:data.profile,answers:faq.answers,guard:faq.guard,homoglyphs:faq.HOMOGLYPHS},null,2)+'\n');
 console.log('Synchronized Python knowledge from shared portfolio content.');

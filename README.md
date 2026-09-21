@@ -156,14 +156,73 @@ The default chatbot has no external dependency. It answers from the approved fac
 
 ### NVIDIA NIM matching (no extra service)
 
-The Worker can ask a model which documented answer fits, with no Python
-service to host. Set one secret:
+The Worker can write a reply grounded in the documented answers, with no
+Python service to host. It needs one secret, and the key is free.
 
-```sh
-wrangler secret put NIM_API_KEY --name portfolio-template   # nvapi-... from build.nvidia.com
+#### Getting a key from NVIDIA, step by step
+
+1. Go to **https://build.nvidia.com** and click **Login** (top right). Sign
+   up with any email, or use Google/GitHub. A personal account is enough;
+   you do not need an NVIDIA Enterprise or NGC subscription.
+2. Verify your email if prompted, then sign back in.
+3. Open any model page, for example
+   **https://build.nvidia.com/openai/gpt-oss-20b**. That is the model this
+   project uses by default.
+4. On the right of the model page click **Get API Key** (some layouts show
+   **Build with this NIM** first, then **Get API Key**).
+5. Click **Generate Key**. A key appears beginning `nvapi-`.
+6. **Copy it now.** NVIDIA shows the full key exactly once. If you lose it,
+   generate another and delete the old one.
+
+New accounts get a free allowance of credits, which is far more than a
+personal portfolio uses: this site's own traffic is a few dozen questions a
+month, and only the ones no documented answer matches reach the model at
+all. There is no card required to start, and nothing here will bill you
+without you adding one.
+
+Keys are visible at **https://build.nvidia.com** under your account menu →
+**API Keys**, where you can also revoke one.
+
+#### Putting the key where the app reads it
+
+Locally, add it to `.env.local` in the project root (this file is
+gitignored and must never be committed):
+
+```env
+NIM_API_KEY=nvapi-your-key-here
 ```
 
-Locally, put `NIM_API_KEY` in `.env.local` and restart `npm run dev`.
+Then restart `npm run dev` — environment files are read at startup, so a
+running server will not pick it up.
+
+For the deployed Worker, set it as a secret rather than a variable, so it is
+encrypted and never printed back:
+
+```sh
+wrangler secret put NIM_API_KEY --name portfolio-template
+# paste the nvapi-... key when prompted, then press Enter
+```
+
+Confirm it took effect:
+
+```sh
+wrangler secret list --name portfolio-template     # NIM_API_KEY should be listed
+npm run check:model                        # calls the model directly and reports
+```
+
+`npm run check:model` is the quickest way to tell whether the key works: it
+sends a handful of real questions, prints how many the model answered and
+how long each took, and says plainly if the key is missing. Without a key
+everything still works — the chatbot answers from the documented set and
+`npm run test:chat` passes either way, which is exactly why a broken key can
+go unnoticed.
+
+#### If you ever paste a key somewhere public
+
+Treat it as compromised and rotate it: generate a new key on
+build.nvidia.com, delete the old one there, update `.env.local`, and re-run
+`wrangler secret put NIM_API_KEY --name portfolio-template`. A key in a chat log, a
+screenshot or a commit is a key someone else has.
 
 `NIM_MODEL` is optional and defaults to `openai/gpt-oss-20b`, which answers in
 about a second. Confirm any replacement against your own key first: most

@@ -583,11 +583,25 @@ export async function chatStats(
         WHERE event = 'chat_ask' AND ${prop('rejected')} IS NOT NULL
         GROUP BY 1 ORDER BY sessions DESC`),
 
-    q(`${WITH_EV}, asks AS (
-         SELECT ${prop('q')} AS question FROM ev
-          WHERE event = 'chat_ask' AND ${prop('q')} IS NOT NULL)
-       SELECT question, COUNT(*) AS asks, 0 AS matched
-         FROM asks GROUP BY question ORDER BY asks DESC LIMIT 25`),
+    // `matched` was the literal 0 for two years, so every row on the panel
+    // read "0 matched" including questions that plainly matched, and the one
+    // number you would use to decide what content to write next was a
+    // constant. It is the same session+turn join the unmatched list below
+    // uses; a question counts as matched when its own answer came from the
+    // approved set rather than from a guard or the not-documented fallback.
+    q(`${WITH_EV}, pairs AS (
+         SELECT ${prop('q')} AS question,
+                (SELECT ${prop('source')} FROM ev b
+                  WHERE b.session_id = a.session_id
+                    AND b.event = 'chat_answer'
+                    AND ${prop('turn')} = json_extract(a.props, '$.turn')
+                  LIMIT 1) AS source
+           FROM ev a
+          WHERE a.event = 'chat_ask' AND ${prop('q')} IS NOT NULL)
+       SELECT question, COUNT(*) AS asks,
+              SUM(CASE WHEN source IN ('From the portfolio', 'AI · grounded in portfolio')
+                       THEN 1 ELSE 0 END) AS matched
+         FROM pairs GROUP BY question ORDER BY asks DESC LIMIT 25`),
 
     // The actionable list: every row is a question content/faq.ts does not
     // answer. Joined on session+turn so an ask is paired with its own answer.
