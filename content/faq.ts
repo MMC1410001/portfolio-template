@@ -95,8 +95,8 @@ export const answers = [
  {id:'leaving',patterns:['why is he leaving','why leave','why does he want to leave','reason for change','reason for leaving','looking for a change'],answer:`That one is worth asking Alex directly at ${profile.email} or ${profile.phone}. What is documented: ${profile.availability}, open to ${profile.openTo}.`,href:'/#contact'},
  {id:'contact',patterns:['contact','contact details','contact him','how to contact','email','email address','get in touch','phone','phone number','mobile number','call him','contact number','reach him','whatsapp'],answer:`You can reach Alex at ${profile.email} or ${profile.phone}, or connect on LinkedIn. He is a ${experience[0].role} at ${experience[0].company}, with a focus on full stack applications and applied AI.`,href:profile.linkedin},
  // Sub-products BEFORE their parent, because the first pattern match wins:
- // 'halcyon' and 'halcyon' belong to the parent, so a question about the Opus
- // Chatbot would otherwise be answered with the engagement summary instead.
+ // 'halcyon' belongs to the parent, so a question about the Halcyon Assistant
+ // would otherwise be answered with the engagement summary instead.
  ...work.flatMap(product=>(product.items??[]).map(item=>({id:item.id,patterns:item.aliases,answer:`${item.name}, part of Alex's work on ${product.name}: ${item.description}`,href:'/#products'}))),
  // A product answers for itself only if it carries both aliases and prose.
  ...work.flatMap(product=>product.aliases&&product.description?[{id:`work-${product.id}`,patterns:product.aliases,answer:`${product.name}: ${product.description}${product.items?` Products covered: ${product.items.map(item=>item.name).join(', ')}.`:''}${product.stack?` Focus: ${product.stack.join(', ')}.`:''}`,href:'/#products'}]:[]),
