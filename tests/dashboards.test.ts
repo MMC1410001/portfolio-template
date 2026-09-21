@@ -150,22 +150,28 @@ test('no internal URL reaches the published content', () => {
 });
 
 test('no real client is named', () => {
-  // The clients behind these dashboards, including the two that content/
-  // portfolio.ts names in #work. The showcase is anonymous for all of them.
+  // ── Put your own clients' names in this list before you publish ─────────
+  //
+  // The dashboards in content/dashboards-demo.ts are recreations: the shape
+  // of the work is real, the names and the numbers are not. This test is what
+  // stops a client's name reaching a public page through a label, a tooltip
+  // or a series title somebody forgot to change — the kind of thing that
+  // ships green, because nothing about it looks like a bug.
+  //
+  // It is seeded with the invented brands this template ships with, so it is
+  // armed from the first clone rather than being a reminder you have to
+  // remember to act on. Add your real ones; there is no reason to remove
+  // these.
   for (const needle of [
     'Halcyon',
-    'Opus',
-    'Ethal',
     'Tixly',
-    'TheTicketBazaar',
-    'Tixly',
-    'Aditya',
-    'Skant',
-    'Manasa',
-    'Fortune Commodities',
-    'Studio Paper',
-    '1 Finance',
-    'ABG',
+    'Lumen',
+    'Apex',
+    'Meridian',
+    'Northwind',
+    'Taxwise',
+    'Brookfield',
+    'Riverside',
   ]) {
     assert.ok(
       !corpus.includes(needle),
