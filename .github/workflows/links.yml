@@ -1,59 +1,83 @@
-# Weekly external link check, split out of the deploy.
+# ============================================================================
+# DISABLED on 2026-09-23. This workflow no longer runs automatically.
 #
-# ── Why this is not a deploy step any more ────────────────────────────────
-# It used to run inside .github/workflows/deploy.yml, and the comment there
-# already said what was wrong with that: link rot is a property of *time*, not
-# of a deploy. A link that worked this morning does not break because you
-# pushed a CSS change, and a link that broke last Tuesday stays broken however
-# long you avoid deploying.
+# The original is preserved verbatim below, commented out. To restore it:
+#   1. delete everything above the '--- original workflow ---' marker
+#   2. uncomment the block below (strip the leading '# ' from each line)
+#   3. re-enable the workflow in the repo's Actions tab (it is also
+#      disabled server-side via the Actions API)
 #
-# The cost matters. Actions minutes are metered on a private repository, and
-# once the included allowance is gone GitHub refuses to start any job at all
-# -- the failure is a 4-second run with no runner assigned, which looks
-# nothing like a billing problem until you read the annotation. So the
-# cheapest run is the one that does not happen. Twenty-five network fetches on
-# every push buy nothing a weekly run does not.
-#
-# ── Why there is no `npm ci` ──────────────────────────────────────────────
-# There is nothing to install. `scripts/check-links.mjs` imports no packages,
-# `content/portfolio.ts` imports nothing at all, and the TypeScript is handled
-# by `node --experimental-strip-types` with the local resolver hook in
-# `tests/ts-hooks.mjs`. Verified by running `npm run check:links` in a fresh
-# `git worktree` with no `node_modules`: 15 ok, 17 unverifiable by design, 0
-# failed. That takes the run from roughly a minute to a few seconds.
-#
-# If the checker ever grows a dependency it will fail here with a bare
-# ERR_MODULE_NOT_FOUND. Add `- run: npm ci` above the check and accept the
-# minute back.
-name: External links
-
+# The stub below exists only to keep the file valid YAML. A file that is
+# commented out entirely is reported by GitHub as an invalid workflow,
+# which itself shows up as a failed run.
+# ============================================================================
+name: "External links (disabled)"
 on:
-  schedule:
-    # Mondays, 03:00 UTC. Deliberately nowhere near the 20:30 UTC retention
-    # sweep, so two failures in a morning are two problems and not one.
-    - cron: '0 3 * * 1'
   workflow_dispatch:
-
-concurrency:
-  group: external-links
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
 jobs:
-  check:
+  disabled:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - run: "echo 'this workflow is disabled'"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      # Host-aware on purpose: hosts behind bot protection are shape-checked
-      # and reported as unverifiable rather than failed. See the header of
-      # scripts/check-links.mjs for the measurements behind that.
-      - name: Check external links
-        run: npm run check:links
+# --- original workflow ---
+# # Weekly external link check, split out of the deploy.
+# #
+# # ── Why this is not a deploy step any more ────────────────────────────────
+# # It used to run inside .github/workflows/deploy.yml, and the comment there
+# # already said what was wrong with that: link rot is a property of *time*, not
+# # of a deploy. A link that worked this morning does not break because you
+# # pushed a CSS change, and a link that broke last Tuesday stays broken however
+# # long you avoid deploying.
+# #
+# # The cost matters. Actions minutes are metered on a private repository, and
+# # once the included allowance is gone GitHub refuses to start any job at all
+# # -- the failure is a 4-second run with no runner assigned, which looks
+# # nothing like a billing problem until you read the annotation. So the
+# # cheapest run is the one that does not happen. Twenty-five network fetches on
+# # every push buy nothing a weekly run does not.
+# #
+# # ── Why there is no `npm ci` ──────────────────────────────────────────────
+# # There is nothing to install. `scripts/check-links.mjs` imports no packages,
+# # `content/portfolio.ts` imports nothing at all, and the TypeScript is handled
+# # by `node --experimental-strip-types` with the local resolver hook in
+# # `tests/ts-hooks.mjs`. Verified by running `npm run check:links` in a fresh
+# # `git worktree` with no `node_modules`: 15 ok, 17 unverifiable by design, 0
+# # failed. That takes the run from roughly a minute to a few seconds.
+# #
+# # If the checker ever grows a dependency it will fail here with a bare
+# # ERR_MODULE_NOT_FOUND. Add `- run: npm ci` above the check and accept the
+# # minute back.
+# name: External links
+#
+# on:
+#   schedule:
+#     # Mondays, 03:00 UTC. Deliberately nowhere near the 20:30 UTC retention
+#     # sweep, so two failures in a morning are two problems and not one.
+#     - cron: '0 3 * * 1'
+#   workflow_dispatch:
+#
+# concurrency:
+#   group: external-links
+#   cancel-in-progress: true
+#
+# permissions:
+#   contents: read
+#
+# jobs:
+#   check:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 10
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: '22'
+#
+#       # Host-aware on purpose: hosts behind bot protection are shape-checked
+#       # and reported as unverifiable rather than failed. See the header of
+#       # scripts/check-links.mjs for the measurements behind that.
+#       - name: Check external links
+#         run: npm run check:links
