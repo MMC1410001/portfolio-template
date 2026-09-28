@@ -144,6 +144,8 @@ export const skills = [
  {name:'Delivery',items:['Git / GitHub','Docker','AWS EC2','CI/CD','Uptime Kuma']},
 ];
 export const certificationSource = `${profile.linkedin}details/certifications/`;
+/** Where the recommendations section links, the same way awards and certifications do. */
+export const recommendationSource = `${profile.linkedin}details/recommendations/`;
 export const certifications = [
  {id:'agentic-ai',name:'Sample: Agentic AI and Multi Agent Workflows',issuer:'Sample Academy',issued:'October 2025',category:'Applied AI',href:'https://example.com',notesHref:'https://example.com',aliases:['agentic ai course','agentic ai certification','multi agent automation']},
  {id:'ml-testing',name:'Sample: Machine Learning Model Testing',issuer:'Sample Academy',issued:'October 2025',category:'Applied AI',href:'https://example.com',notesHref:'https://example.com',aliases:['machine learning models testing','ml testing certificate']},
