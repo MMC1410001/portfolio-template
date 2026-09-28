@@ -34,7 +34,8 @@
  * fetched here: db.ts imports `cloudflare:workers`, and this file is
  * unit-tested in a bare Node process against scripts/d1-sqlite.ts.
  */
-import { readCookie } from './admin-auth';
+import { authorizeAdmin, readCookie } from './admin-auth';
+import { clientIp, matchesAnyCidr, parseCidrList } from './net';
 import { signWith, verifyWith } from '@/lib/chat/turn-sig';
 import { DAILY_QUESTIONS, QUOTA_HEADERS, QUOTA_WINDOW_MS, type Quota } from '@/lib/chat/quota';
 
@@ -116,9 +117,40 @@ export interface QuotaVerdict {
   quota: Quota | null;
   /** Set on the response when this request minted the browser id. */
   setCookie: string | null;
+  /** No allowance applies: see chatExemption(). */
+  unlimited?: boolean;
 }
 
 const OPEN: QuotaVerdict = { allowed: true, refusedBy: null, quota: null, setCookie: null };
+export const UNLIMITED_VERDICT: QuotaVerdict = { ...OPEN, unlimited: true };
+
+/**
+ * Who is not held to any chat limit, per-minute or daily: the owner testing
+ * the site.
+ *
+ *   network  the caller's address is inside CHAT_UNLIMITED_CIDRS, a secret
+ *            rather than a var so the owner's address is not in the repo.
+ *            Read from cf-connecting-ip, which Cloudflare sets and a client
+ *            cannot. Everyone behind that address is exempt too, which is
+ *            the point of listing an office or a home connection.
+ *   admin    the request passes authorizeAdmin(): a live pa_admin session
+ *            (the cookie is Path=/, so it reaches this route) for an address
+ *            that ADMIN_EMAILS still lists, or the admin bearer token. The
+ *            allowlist is re-read per request, so removing an address ends
+ *            the exemption at once.
+ *
+ * Any failure here is "not exempt", never "exempt".
+ */
+export async function chatExemption(request: Request): Promise<'network' | 'admin' | null> {
+  try {
+    const { ip } = clientIp(request);
+    if (ip && matchesAnyCidr(ip, parseCidrList(process.env.CHAT_UNLIMITED_CIDRS))) return 'network';
+    if (await authorizeAdmin(request)) return 'admin';
+  } catch (error) {
+    console.error('[chat] exemption check failed', error);
+  }
+  return null;
+}
 
 /**
  * Charge one question to the caller's browser, then to its network.
@@ -164,6 +196,7 @@ export function applyQuota(response: Response, verdict: QuotaVerdict): Response 
     response.headers.set(QUOTA_HEADERS.remaining, String(verdict.quota.remaining));
     response.headers.set(QUOTA_HEADERS.reset, String(verdict.quota.resetAt));
   }
+  if (verdict.unlimited) response.headers.set(QUOTA_HEADERS.unlimited, '1');
   if (verdict.setCookie) response.headers.append('Set-Cookie', verdict.setCookie);
   return response;
 }

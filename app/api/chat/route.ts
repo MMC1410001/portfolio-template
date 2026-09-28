@@ -1,7 +1,7 @@
 import { answerQuestion } from '@/content/faq';
 import { recordChatHealth } from '@/lib/analytics/chat-health';
 import { chargeChatRequest } from '@/lib/analytics/chat-limit';
-import { applyQuota, chargeChatQuota } from '@/lib/analytics/chat-quota';
+import { applyQuota, chargeChatQuota, chatExemption, UNLIMITED_VERDICT } from '@/lib/analytics/chat-quota';
 import { ensureSchema, getDb } from '@/lib/analytics/db';
 import { DAILY_LIMIT_CODE } from '@/lib/chat/quota';
 import { modelEligible as isModelEligible, screenHistory } from '@/lib/chat/gate';
@@ -53,8 +53,11 @@ export async function POST(request:Request) {
  // Charged BEFORE answerQuestion and before any D1 write, the same order
  // /api/track uses. Chat.tsx answers locally on any non-OK response, so a
  // refused caller still gets the portfolio answer, labelled "Offline".
+ // The owner testing the site (an admin session, or CHAT_UNLIMITED_CIDRS) is
+ // held to neither limit below. Still charged, so the backend gets a bucket.
+ const exempt=await chatExemption(request);
  const client=await chargeChatRequest(request);
- if(!client.allowed)return Response.json({error:'Too many questions just now. Try again in a minute.'},{status:429,headers:{'Retry-After':'60','Cache-Control':'private, no-store'}});
+ if(!client.allowed&&!exempt)return Response.json({error:'Too many questions just now. Try again in a minute.'},{status:429,headers:{'Retry-After':'60','Cache-Control':'private, no-store'}});
  // The daily allowance: 50 questions per browser in 24 hours, with a looser
  // per-network ceiling behind it (lib/analytics/chat-quota.ts). Charged after
  // the per-minute check, so a burst refused for speed is not also counted as
@@ -63,7 +66,7 @@ export async function POST(request:Request) {
  // refusal says which counter refused and when it resets, and the panel
  // closes the input rather than answering offline.
  const db=getDb();
- const allowance=await chargeChatQuota(request,client.bucket,db&&await ensureSchema(db)?db:null);
+ const allowance=exempt?UNLIMITED_VERDICT:await chargeChatQuota(request,client.bucket,db&&await ensureSchema(db)?db:null);
  const answered=(response:Response)=>applyQuota(response,allowance);
  if(!allowance.allowed)return answered(Response.json({error:allowance.refusedBy==='network'?'This network has reached today\u2019s question limit.':'You have reached today\u2019s question limit.',code:DAILY_LIMIT_CODE,refusedBy:allowance.refusedBy,limit:allowance.quota?.limit,resetAt:allowance.quota?.resetAt},{status:429,headers:{'Retry-After':String(Math.max(60,Math.ceil(((allowance.quota?.resetAt??0)-Date.now())/1000))),'Cache-Control':'private, no-store'}}));
  const fallback=answerQuestion(body.message);

@@ -27,7 +27,12 @@ export const QUOTA_HEADERS = {
   limit: 'X-Chat-Limit',
   remaining: 'X-Chat-Remaining',
   reset: 'X-Chat-Reset',
+  /** Present, as `1`, when no allowance applies to this caller (an admin, or a trusted network). */
+  unlimited: 'X-Chat-Unlimited',
 } as const;
+
+/** What the panel stores instead of an allowance when none applies. */
+export const UNLIMITED = 'unlimited';
 
 /** The 429 body's `code` when the allowance, not the per-minute rate, refused. */
 export const DAILY_LIMIT_CODE = 'daily_limit';

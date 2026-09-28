@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { openDemoDatabase } from '../scripts/d1-sqlite';
 import { SCHEMA_STATEMENTS } from '../lib/analytics/schema';
-import { applyQuota, chargeChatQuota, chargeQuota, mintBrowserId, readBrowserId, QUOTA_COOKIE } from '../lib/analytics/chat-quota';
+import { applyQuota, chargeChatQuota, chargeQuota, chatExemption, mintBrowserId, readBrowserId, QUOTA_COOKIE, UNLIMITED_VERDICT } from '../lib/analytics/chat-quota';
 import { DAILY_QUESTIONS, QUOTA_WINDOW_MS, parseQuota, quotaExpired, readQuota, serialiseQuota } from '../lib/chat/quota';
 
 const SECRET = 'q'.repeat(64);
@@ -145,4 +145,31 @@ test('every answer the route returns carries the allowance', () => {
   assert.match(chat, /refusal\?\.code===DAILY_LIMIT_CODE/);
   assert.match(chat, /You can ask up to/);
   assert.match(chat, /left today/);
+});
+
+test('the owner is exempt by network or by admin session; nobody else is', async () => {
+  const from = (ip: string, headers: Record<string, string> = {}) =>
+    new Request('https://x.test/api/chat', { method: 'POST', headers: { 'cf-connecting-ip': ip, ...headers } });
+  const token = 't'.repeat(40);
+  await withEnv({ CHAT_UNLIMITED_CIDRS: '203.0.113.7/32, 2001:db8:1:2::/64', ADMIN_TOKEN: token, ADMIN_EMAILS: undefined }, async () => {
+    assert.equal(await chatExemption(from('203.0.113.7')), 'network');
+    assert.equal(await chatExemption(from('2001:db8:1:2:abcd::9')), 'network');
+    assert.equal(await chatExemption(from('203.0.113.8')), null);
+    assert.equal(await chatExemption(from('198.51.100.1', { authorization: `Bearer ${token}` })), 'admin');
+    assert.equal(await chatExemption(from('198.51.100.1', { authorization: `Bearer ${'x'.repeat(40)}` })), null);
+    // A forged admin cookie is not an admin.
+    assert.equal(await chatExemption(from('198.51.100.1', { cookie: 'pa_admin=9999999999999.forged' })), null);
+  });
+  await withEnv({ CHAT_UNLIMITED_CIDRS: undefined, ADMIN_TOKEN: undefined }, async () => {
+    assert.equal(await chatExemption(from('203.0.113.7')), null);
+  });
+  const res = applyQuota(new Response('x'), UNLIMITED_VERDICT);
+  assert.equal(res.headers.get('X-Chat-Unlimited'), '1');
+  assert.equal(res.headers.get('X-Chat-Limit'), null);
+});
+
+test('the route skips both limits for an exempt caller, and only for one', () => {
+  const route = readFileSync(new URL('../app/api/chat/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /if\(!client\.allowed&&!exempt\)return/);
+  assert.match(route, /const allowance=exempt\?UNLIMITED_VERDICT:await chargeChatQuota\(/);
 });
