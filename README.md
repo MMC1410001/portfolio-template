@@ -42,11 +42,16 @@ Read `CLAUDE.md` for the architecture and `ANALYTICS.md` before touching
 - A résumé view and a scroll-driven turntable reveal
 - Responsive animations with reduced-motion support
 - A factual chatbot that works without an API key or paid subscription
+- Optional NVIDIA NIM replies, written only from the approved answers
+- A daily chat allowance of 50 questions per browser, with the owner exempt
 - An optional FastAPI service that can use Gemini to match questions to approved portfolio answers
 - One shared content source for the site and chatbot knowledge
 - A private analytics dashboard at `/admin`, written from scratch, no Google Analytics, no Tag
   Manager, no third-party tracking script of any kind
 - A `/privacy` page that states what is measured, for how long, and lets a visitor switch it off
+- A public `/analytics` showcase of that dashboard on synthetic data, and `/analytics/design-notes`,
+  the design notes (`ANALYTICS.md`) rendered as a page
+- `/dashboards`, recreations of delivery dashboards, one lazily loaded chunk per board
 
 ## Run the website in under five minutes
 
@@ -83,10 +88,10 @@ That is enough to use the full website and its factual chat guide. After the fol
 
 1. Read the résumé view first.
 2. Press **Experience mode**, or stay on the page for three seconds (a hidden tab pauses the clock), to reveal the interactive view.
-3. Move through the 3D system with the buttons, scrolling, and supported mouse or touch actions.
-4. Open the chat button to ask about Alex's projects, skills, certifications, course notes, and experience.
+3. Scroll to turn the figure. The turntable moves only with the scroll, so there is nothing to pause or configure.
+4. Open the chat button to ask about Alex's projects, skills, certifications, course notes, and experience. Each browser can ask 50 questions a day, and the panel warns when 5 are left.
 
-The 3D view adapts to the device. Visitors can choose a lighter view or a 2D fallback, and the portfolio respects reduced-motion preferences.
+With reduced motion turned on, the view does not open by itself after three seconds, the reveal animation is skipped when **Experience mode** is pressed, and the turntable shows a single still frame.
 
 ## Technical architecture
 
@@ -96,6 +101,8 @@ flowchart LR
     R --> C[Shared portfolio content]
     R --> Q[Chat API route]
     Q --> F[Approved FAQ answers]
+    Q -. optional .-> N[NVIDIA NIM]
+    N --> Q
     Q -. optional .-> P[FastAPI service]
     F --> Q
     P --> Q
@@ -108,7 +115,7 @@ flowchart LR
 
 The browser renders the React portfolio. The page content lives in TypeScript files so the website and chatbot use the same facts. At build time, the knowledge script creates the Python knowledge file from that shared content.
 
-The chat route returns an immediate approved answer by default. It keeps the portfolio useful even if an optional Python service or AI provider is unavailable. If FastAPI and Gemini are configured, Gemini only selects from existing approved answers. It does not write new claims about Alex or expose private work.
+The chat route returns an immediate approved answer by default. It keeps the portfolio useful even if an optional Python service or AI provider is unavailable. With `NIM_API_KEY` set, the Worker can also have NVIDIA's model write a reply, but only from a shortlist of approved answers (see [Chatbot setup](#chatbot-setup)). If FastAPI and Gemini are configured, Gemini only selects from existing approved answers. It does not write new claims about Alex or expose private work.
 
 ## Technology choices
 
@@ -119,21 +126,28 @@ The chat route returns an immediate approved answer by default. It keeps the por
 | Interactive view | GSAP ScrollTrigger over 60 AVIF frames | A scroll-driven photo turntable, lazy-loaded only when the view opens |
 | Chat | API route and approved FAQ content, optional NVIDIA NIM | Curated answers first; with `NIM_API_KEY` set, the Worker composes follow-ups from a shortlist of approved answers only |
 | Optional AI matching | Python, FastAPI, Gemini | Matches questions to approved answers without generating new portfolio claims |
-| Hosting | Sites and Cloudflare Worker build | Packages the frontend and API route for the configured site |
+| Hosting | Cloudflare Workers and D1 (OpenAI Sites optional) | Serves the site and API routes; D1 stores analytics and the chat allowances |
 
 ## Project folders
 
 | Folder or file | Purpose |
 | --- | --- |
-| `app/` | The page and chat API route |
-| `components/portfolio/` | The résumé view, chat UI, 3D experience, and interactions |
+| `app/` | Routes: the homepage, `/admin`, `/analytics`, `/dashboards`, `/privacy`, `robots.txt`, `sitemap.xml`, and the `/api/*` handlers |
+| `components/portfolio/` | The résumé view, chat UI, turntable view, and interactions |
+| `components/admin/`, `components/showcase/`, `components/dashboards/` | The analytics dashboard, its public showcase, and the dashboard recreations |
+| `components/ui/` | Generated shadcn components (`@base-ui/react`) |
+| `lib/chat/` | Chat guards, reply signatures, the daily allowance, and the NVIDIA NIM client |
+| `lib/analytics/` | Event ingest, dashboard queries, admin sign-in, trusted networks, and the chat limits |
+| `hooks/` | React hooks shared across the site |
 | `content/portfolio.ts` | Profile, projects, experience, certifications, recommendations, and learning links |
 | `content/faq.ts` | Chatbot answers and safety rules |
 | `scripts/sync-knowledge.mjs` | Copies approved content into Python's knowledge file |
 | `backend/` | Optional FastAPI chatbot service |
-| `public/` | Public images and résumé files |
-| `tests/` | Chatbot and FastAPI checks |
-| `.openai/hosting.json` | Existing Sites hosting connection |
+| `public/` | Public images, turntable frames, and résumé files |
+| `migrations/` | The D1 schema, one file per version, generated by `npm run emit:migration` |
+| `tests/` | Unit and route-handler tests, live chat and analytics replays, and FastAPI checks |
+| `wrangler.jsonc` | The Worker name, D1 binding, and compatibility settings (the source of truth for deploys) |
+| `.openai/hosting.json` | Optional OpenAI Sites target; delete it to make the repo Cloudflare-only |
 
 ## Update portfolio content
 
@@ -176,8 +190,8 @@ Python service to host. It needs one secret, and the key is free.
 
 New accounts get a free allowance of credits, which is far more than a
 personal portfolio uses: this site's own traffic is a few dozen questions a
-month, and only the ones no documented answer matches reach the model at
-all. There is no card required to start, and nothing here will bill you
+month, most of them are answered from the documented set without reaching
+the model, and a site-wide daily cap bounds the rest. There is no card required to start, and nothing here will bill you
 without you adding one.
 
 Keys are visible at **https://build.nvidia.com** under your account menu →
@@ -229,19 +243,50 @@ answers in one to three seconds with its thinking turned off. Confirm any replac
 models on `integrate.api.nvidia.com` are either not enabled for a given
 account (an instant 404) or cold start past the 6s timeout.
 
-Two limits on what the model is allowed to do, both deliberate:
+What the model is allowed to do is deliberately narrow:
 
-- **It only sees questions no pattern matched.** A documented match is already
-  correct, and the patterns in `content/faq.ts` are tuned against the exact
-  questions in `tests/chat-cases.json`; a model overruling one can only
-  regress. Every guard runs before it, so a sensitive, abusive, personal or
-  off-topic question never leaves the Worker.
-- **It returns an answer id, never prose.** It is sent the approved answer ids
-  and their patterns as data, and the text served to the visitor is looked up
-  from `content/faq.ts` by the id it names. An id that is not in the set is
-  treated as no answer, and the visitor gets the built-in reply.
+- **Guards run first.** A sensitive, abusive, personal or off-topic question
+  never leaves the Worker, and neither does an earlier refused question in the
+  same conversation.
+- **Two kinds of question reach it:** one that no pattern matched, and a
+  matched question asked as a follow-up in a conversation. A first question
+  that matched gets the curated answer, because the patterns in
+  `content/faq.ts` are tuned against `tests/chat-cases.json` and a model
+  overruling one can only regress.
+- **It writes prose, but only from a shortlist of approved answers** it is
+  handed, and it is told to use nothing else. A reply that invents a link, or
+  one that declines to answer, is rejected, and the visitor gets the curated
+  answer instead.
+- **Questions in other languages:** one that matched a pattern is sent as a
+  translation job only (the curated answer and the language name, never the
+  visitor's text). One that matched nothing gets the curated "not documented"
+  reply.
+- **A site-wide daily cap,** `CHAT_MODEL_DAILY_LIMIT` (default 1000 calls),
+  bounds the NVIDIA bill whatever visitors do. Past it, everyone gets curated
+  answers.
+- **Any failure or timeout** returns the curated answer.
 
-Answers matched this way are labelled `AI · grounded in portfolio`.
+Model replies are labelled `AI · grounded in portfolio`.
+
+### Chat limits
+
+- **Daily allowance:** 50 questions per browser in 24 hours
+  (`CHAT_DAILY_LIMIT`), counted against a random id in an HttpOnly, signed
+  `pf_chat` cookie. The panel states the limit up front, warns at 5 left, and
+  on the 51st question closes the input and shows the reset time and contact
+  links. A private window starts a new allowance.
+- **Network backstop:** 300 a day per network (`CHAT_DAILY_NETWORK_LIMIT`),
+  keyed on a salted hash of the address (the /64 for IPv6). It is high on
+  purpose: an office or a mobile carrier is many people behind one address.
+- **Rate limit:** `CHAT_RATE_LIMIT` requests per minute per visitor (default 20).
+- **Owner exemption:** a signed-in admin, or any address listed under
+  **Trusted networks** in `/admin`, is held to none of these. Press **Add my
+  current IP** there when your ISP assigns a new address. Exempt responses
+  carry `X-Chat-Unlimited: 1`, and the panel says no limit applies. The same
+  list marks your own visits as internal in analytics.
+
+`.env.local` raises these limits for local work, because `npm run test:chat`
+sends a few hundred requests from one address.
 
 ### Optional FastAPI service
 
@@ -264,13 +309,13 @@ On Windows PowerShell, activate the virtual environment with:
 
 Open `http://127.0.0.1:8000/health` to confirm that the service is running. It returns factual answers even without a Gemini key.
 
-To let the local website use FastAPI, create a local `.env` file from `.env.example` and set:
+To let the local website use FastAPI, set this in `.env.local` (copy `.env.example` to `.env.local` first if you have not):
 
 ```env
 PYTHON_CHAT_URL=http://127.0.0.1:8000/chat
 ```
 
-Restart `npm run dev` after changing `.env`.
+Restart `npm run dev` after changing `.env.local`.
 
 ### Optional Gemini matching
 
@@ -297,6 +342,13 @@ FastAPI does not load a `.env` file by itself. Set Python service values in the 
 | `npm run test:analytics` | Runs analytics checks. Needs `ADMIN_TOKEN` set |
 | `npm run build` | Creates a production build and refreshes Python knowledge |
 | `npm run start` | Serves the built Cloudflare Worker locally after `npm run build` |
+| `npm run check:model` | Calls the NVIDIA model directly and reports answer rate and latency |
+| `npm run lint` | Runs oxlint. Pre-existing errors in `components/ui/` mean it never passes whole; lint the paths you changed (`npx oxlint lib/chat`) |
+| `npm run seed:demo` | Regenerates the synthetic data behind `/analytics` |
+| `npm run emit:migration` | Regenerates `migrations/` from the schema |
+| `npm run preflight` | Checks a deploy would not come up half-broken |
+| `npm run deploy` | Preflight, build, and `wrangler deploy` |
+| `npm run db:migrate` | Applies `migrations/` to the remote D1 (`db:migrate:local` for the local one) |
 | `.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` | Runs the Python chatbot checks verbosely on macOS or Linux (`.venv\Scripts\python` on Windows) |
 
 ### Working on another machine
@@ -314,9 +366,11 @@ specific to one machine, so none of it is copied across:
 
 The one file to carry over by hand is **`.env.local`**: it holds the secrets (`ADMIN_TOKEN`,
 `ANALYTICS_IP_SALT`, `NIM_API_KEY`) and must never be committed. Keep it in a password manager.
-Production reads its own copies from the Worker's secrets, not from this file.
+`.env.example` lists every setting with placeholder values. Production reads its own copies from
+the Worker's secrets, not from this file.
 
-So a new machine is: clone, add `.env.local`, `npm ci`, `npm run dev`. The npm scripts run on
+So a new machine is: clone, `cp .env.example .env.local` (`copy` on Windows) and fill in the
+secrets, `npm ci`, `npm run dev`. The npm scripts run on
 macOS, Linux and Windows alike. The one macOS-only piece is `scripts/turntable-frames.swift`, which
 is needed only to regenerate the turntable frames.
 
@@ -326,7 +380,7 @@ The site runs as a Cloudflare Worker. Everything below happens in **Terminal**,
 in this folder. Open it with:
 
 ```sh
-cd /Users/Alex/Alex/portfolio
+cd portfolio   # the folder you cloned
 ```
 
 VS Code's built-in terminal works too (**Terminal → New Terminal**, it opens
@@ -406,7 +460,8 @@ every file in `migrations/` it has not applied before, one per schema version
 npm run deploy
 ```
 
-It typechecks, runs a preflight, builds, and uploads. It finishes by printing
+It runs a preflight, builds, and uploads. It does not typecheck, so run
+`npm run typecheck` first. It finishes by printing
 your live URL, something like
 `https://portfolio-template.<your-subdomain>.workers.dev`. Open it; the site
 should load.
@@ -431,6 +486,18 @@ to the screen, and the value is stored encrypted on Cloudflare. Never on disk
 and never in this repo.
 
 Run `openssl rand -hex 32` in a second Terminal tab to generate each value.
+
+Optional secrets, set the same way:
+
+```sh
+npx wrangler secret put NIM_API_KEY       # model replies, see Chatbot setup
+npx wrangler secret put ADMIN_EMAILS      # comma-separated addresses allowed into /admin
+npx wrangler secret put GOOGLE_CLIENT_ID  # Google sign-in on /admin, from Google Cloud Console → Credentials
+```
+
+Google sign-in needs both of the last two, and the client's Authorized
+JavaScript origins must include the site URL (see step 10). Without them,
+`/admin` takes the token only.
 
 **Do not set `TRUST_PLATFORM_AUTH_HEADER`.** It tells the admin gate to trust a
 request header, which is only safe behind an ingress that strips inbound copies.
@@ -464,7 +531,8 @@ Add two repository secrets under **Settings → Secrets and variables → Action
   using the **Edit Cloudflare Workers** template
 - `CLOUDFLARE_ACCOUNT_ID`: the value from `npx wrangler whoami` in step 1
 
-After that, `.github/workflows/deploy.yml` deploys every push to `main`.
+After that, `.github/workflows/deploy.yml` deploys every push to `main`. In this template the
+workflows ship disabled (commented out behind a stub); the header of each file says how to restore it.
 
 ### 9. A custom domain (optional)
 
@@ -570,7 +638,7 @@ sample data so it can be shared without exposing anyone's visit. The private pan
 people typed into the chat and a per-visit table with city and network operator, which is not
 something to publish. Regenerate the sample with `npm run seed:demo`.
 
-To run it locally, create `.env.local` with:
+To run it locally, `.env.local` needs at least:
 
 ```env
 ANALYTICS_IP_SALT=any-random-string
@@ -578,27 +646,28 @@ ADMIN_TOKEN=a-token-of-at-least-32-characters
 ADMIN_EMAILS=your@email.address
 ```
 
-Then open `http://localhost:3000/admin`. Storage is a Cloudflare D1 database named by `"d1"` in
-`.openai/hosting.json`; set that to `null` and the whole system turns itself off cleanly rather than
-erroring.
+Then open `http://localhost:3000/admin`. Storage is the Cloudflare D1 database bound as
+`ANALYTICS_DB` in `wrangler.jsonc`. Remove that binding (or, on Sites, set `"d1"` to `null` in
+`.openai/hosting.json`) and the whole system turns itself off cleanly rather than erroring.
 
 `ANALYTICS.md` is the full account: what is recorded, how long it is kept, and the reasoning behind
-the parts that look odd. Read it before changing anything under `lib/analytics/`.
+the parts that look odd. Read it before changing anything under `lib/analytics/`. It is also public:
+`/analytics/design-notes` renders it, so whatever goes into it is published on the next deploy.
 
 ## Hosting
 
-This repository contains `.openai/hosting.json`, which connects it to the existing Sites project. The configured Sites build uses the React portfolio and factual chat fallback.
+The live site is a Cloudflare Worker with a D1 database (see [Deploying to Cloudflare](#deploying-to-cloudflare-step-by-step)). `.openai/hosting.json` keeps an older OpenAI Sites target working while the file exists; delete it to make the repo Cloudflare-only.
 
-The optional FastAPI service is separate from the Sites JavaScript Worker. If you enable it, deploy FastAPI to a Python compatible service you control, configure its environment variables there, and then point `PYTHON_CHAT_URL` at its HTTPS `/chat` endpoint.
+The optional FastAPI service is separate from the Worker. If you enable it, deploy FastAPI to a Python compatible service you control, configure its environment variables there, and then point `PYTHON_CHAT_URL` at its HTTPS `/chat` endpoint.
 
 ## Before you publish
 
 1. Check every new public link in a private browser window.
-2. Run `npm run typecheck`, `npm run test:chat`, and `npm run build`.
+2. Run `npm run typecheck`, `npm test` (with `npm run dev` running in another terminal), and `npm run build`.
 3. Verify that photos, résumé files, and course notes are intended for public sharing.
-4. Search for secrets before committing. Do not commit `.env` files or personal access tokens.
+4. Search for secrets before committing. Do not commit `.env.local`, `.dev.vars`, or personal access tokens. Keep real values out of `.env.example`.
 5. Confirm that every client description is a safe high-level summary.
 
 ## Design reference
 
-The interactive direction was inspired by [Amazing Portfolio Web Design Inspiration of 2026](https://www.youtube.com/watch?v=uw6C8Z1XieY). The résumé-to-3D reveal and content structure are original to this project.
+The interactive direction was inspired by [Amazing Portfolio Web Design Inspiration of 2026](https://www.youtube.com/watch?v=uw6C8Z1XieY). The résumé-to-turntable reveal and content structure are original to this project.
