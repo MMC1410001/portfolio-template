@@ -329,6 +329,20 @@ amplifier sharing a quota with analytics ingest. `npm run test:chat` replays 75 
 and trips the default, so `.env.local` sets `CHAT_RATE_LIMIT=1000` for the dev server; production
 leaves it unset.
 
+**There is also a daily allowance: 50 questions per browser in 24 hours** (`lib/analytics/chat-quota.ts`,
+`CHAT_DAILY_LIMIT`). Nothing identifies a person without a login, so it is charged against two
+things. A browser id is a random UUID in an HttpOnly, signed `pf_chat` cookie that `/api/chat` mints
+on the first question. A private window resets it. The network is the same salted `/64`-for-IPv6 hash
+the per-minute limit uses, capped at 300 (`CHAT_DAILY_NETWORK_LIMIT`), and it is only a backstop: an
+office, a campus or a mobile carrier's shared IPv4 is many people, and an IP-only limit would close
+the chat on a recruiter because a colleague used it. The browser is charged first, so a closed chat
+being hammered does not spend its network's allowance. Counts live in `chat_quota`, not
+`ingest_budget`, which is swept of anything older than an hour. Every response carries
+`X-Chat-Limit/Remaining/Reset` (so the panel can warn at 5 left), and past the limit the route
+answers 429 `code:'daily_limit'`. `Chat.tsx` then closes the input with the reset time and contact
+links rather than answering offline. `.env.local` raises both limits, because `test:chat` sends 270
+requests from one address. The `pf_chat` cookie is disclosed on `/privacy`.
+
 The Python side still refuses to trust `X-Forwarded-For`, but keying on `request.client.host`
 alone was worse than conservative, behind the Worker that is a Cloudflare egress address, so every
 visitor shared one bucket and fifteen questions from one person locked the AI path for everyone.

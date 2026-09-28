@@ -12,6 +12,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { RETENTION_DAYS } from '@/lib/analytics/schema';
+import { DAILY_QUESTIONS } from '@/lib/chat/quota';
 import { AnalyticsOptOut } from '@/components/portfolio/AnalyticsOptOut';
 
 export const metadata: Metadata = {
@@ -177,6 +178,27 @@ export default function PrivacyPage() {
       </section>
 
       <section>
+        <h2>The daily question limit</h2>
+        <p>
+          The chat guide answers up to {DAILY_QUESTIONS} questions per browser
+          in any 24 hours. To count them, the first question sets one cookie,{' '}
+          <code>pf_chat</code>: a random id, signed so it cannot be forged,
+          sent only to the chat endpoint and unreadable by the page itself. The
+          server keeps a count against that id, and a second, looser count
+          against the same one-way network hash used for rate limiting, so that
+          clearing the cookie does not reset the limit indefinitely. Neither
+          count holds a question, an address or anything else about you. The
+          chat panel also remembers, in your browser, how many questions you
+          have left, so a reload does not lose track.
+        </p>
+        <p>
+          This cookie is for the limit, not for analytics, so turning analytics
+          off below does not remove it; clearing this site&rsquo;s cookies
+          does. The counts are deleted a day after their 24 hours end.
+        </p>
+      </section>
+
+      <section>
         <h2>How long it is kept</h2>
         <ul>
           <li>
@@ -185,6 +207,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Click positions: {RETENTION_DAYS.clickPoints} days.</strong>
+          </li>
+          <li>
+            <strong>Daily question counts: until a day after their 24 hours end.</strong>
           </li>
           <li>
             <strong>Everything else: {RETENTION_DAYS.events} days.</strong>
@@ -205,7 +230,8 @@ export default function PrivacyPage() {
           you: a random id for the current browser tab, and a random id for
           this browser so a second visit is not counted as a stranger. Both are
           stored by your browser, not in a cookie, and clearing site data
-          removes them.
+          removes them. The one cookie this site sets for visitors is the chat
+          limit&rsquo;s, described above.
         </p>
       </section>
 

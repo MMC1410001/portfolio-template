@@ -1,6 +1,9 @@
 import { answerQuestion } from '@/content/faq';
 import { recordChatHealth } from '@/lib/analytics/chat-health';
 import { chargeChatRequest } from '@/lib/analytics/chat-limit';
+import { applyQuota, chargeChatQuota } from '@/lib/analytics/chat-quota';
+import { ensureSchema, getDb } from '@/lib/analytics/db';
+import { DAILY_LIMIT_CODE } from '@/lib/chat/quota';
 import { modelEligible as isModelEligible, screenHistory } from '@/lib/chat/gate';
 import { composeAnswer, nimConfigured, streamAnswer, type ChatTurn } from '@/lib/chat/nim';
 import { readCapped } from '@/lib/read-capped';
@@ -52,6 +55,17 @@ export async function POST(request:Request) {
  // refused caller still gets the portfolio answer, labelled "Offline".
  const client=await chargeChatRequest(request);
  if(!client.allowed)return Response.json({error:'Too many questions just now. Try again in a minute.'},{status:429,headers:{'Retry-After':'60','Cache-Control':'private, no-store'}});
+ // The daily allowance: 50 questions per browser in 24 hours, with a looser
+ // per-network ceiling behind it (lib/analytics/chat-quota.ts). Charged after
+ // the per-minute check, so a burst refused for speed is not also counted as
+ // questions. Every response from here on carries the allowance in headers,
+ // which is how the panel can warn at five left rather than at none; a
+ // refusal says which counter refused and when it resets, and the panel
+ // closes the input rather than answering offline.
+ const db=getDb();
+ const allowance=await chargeChatQuota(request,client.bucket,db&&await ensureSchema(db)?db:null);
+ const answered=(response:Response)=>applyQuota(response,allowance);
+ if(!allowance.allowed)return answered(Response.json({error:allowance.refusedBy==='network'?'This network has reached today\u2019s question limit.':'You have reached today\u2019s question limit.',code:DAILY_LIMIT_CODE,refusedBy:allowance.refusedBy,limit:allowance.quota?.limit,resetAt:allowance.quota?.resetAt},{status:429,headers:{'Retry-After':String(Math.max(60,Math.ceil(((allowance.quota?.resetAt??0)-Date.now())/1000))),'Cache-Control':'private, no-store'}}));
  const fallback=answerQuestion(body.message);
  // Sites currently packages this JavaScript Worker. A separately deployed Python
  // service is optional; no external connection or model is implied by the fallback.
@@ -98,7 +112,7 @@ export async function POST(request:Request) {
  // enough to send it to NVIDIA. The rule lives in lib/chat/gate.ts.
  const modelEligible=isModelEligible(fallback,history,body.message);
  if(backend&&enrichable){
-  try{const response=await fetch(backend,{method:'POST',headers:{'Content-Type':'application/json',...(process.env.CHAT_BACKEND_TOKEN?{'Authorization':`Bearer ${process.env.CHAT_BACKEND_TOKEN}`}:{}),...(client.bucket?{'X-Client-Bucket':client.bucket}:{})},body:JSON.stringify({message:body.message}),signal:AbortSignal.timeout(7000)});if(response.ok){const data=await response.json() as {answer?:string;mode?:string};if(typeof data.answer==='string'){backendOk=true;recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return Response.json(await signed({answer:data.answer.slice(0,4000),mode:data.mode==='ai'?'ai':'faq',source:data.mode==='ai'?'AI · grounded in portfolio':fallback.source,href:fallback.href}))}}backendFailed=!backendOk}catch{backendFailed=true;/* An unavailable model must never block portfolio answers. */}
+  try{const response=await fetch(backend,{method:'POST',headers:{'Content-Type':'application/json',...(process.env.CHAT_BACKEND_TOKEN?{'Authorization':`Bearer ${process.env.CHAT_BACKEND_TOKEN}`}:{}),...(client.bucket?{'X-Client-Bucket':client.bucket}:{})},body:JSON.stringify({message:body.message}),signal:AbortSignal.timeout(7000)});if(response.ok){const data=await response.json() as {answer?:string;mode?:string};if(typeof data.answer==='string'){backendOk=true;recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return answered(Response.json(await signed({answer:data.answer.slice(0,4000),mode:data.mode==='ai'?'ai':'faq',source:data.mode==='ai'?'AI · grounded in portfolio':fallback.source,href:fallback.href})))}}backendFailed=!backendOk}catch{backendFailed=true;/* An unavailable model must never block portfolio answers. */}
  }
  // NVIDIA NIM, called straight from this Worker.
  //
@@ -145,16 +159,16 @@ export async function POST(request:Request) {
    recordChatHealth({configured:true,ok:!failed,failed,guarded:false});
    try{controller.close()}catch{/* already closed by a cancelled request */}
   }});
-  return new Response(stream,{headers:{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'private, no-store','X-Accel-Buffering':'no'}});
+  return answered(new Response(stream,{headers:{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'private, no-store','X-Accel-Buffering':'no'}}));
  }
  if(modelEligible&&!backendOk&&nimConfigured()){
   const picked=await composeAnswer(body.message,history,fallback.id?[fallback.id,...carried]:carried);
-  if(picked){recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return Response.json(await signed({answer:picked.answer.slice(0,4000),mode:'ai',source:'AI · grounded in portfolio',href:picked.href??fallback.href,ids:picked.ids}))}
+  if(picked){recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return answered(Response.json(await signed({answer:picked.answer.slice(0,4000),mode:'ai',source:'AI · grounded in portfolio',href:picked.href??fallback.href,ids:picked.ids})))}
   modelFailed=true;
  }
  // Coarse counters only, no question text. This is the one thing that
  // knows whether PYTHON_CHAT_URL answered, which the client provably
  // cannot. Rendered in its own card so it cannot double-count chat_*.
  recordChatHealth({configured:Boolean(backend)||nimConfigured(),ok:backendOk,failed:backendFailed||modelFailed,guarded:shortCircuited});
- return Response.json(await signed(fallback.id?{...fallback,ids:[fallback.id]}:fallback));
+ return answered(Response.json(await signed(fallback.id?{...fallback,ids:[fallback.id]}:fallback)));
 }

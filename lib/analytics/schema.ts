@@ -27,7 +27,10 @@
  * documents in its `008_fix_missing_columns.sql`.
  */
 
-export const SCHEMA_VERSION = 1;
+// 2: chat_quota. A new table, so CREATE TABLE IF NOT EXISTS appended to the
+// flat list is still re-runnable; the bump is only what makes ensureSchema()
+// run the list again on a database that recorded version 1.
+export const SCHEMA_VERSION = 2;
 
 /** Ordered, re-runnable DDL. Every statement is IF NOT EXISTS. */
 export const SCHEMA_STATEMENTS: readonly string[] = [
@@ -130,6 +133,19 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
    )`,
   `CREATE INDEX IF NOT EXISTS ingest_budget_window_idx
      ON ingest_budget (window_start)`,
+
+  // The daily question allowance on /api/chat, lib/analytics/chat-quota.ts.
+  // Not ingest_budget: that table is swept of anything older than an hour,
+  // and this window is 24. Buckets are `b:<browser id>` and `n:<network
+  // hash>`; neither is reversible to a person, and a row is deleted once its
+  // window has closed.
+  `CREATE TABLE IF NOT EXISTS chat_quota (
+     bucket       TEXT PRIMARY KEY,
+     window_start INTEGER NOT NULL,
+     questions    INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS chat_quota_window_idx
+     ON chat_quota (window_start)`,
 ];
 
 /**

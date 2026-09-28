@@ -27,6 +27,7 @@
 
 import { RETENTION_DAYS } from './schema';
 import { istDayKey } from './time';
+import { QUOTA_WINDOW_MS } from '@/lib/chat/quota';
 
 const DAY_MS = 86_400_000;
 const SWEEP_INTERVAL_MS = DAY_MS;
@@ -41,6 +42,8 @@ export interface SweepReport {
   questionText: number;
   chatHealth: number;
   budget: number;
+  /** Daily chat allowance rows whose window closed (chat-quota.ts). */
+  chatQuota: number;
 }
 
 const IDLE: SweepReport = {
@@ -50,6 +53,7 @@ const IDLE: SweepReport = {
   questionText: 0,
   chatHealth: 0,
   budget: 0,
+  chatQuota: 0,
 };
 
 /**
@@ -155,6 +159,11 @@ export async function sweep(
     db
       .prepare(`DELETE FROM ingest_budget WHERE window_start < ?1`)
       .bind(now - 3_600_000),
+    // A window that closed is already reset in place on the next question,
+    // so the row is only kept for that; a day past closing it goes.
+    db
+      .prepare(`DELETE FROM chat_quota WHERE window_start < ?1`)
+      .bind(now - 2 * QUOTA_WINDOW_MS),
   ]);
 
   const changed = (i: number) => results[i]?.meta?.changes ?? 0;
@@ -165,5 +174,6 @@ export async function sweep(
     questionText: changed(2),
     chatHealth: changed(3),
     budget: changed(4),
+    chatQuota: changed(5),
   };
 }

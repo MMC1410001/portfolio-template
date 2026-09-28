@@ -498,6 +498,10 @@ putting `ADMIN_TOKEN` in a third-party service.
 
 ## Rate limiting, and what it does not do
 
+`/api/chat` also has a **daily allowance**, 50 questions per browser and 300 per network in 24
+hours, in its own `chat_quota` table. It is described in CLAUDE.md. Its rows are swept a day after
+their window closes, and the retention report counts them as `chatQuota`.
+
 A D1 counter, charged **per event before any work**, 120 per address per
 minute. "Address" is the IPv4 address, or the **/64** for IPv6 (`budgetKey` in
 `net.ts`): one home connection holds 2^64 addresses, so a full-address key was

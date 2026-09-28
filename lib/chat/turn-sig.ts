@@ -57,33 +57,50 @@ function fromB64url(text: string): Uint8Array<ArrayBuffer> | null {
   return bytes;
 }
 
-/** One derived key per secret per isolate: importKey is not free. */
-let cached: { secret: string; key: Promise<CryptoKey> } | null = null;
+/**
+ * One derived key per (secret, label) per isolate: importKey is not free. The
+ * label is what keeps two uses of the salt apart, so a reply signature can
+ * never pass as a quota id's, or the other way round.
+ */
+const keys = new Map<string, Promise<CryptoKey>>();
 
-function signingKey(secret: string): Promise<CryptoKey> {
-  if (cached?.secret === secret) return cached.key;
-  const key = (async () => {
-    const root = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-    const derived = await crypto.subtle.sign('HMAC', root, encoder.encode(LABEL));
-    return crypto.subtle.importKey('raw', derived, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
-  })();
-  cached = { secret, key };
+function signingKey(secret: string, label: string): Promise<CryptoKey> {
+  const id = `${label}\n${secret}`;
+  let key = keys.get(id);
+  if (!key) {
+    key = (async () => {
+      const root = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+      const derived = await crypto.subtle.sign('HMAC', root, encoder.encode(label));
+      return crypto.subtle.importKey('raw', derived, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+    })();
+    keys.set(id, key);
+  }
   return key;
 }
 
-/** The signature for a reply, over exactly what the browser will send back. */
-export async function signTurn(reply: string, secret: string): Promise<string> {
-  const key = await signingKey(secret);
-  return b64url(await crypto.subtle.sign('HMAC', key, encoder.encode(reply.slice(0, TURN_CHARS))));
+/** HMAC-SHA256 of `message` under the key derived for `label`, base64url. */
+export async function signWith(label: string, message: string, secret: string): Promise<string> {
+  const key = await signingKey(secret, label);
+  return b64url(await crypto.subtle.sign('HMAC', key, encoder.encode(message)));
 }
 
 /** Constant-time, via WebCrypto's own verify. Malformed input is simply false. */
-export async function verifyTurn(text: string, sig: unknown, secret: string): Promise<boolean> {
-  if (typeof sig !== 'string' || text.length > TURN_CHARS) return false;
+export async function verifyWith(label: string, message: string, sig: unknown, secret: string): Promise<boolean> {
+  if (typeof sig !== 'string') return false;
   const bytes = fromB64url(sig);
   if (!bytes) return false;
-  const key = await signingKey(secret);
-  return crypto.subtle.verify('HMAC', key, bytes, encoder.encode(text));
+  const key = await signingKey(secret, label);
+  return crypto.subtle.verify('HMAC', key, bytes, encoder.encode(message));
+}
+
+/** The signature for a reply, over exactly what the browser will send back. */
+export function signTurn(reply: string, secret: string): Promise<string> {
+  return signWith(LABEL, reply.slice(0, TURN_CHARS), secret);
+}
+
+export async function verifyTurn(text: string, sig: unknown, secret: string): Promise<boolean> {
+  if (text.length > TURN_CHARS) return false;
+  return verifyWith(LABEL, text, sig, secret);
 }
 
 export interface IncomingTurn {

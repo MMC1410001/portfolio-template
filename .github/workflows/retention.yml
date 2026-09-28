@@ -112,7 +112,8 @@ jobs:
 #                    "| Click points (30d) | \(.clickPoints) |",
 #                    "| Question text (30d) | \(.questionText) |",
 #                    "| Chat health (365d) | \(.chatHealth) |",
-#                    "| Rate-limit windows | \(.budget) |"' response.json
+#                    "| Rate-limit windows | \(.budget) |",
+#                    "| Chat allowance windows | \(.chatQuota // 0) |"' response.json
 #           } >> "${GITHUB_STEP_SUMMARY}"
 #
 #           if [ "$(jq -r '.events' response.json)" = "5000" ]; then
