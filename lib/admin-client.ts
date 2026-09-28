@@ -15,7 +15,10 @@ export type AdminAction =
   | 'click-map'
   | 'sessions'
   | 'whoami'
-  | 'retention-sweep';
+  | 'retention-sweep'
+  | 'trusted-list'
+  | 'trusted-add'
+  | 'trusted-remove';
 
 export class AdminError extends Error {
   constructor(

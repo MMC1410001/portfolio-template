@@ -32,6 +32,7 @@ import {
 } from '@/lib/analytics/payload';
 import { classifyUserAgent } from '@/lib/analytics/user-agent';
 import { readCapped } from '@/lib/read-capped';
+import { trustedCidrs } from '@/lib/analytics/trusted';
 import {
   budgetKey,
   clientIp,
@@ -39,7 +40,6 @@ import {
   internalVisitorIds,
   ipPrefix,
   matchesAnyCidr,
-  parseCidrList,
 } from '@/lib/analytics/net';
 import { buildRows, chargeBudget, writeBatch } from '@/lib/analytics/ingest';
 import { sweepIfDue } from '@/lib/analytics/retention';
@@ -64,8 +64,6 @@ function refused(reason: string): Response {
   );
 }
 
-/** Parsed once per isolate. This is a constant for the life of the deploy. */
-let cidrs: ReturnType<typeof parseCidrList> | null = null;
 let warnedNoSalt = false;
 
 type CfRequest = Request & { cf?: IncomingRequestCfProperties };
@@ -148,7 +146,9 @@ export async function POST(request: Request) {
     const budget = await chargeBudget(db, bucket, events.length, Date.now());
     if (!budget.allowed) return refused('rate_limited');
 
-    cidrs ??= parseCidrList(process.env.ANALYTICS_INTERNAL_CIDRS);
+    // The trusted-network list from /admin, merged with the env floor, and
+    // cached per isolate (lib/analytics/trusted.ts).
+    const cidrs = await trustedCidrs(db);
     const attribution = sanitiseAttribution(body.attribution);
     const visitorId = attribution?.visitor_id ?? null;
 

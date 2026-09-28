@@ -35,7 +35,8 @@
  * unit-tested in a bare Node process against scripts/d1-sqlite.ts.
  */
 import { authorizeAdmin, readCookie } from './admin-auth';
-import { clientIp, matchesAnyCidr, parseCidrList } from './net';
+import { clientIp, matchesAnyCidr } from './net';
+import { trustedCidrs } from './trusted';
 import { signWith, verifyWith } from '@/lib/chat/turn-sig';
 import { DAILY_QUESTIONS, QUOTA_HEADERS, QUOTA_WINDOW_MS, type Quota } from '@/lib/chat/quota';
 
@@ -128,11 +129,13 @@ export const UNLIMITED_VERDICT: QuotaVerdict = { ...OPEN, unlimited: true };
  * Who is not held to any chat limit, per-minute or daily: the owner testing
  * the site.
  *
- *   network  the caller's address is inside CHAT_UNLIMITED_CIDRS, a secret
- *            rather than a var so the owner's address is not in the repo.
- *            Read from cf-connecting-ip, which Cloudflare sets and a client
- *            cannot. Everyone behind that address is exempt too, which is
- *            the point of listing an office or a home connection.
+ *   network  the caller's address is on the trusted-network list: the one
+ *            edited in /admin, which also excludes it from analytics, merged
+ *            with the CHAT_UNLIMITED_CIDRS and ANALYTICS_INTERNAL_CIDRS env
+ *            floor (lib/analytics/trusted.ts). Read from cf-connecting-ip,
+ *            which Cloudflare sets and a client cannot. Everyone behind that
+ *            address is exempt too, which is the point of listing an office
+ *            or a home connection.
  *   admin    the request passes authorizeAdmin(): a live pa_admin session
  *            (the cookie is Path=/, so it reaches this route) for an address
  *            that ADMIN_EMAILS still lists, or the admin bearer token. The
@@ -141,10 +144,10 @@ export const UNLIMITED_VERDICT: QuotaVerdict = { ...OPEN, unlimited: true };
  *
  * Any failure here is "not exempt", never "exempt".
  */
-export async function chatExemption(request: Request): Promise<'network' | 'admin' | null> {
+export async function chatExemption(request: Request, db: D1Database | null): Promise<'network' | 'admin' | null> {
   try {
     const { ip } = clientIp(request);
-    if (ip && matchesAnyCidr(ip, parseCidrList(process.env.CHAT_UNLIMITED_CIDRS))) return 'network';
+    if (ip && matchesAnyCidr(ip, await trustedCidrs(db))) return 'network';
     if (await authorizeAdmin(request)) return 'admin';
   } catch (error) {
     console.error('[chat] exemption check failed', error);

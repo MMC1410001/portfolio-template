@@ -343,13 +343,19 @@ answers 429 `code:'daily_limit'`. `Chat.tsx` then closes the input with the rese
 links rather than answering offline. `.env.local` raises both limits, because `test:chat` sends 270
 requests from one address. The `pf_chat` cookie is disclosed on `/privacy`.
 
-**The owner is exempt from both chat limits** (`chatExemption` in `chat-quota.ts`): any caller that
-passes `authorizeAdmin()` (a live `pa_admin` session, which is `Path=/` and so reaches `/api/chat`,
-for an address still in `ADMIN_EMAILS`, or the bearer token), and any address inside
-`CHAT_UNLIMITED_CIDRS`, a Worker **secret** so the owner's IP stays out of the repo. An exempt
-response carries `X-Chat-Unlimited: 1` and the panel says no limit applies, which is also how to
-check the exemption took effect. Exempting a network exempts everyone behind it, and a home IPv4
-changes when the ISP reassigns it, so re-set the secret if the panel shows the normal limit again.
+**The owner is exempt from both chat limits** (`chatExemption` in `chat-quota.ts`). Two kinds of
+caller are exempt. The first is any caller that passes `authorizeAdmin()`: a live `pa_admin`
+session for an address still in `ADMIN_EMAILS` (the cookie is `Path=/`, so it reaches `/api/chat`),
+or the bearer token. The second is any address on the **trusted-network list**
+(`lib/analytics/trusted.ts`). That list is edited in `/admin` under Trusted networks, stored in
+`trusted_networks`, and the same list marks analytics sessions internal. `ANALYTICS_INTERNAL_CIDRS`
+and `CHAT_UNLIMITED_CIDRS` are merged in as a fixed floor that the panel shows but cannot remove.
+The section is `adminOnly` in `admin-sections.ts`, so the public `/analytics` showcase, which has no
+database, neither lists nor renders it. An exempt response carries `X-Chat-Unlimited: 1` and the
+chat panel says no limit applies, which is how to check the exemption took effect. Exempting a
+network exempts everyone behind it, and a home IPv4 changes when the ISP reassigns it. If the chat
+panel shows the normal limit again, press "Add my current IP". The email allowlist stays a secret
+by design: if the panel could edit it, one compromised session could grant itself lasting access.
 
 The Python side still refuses to trust `X-Forwarded-For`, but keying on `request.client.host`
 alone was worse than conservative, behind the Worker that is a Cloudflare egress address, so every

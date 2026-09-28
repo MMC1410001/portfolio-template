@@ -136,8 +136,8 @@ export function describeInternal(
 
   const rules =
     cidrsActive + visitorsActive === 0
-      ? 'No internal networks or visitors are configured yet. Set ' +
-        'ANALYTICS_INTERNAL_CIDRS, or use "Stop counting my visits" below.'
+      ? 'No internal networks or visitors are configured yet. Add one under ' +
+        'Trusted networks, or use "Stop counting my visits" below.'
       : `Matching ${cidrsActive} network${cidrsActive === 1 ? '' : 's'} and ` +
         `${visitorsActive} visitor${visitorsActive === 1 ? '' : 's'}.`;
 

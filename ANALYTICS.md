@@ -324,6 +324,14 @@ already seen.
 
 ## Internal traffic
 
+**Trusted networks** are the main way to mark your own traffic, and the one list does two jobs. It
+is edited in `/admin` (the Trusted networks section, with an "Add my current IP" button) and stored
+in `trusted_networks`. A session from one of these networks is recorded as internal, and a chat
+question from one is held to no limit. The env vars below still work as a fixed floor, merged in and
+shown in the panel, but they can only be removed by editing the Worker. `lib/analytics/trusted.ts`
+caches the merged list per isolate for 30 seconds. A session is marked when it is recorded, so
+adding a network excludes the next visit, not the ones already counted.
+
 Two env vars, `ANALYTICS_INTERNAL_CIDRS` and `ANALYTICS_INTERNAL_VISITORS`, 
 plus a per-browser opt-out.
 

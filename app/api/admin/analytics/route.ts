@@ -19,7 +19,8 @@ import {
 } from '@/lib/analytics/admin-auth';
 import { getDbHandle, ensureSchema } from '@/lib/analytics/db';
 import { readWindow } from '@/lib/analytics/time';
-import { internalVisitorIds, parseCidrList } from '@/lib/analytics/net';
+import { clientIp, internalVisitorIds } from '@/lib/analytics/net';
+import { addTrusted, listTrusted, removeTrusted, trustedCidrs } from '@/lib/analytics/trusted';
 import { sweepIfDue, sweep } from '@/lib/analytics/retention';
 import {
   audience,
@@ -47,6 +48,8 @@ interface Body {
   device?: unknown;
   mode?: unknown;
   limit?: unknown;
+  cidr?: unknown;
+  label?: unknown;
 }
 
 export async function POST(request: Request) {
@@ -84,8 +87,7 @@ export async function POST(request: Request) {
           adminEmails: allowlistSize(),
           hasToken: Boolean(process.env.ADMIN_TOKEN),
           hasIpSalt: Boolean(process.env.ANALYTICS_IP_SALT),
-          internalCidrs: parseCidrList(process.env.ANALYTICS_INTERNAL_CIDRS)
-            .length,
+          trustedNetworks: (await trustedCidrs(handle?.db ?? null)).length,
         },
       },
       { headers: HEADERS },
@@ -108,7 +110,7 @@ export async function POST(request: Request) {
     window: readWindow({ from: body.from, to: body.to, range: body.range }),
     // Defaults to excluding internal traffic, matching the panel's default.
     excludeInternal: body.excludeInternal !== false,
-    cidrsActive: parseCidrList(process.env.ANALYTICS_INTERNAL_CIDRS).length,
+    cidrsActive: (await trustedCidrs(db)).length,
     visitorsActive: internalVisitorIds(process.env.ANALYTICS_INTERNAL_VISITORS)
       .length,
   };
@@ -116,6 +118,25 @@ export async function POST(request: Request) {
   try {
     if (action === 'retention-sweep') {
       return Response.json(await sweep(db, Date.now()), { headers: HEADERS });
+    }
+
+    // Trusted networks: excluded from analytics, held to no chat limit. The
+    // same admin gate as every read above, and the pa_admin cookie is
+    // SameSite=Strict, so another site cannot make an admin's browser post
+    // here. `yourIp` is what the "Add my current IP" button adds.
+    if (action === 'trusted-list' || action === 'trusted-add' || action === 'trusted-remove') {
+      if (action !== 'trusted-list') {
+        const cidr = typeof body.cidr === 'string' ? body.cidr : '';
+        const change =
+          action === 'trusted-add'
+            ? await addTrusted(db, cidr, typeof body.label === 'string' ? body.label : '', identity.who)
+            : await removeTrusted(db, cidr);
+        if (!change.ok) return Response.json({ error: change.error }, { status: 400, headers: HEADERS });
+      }
+      return Response.json(
+        { entries: await listTrusted(db), yourIp: clientIp(request).ip },
+        { headers: HEADERS },
+      );
     }
 
     // Deterministic and free, and it never delays the dashboard.

@@ -30,7 +30,8 @@
 // 2: chat_quota. A new table, so CREATE TABLE IF NOT EXISTS appended to the
 // flat list is still re-runnable; the bump is only what makes ensureSchema()
 // run the list again on a database that recorded version 1.
-export const SCHEMA_VERSION = 2;
+// 3: trusted_networks, the same kind of additive CREATE TABLE.
+export const SCHEMA_VERSION = 3;
 
 /** Ordered, re-runnable DDL. Every statement is IF NOT EXISTS. */
 export const SCHEMA_STATEMENTS: readonly string[] = [
@@ -146,6 +147,16 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
    )`,
   `CREATE INDEX IF NOT EXISTS chat_quota_window_idx
      ON chat_quota (window_start)`,
+
+  // Networks the owner has marked as their own, from /admin: excluded from
+  // analytics and held to no chat limit (lib/analytics/trusted.ts). Owner
+  // configuration, not visitor data: every row was typed in by an admin.
+  `CREATE TABLE IF NOT EXISTS trusted_networks (
+     cidr      TEXT PRIMARY KEY,
+     label     TEXT NOT NULL DEFAULT '',
+     added_at  INTEGER NOT NULL,
+     added_by  TEXT NOT NULL DEFAULT ''
+   )`,
 ];
 
 /**

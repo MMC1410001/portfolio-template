@@ -48,6 +48,7 @@ import { ChatPanel } from './ChatPanel';
 import { ClicksPanel } from './ClicksPanel';
 import { ClickHeatmap, type Device } from './ClickHeatmap';
 import { InternalNotice } from './InternalNotice';
+import { TrustedNetworksPanel } from './TrustedNetworksPanel';
 import { RangeControls } from './RangeControls';
 import { SessionsPanel } from './SessionsPanel';
 import { SignOutButton } from './SignOutButton';
@@ -300,6 +301,14 @@ export function AdminShell({ who }: { who: string }) {
             ) : (
               <PanelSkeleton />
             )}
+          </AdminSection>
+
+          <AdminSection
+            id="admin-trusted"
+            title={adminSection('admin-trusted').label}
+            blurb={adminSection('admin-trusted').blurb}
+          >
+            <TrustedNetworksPanel />
           </AdminSection>
 
           <footer className="pb-8 text-[11px] text-muted-foreground">

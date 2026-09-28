@@ -55,7 +55,8 @@ export async function POST(request:Request) {
  // refused caller still gets the portfolio answer, labelled "Offline".
  // The owner testing the site (an admin session, or CHAT_UNLIMITED_CIDRS) is
  // held to neither limit below. Still charged, so the backend gets a bucket.
- const exempt=await chatExemption(request);
+ const db=getDb();
+ const exempt=await chatExemption(request,db&&await ensureSchema(db)?db:null);
  const client=await chargeChatRequest(request);
  if(!client.allowed&&!exempt)return Response.json({error:'Too many questions just now. Try again in a minute.'},{status:429,headers:{'Retry-After':'60','Cache-Control':'private, no-store'}});
  // The daily allowance: 50 questions per browser in 24 hours, with a looser
@@ -65,7 +66,6 @@ export async function POST(request:Request) {
  // which is how the panel can warn at five left rather than at none; a
  // refusal says which counter refused and when it resets, and the panel
  // closes the input rather than answering offline.
- const db=getDb();
  const allowance=exempt?UNLIMITED_VERDICT:await chargeChatQuota(request,client.bucket,db&&await ensureSchema(db)?db:null);
  const answered=(response:Response)=>applyQuota(response,allowance);
  if(!allowance.allowed)return answered(Response.json({error:allowance.refusedBy==='network'?'This network has reached today\u2019s question limit.':'You have reached today\u2019s question limit.',code:DAILY_LIMIT_CODE,refusedBy:allowance.refusedBy,limit:allowance.quota?.limit,resetAt:allowance.quota?.resetAt},{status:429,headers:{'Retry-After':String(Math.max(60,Math.ceil(((allowance.quota?.resetAt??0)-Date.now())/1000))),'Cache-Control':'private, no-store'}}));

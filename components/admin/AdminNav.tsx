@@ -20,9 +20,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { ADMIN_SECTIONS } from './admin-sections';
+import { ADMIN_SECTIONS, type AdminNavSection } from './admin-sections';
 
-export function AdminNav({ active }: { active: string | null }) {
+export function AdminNav({ active, sections = ADMIN_SECTIONS }: { active: string | null; sections?: readonly AdminNavSection[] }) {
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarContent>
@@ -30,7 +30,7 @@ export function AdminNav({ active }: { active: string | null }) {
           <SidebarGroupLabel>Analytics</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {ADMIN_SECTIONS.map((section) => (
+              {sections.map((section) => (
                 <SidebarMenuItem key={section.id}>
                   <SidebarMenuButton
                     isActive={active === section.id}

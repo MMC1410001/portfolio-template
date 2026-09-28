@@ -41,7 +41,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { ADMIN_SECTION_IDS, adminSection } from '@/components/admin/admin-sections';
+import { SHOWCASE_SECTIONS, SHOWCASE_SECTION_IDS, adminSection } from '@/components/admin/admin-sections';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { AdminSection } from '@/components/admin/AdminSection';
 import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
@@ -132,12 +132,12 @@ export function ShowcaseShell() {
     [rangeId, device, kind, mode],
   );
 
-  const active = useAdminSectionNav(ADMIN_SECTION_IDS);
+  const active = useAdminSectionNav(SHOWCASE_SECTION_IDS);
   const anchor = prettyAnchor(demo.anchor);
 
   return (
     <SidebarProvider>
-      <AdminNav active={active} />
+      <AdminNav active={active} sections={SHOWCASE_SECTIONS} />
       <SidebarInset>
         <header className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
           <SidebarTrigger />

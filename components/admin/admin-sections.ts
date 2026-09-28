@@ -10,6 +10,8 @@ export interface AdminNavSection {
   label: string;
   /** One line under the heading, saying what the panel answers. */
   blurb: string;
+  /** Settings, not a report: shown on /admin, left out of the public /analytics showcase. */
+  adminOnly?: boolean;
 }
 
 export const ADMIN_SECTIONS: readonly AdminNavSection[] = [
@@ -54,6 +56,12 @@ export const ADMIN_SECTIONS: readonly AdminNavSection[] = [
     label: 'Sessions',
     blurb: 'Individual visits, for when a number looks wrong.',
   },
+  {
+    id: 'admin-trusted',
+    label: 'Trusted networks',
+    blurb: 'Your own networks: counted as internal, and no chat question limit.',
+    adminOnly: true,
+  },
 ];
 
 /**
@@ -64,6 +72,10 @@ export const ADMIN_SECTIONS: readonly AdminNavSection[] = [
  * the IntersectionObserver was torn down and rebuilt on every render.
  */
 export const ADMIN_SECTION_IDS: readonly string[] = ADMIN_SECTIONS.map((s) => s.id);
+
+/** What the public showcase renders: the reports, not the settings. */
+export const SHOWCASE_SECTIONS: readonly AdminNavSection[] = ADMIN_SECTIONS.filter((s) => !s.adminOnly);
+export const SHOWCASE_SECTION_IDS: readonly string[] = SHOWCASE_SECTIONS.map((s) => s.id);
 
 const BY_ID = new Map(ADMIN_SECTIONS.map((s) => [s.id, s]));
 
