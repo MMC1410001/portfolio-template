@@ -20,7 +20,7 @@ export interface LearnerRow {
 
 export const learners: LearnerRow[] = [
   {
-    person: P.kabir,
+    person: P.thomas,
     rating: 8.0,
     verdict: 'Excellent',
     verdictNote: 'Top-tier contributor with strong functional and technical depth.',
@@ -33,7 +33,7 @@ export const learners: LearnerRow[] = [
     useCase: 'Resource allocation and utilisation tracking workflow',
   },
   {
-    person: P.ananya,
+    person: P.emily,
     rating: 7.0,
     verdict: 'Good',
     verdictNote: 'Solid grasp of the framework; depth still building on the data model.',
@@ -46,7 +46,7 @@ export const learners: LearnerRow[] = [
     useCase: 'Leave and attendance approval workflow',
   },
   {
-    person: P.neha,
+    person: P.grace,
     rating: 7.0,
     verdict: 'Good',
     verdictNote: 'Strong on validation; writes the clearest test notes on the team.',
@@ -59,7 +59,7 @@ export const learners: LearnerRow[] = [
     useCase: 'Document approval and revision tracking',
   },
   {
-    person: P.rohan,
+    person: P.jack,
     rating: 8.0,
     verdict: 'Excellent',
     verdictNote: 'Moves quickly from a requirement to a working doctype.',
@@ -72,7 +72,7 @@ export const learners: LearnerRow[] = [
     useCase: 'Subscription and renewal reminders',
   },
   {
-    person: P.sana,
+    person: P.sophie,
     rating: 7.0,
     verdict: 'Good',
     verdictNote: 'Reliable delivery; still leaning on pairing for the harder scripts.',
@@ -85,7 +85,7 @@ export const learners: LearnerRow[] = [
     useCase: 'Employee feedback collection',
   },
   {
-    person: P.arjun,
+    person: P.harry,
     rating: 9.0,
     verdict: 'Excellent',
     verdictNote: 'Sets the reference implementation the rest of the group works from.',
@@ -98,7 +98,7 @@ export const learners: LearnerRow[] = [
     useCase: 'Credential management and access review',
   },
   {
-    person: P.tanvi,
+    person: P.chloe,
     rating: 7.0,
     verdict: 'Good',
     verdictNote: 'Good functional coverage; technical depth is the next step.',
@@ -111,7 +111,7 @@ export const learners: LearnerRow[] = [
     useCase: 'Onboarding checklist automation',
   },
   {
-    person: P.riya,
+    person: P.lucy,
     rating: 7.0,
     verdict: 'Good',
     verdictNote: 'Business-side depth is the strength here rather than the build.',
@@ -124,7 +124,7 @@ export const learners: LearnerRow[] = [
     useCase: 'Billing and invoice tracking',
   },
   {
-    person: P.priya,
+    person: P.hannah,
     rating: 4.5,
     verdict: 'Needs support',
     verdictNote: 'Attendance and assignment completion are both below the bar.',

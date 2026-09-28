@@ -44,14 +44,14 @@ export interface EffortResource {
 
 export const effortResources: EffortResource[] = [
   { name: 'Dev pool', byMonth: [207, 177, 136, 168, 138, 178] },
-  { name: 'Arjun N.', byMonth: [174, 152, 121, 52, 58, 30] },
-  { name: 'Rohan M.', byMonth: [null, null, null, 54, 101, 134] },
-  { name: 'Neha I.', byMonth: [null, null, null, 65, 40, 90] },
-  { name: 'Kabir S.', byMonth: [null, null, 34, 36, 52, 71] },
-  { name: 'Sana Q.', byMonth: [null, null, null, 4, 52, 34] },
-  { name: 'Ananya R.', byMonth: [null, null, null, null, 42, 26] },
-  { name: 'Tanvi D.', byMonth: [null, null, null, 21, 19, 12] },
-  { name: 'Riya K.', byMonth: [null, null, null, 4, 12, 4] },
+  { name: 'Harry C.', byMonth: [174, 152, 121, 52, 58, 30] },
+  { name: 'Jack M.', byMonth: [null, null, null, 54, 101, 134] },
+  { name: 'Grace H.', byMonth: [null, null, null, 65, 40, 90] },
+  { name: 'Thomas R.', byMonth: [null, null, 34, 36, 52, 71] },
+  { name: 'Sophie M.', byMonth: [null, null, null, 4, 52, 34] },
+  { name: 'Emily C.', byMonth: [null, null, null, null, 42, 26] },
+  { name: 'Chloe T.', byMonth: [null, null, null, 21, 19, 12] },
+  { name: 'Lucy W.', byMonth: [null, null, null, 4, 12, 4] },
 ];
 
 export const effortKickoff = '01 Nov 2025';
