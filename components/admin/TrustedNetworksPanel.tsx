@@ -25,14 +25,19 @@ interface Entry {
   addedAt: number | null;
   addedBy: string;
   source: 'panel' | 'env';
+  /** This entry's range contains the address this request came from. */
+  coversYou: boolean;
 }
 interface Listing {
   entries: Entry[];
   yourIp: string | null;
+  /** What "Add my current IP" adds: the address for IPv4, its /64 for IPv6. */
+  yourNetwork: string | null;
+  yourIpCovered: boolean;
 }
 
 const REFUSALS: Record<string, string> = {
-  invalid: 'That is not an address or range this list accepts. Use an IP (203.0.113.7) or a range no wider than /16 for IPv4 or /32 for IPv6.',
+  invalid: 'That is not an address or range this list accepts. Use an IP (203.0.113.7) or a range no wider than /24 for IPv4 or /48 for IPv6.',
   full: 'The list is full. Remove a network you no longer use first.',
   env: 'That one comes from the Worker settings and can only be removed there.',
   missing: 'That network is not on the list.',
@@ -77,8 +82,7 @@ export function TrustedNetworksPanel() {
   if (loadError) return <PanelError message={loadError} />;
   if (!listing) return <p className="text-xs text-muted-foreground">Loading…</p>;
 
-  const yourIp = listing.yourIp;
-  const listed = (ip: string) => listing.entries.some((e) => e.cidr === `${ip}/${ip.includes(':') ? 128 : 32}`);
+  const { yourIp, yourNetwork, yourIpCovered } = listing;
 
   return (
     <div className="flex flex-col gap-4">
@@ -106,7 +110,7 @@ export function TrustedNetworksPanel() {
               <tr key={entry.cidr} className="border-t">
                 <td className="px-3 py-2 font-mono">
                   {entry.cidr}
-                  {yourIp && entry.cidr.startsWith(`${yourIp}/`) ? <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] text-primary">you</span> : null}
+                  {entry.coversYou ? <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] text-primary">you</span> : null}
                 </td>
                 <td className="px-3 py-2">{entry.label || <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-3 py-2 text-muted-foreground">{entry.source === 'env' ? 'Worker setting' : 'This panel'}</td>
@@ -124,15 +128,16 @@ export function TrustedNetworksPanel() {
         </table>
       </div>
 
-      {yourIp && !listed(yourIp) ? (
+      {yourIp && yourNetwork && !yourIpCovered ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" disabled={busy} onClick={() => void change('trusted-add', yourIp, 'Added from this browser')}>
+          <Button size="sm" disabled={busy} onClick={() => void change('trusted-add', yourNetwork, 'Added from this browser')}>
             Add my current IP
           </Button>
-          <span className="font-mono text-[11px] text-muted-foreground">{yourIp}</span>
+          <span className="font-mono text-[11px] text-muted-foreground">{yourNetwork}</span>
+          {yourNetwork.includes(':') ? <span className="text-[11px] text-muted-foreground">(the /64 your IPv6 address {yourIp} rotates within)</span> : null}
         </div>
-      ) : yourIp ? (
-        <p className="text-[11px] text-muted-foreground">Your current IP, <span className="font-mono">{yourIp}</span>, is on the list.</p>
+      ) : yourIp && yourIpCovered ? (
+        <p className="text-[11px] text-muted-foreground">Your current IP, <span className="font-mono">{yourIp}</span>, is covered by the list.</p>
       ) : null}
 
       <form
@@ -152,7 +157,7 @@ export function TrustedNetworksPanel() {
         </div>
         <Button type="submit" size="sm" disabled={busy || !cidr.trim()}>Add network</Button>
       </form>
-      {failed ? <p className="text-xs text-destructive">{failed}</p> : null}
+      {failed ? <p role="alert" className="text-xs text-destructive">{failed}</p> : null}
     </div>
   );
 }

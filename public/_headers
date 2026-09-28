@@ -1,0 +1,26 @@
+# Cache rules for files in public/, which Workers static assets serve with
+# `max-age=0, must-revalidate` by default: a revalidation round trip per image
+# on every visit, sixty of them for the turntable.
+#
+# A day, not a year. These names are not content-hashed, so `immutable` would
+# be a promise the files cannot keep: re-running scripts/turntable-frames.swift
+# or replacing a photo writes the same path, and a year-long cache would show
+# the old one until it expired. After the day, stale-while-revalidate serves
+# the cached copy at once and refreshes it in the background, so a returning
+# visitor never waits on it and a changed file lands within one visit.
+#
+# The résumé PDF is left out on purpose: it is the file most likely to change
+# and the one a recruiter must not get an old copy of.
+#
+# The /_next/static/* rule is the one the build writes into dist/client/ when
+# public/ has no _headers of its own. With this file present it writes
+# nothing, so the rule is repeated here: drop it and every hashed script,
+# stylesheet and font silently goes back to revalidating on each visit.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+/turntable/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/avatar*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/portrait*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800

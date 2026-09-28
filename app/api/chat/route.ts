@@ -1,11 +1,11 @@
-import { answerQuestion } from '@/content/faq';
+import { answerQuestion, answers } from '@/content/faq';
 import { recordChatHealth } from '@/lib/analytics/chat-health';
 import { chargeChatRequest } from '@/lib/analytics/chat-limit';
-import { applyQuota, chargeChatQuota, chatExemption, UNLIMITED_VERDICT } from '@/lib/analytics/chat-quota';
+import { applyQuota, chargeChatQuota, chargeModelCall, chatExemption, UNLIMITED_VERDICT } from '@/lib/analytics/chat-quota';
 import { ensureSchema, getDb } from '@/lib/analytics/db';
 import { DAILY_LIMIT_CODE } from '@/lib/chat/quota';
-import { modelEligible as isModelEligible, screenHistory } from '@/lib/chat/gate';
-import { composeAnswer, nimConfigured, streamAnswer, type ChatTurn } from '@/lib/chat/nim';
+import { modelEligible as isModelEligible, screenHistory, translationTarget } from '@/lib/chat/gate';
+import { composeAnswer, nimConfigured, streamAnswer, streamTranslation, translateAnswer, type ChatTurn } from '@/lib/chat/nim';
 import { readCapped } from '@/lib/read-capped';
 import { signTurn, verifyHistory, type IncomingTurn } from '@/lib/chat/turn-sig';
 /**
@@ -55,9 +55,11 @@ export async function POST(request:Request) {
  // refused caller still gets the portfolio answer, labelled "Offline".
  // The owner testing the site (an admin session, or CHAT_UNLIMITED_CIDRS) is
  // held to neither limit below. Still charged, so the backend gets a bucket.
- const db=getDb();
- const exempt=await chatExemption(request,db&&await ensureSchema(db)?db:null);
- const client=await chargeChatRequest(request);
+ // The schema is ensured once, then the exemption and the per-minute charge
+ // run side by side: neither reads what the other writes, and the charge
+ // happens for an exempt caller too, so there is nothing to order.
+ const db=getDb();const ready=db&&await ensureSchema(db)?db:null;
+ const [exempt,client]=await Promise.all([chatExemption(request,ready),chargeChatRequest(request)]);
  if(!client.allowed&&!exempt)return Response.json({error:'Too many questions just now. Try again in a minute.'},{status:429,headers:{'Retry-After':'60','Cache-Control':'private, no-store'}});
  // The daily allowance: 50 questions per browser in 24 hours, with a looser
  // per-network ceiling behind it (lib/analytics/chat-quota.ts). Charged after
@@ -66,7 +68,7 @@ export async function POST(request:Request) {
  // which is how the panel can warn at five left rather than at none; a
  // refusal says which counter refused and when it resets, and the panel
  // closes the input rather than answering offline.
- const allowance=exempt?UNLIMITED_VERDICT:await chargeChatQuota(request,client.bucket,db&&await ensureSchema(db)?db:null);
+ const allowance=exempt?UNLIMITED_VERDICT:await chargeChatQuota(request,client.bucket,ready);
  const answered=(response:Response)=>applyQuota(response,allowance);
  if(!allowance.allowed)return answered(Response.json({error:allowance.refusedBy==='network'?'This network has reached today\u2019s question limit.':'You have reached today\u2019s question limit.',code:DAILY_LIMIT_CODE,refusedBy:allowance.refusedBy,limit:allowance.quota?.limit,resetAt:allowance.quota?.resetAt},{status:429,headers:{'Retry-After':String(Math.max(60,Math.ceil(((allowance.quota?.resetAt??0)-Date.now())/1000))),'Cache-Control':'private, no-store'}}));
  const fallback=answerQuestion(body.message);
@@ -114,8 +116,14 @@ export async function POST(request:Request) {
  // falls through to the no-match answer, and `unmatched` alone used to be
  // enough to send it to NVIDIA. The rule lives in lib/chat/gate.ts.
  const modelEligible=isModelEligible(fallback,history,body.message);
+ // The Python tier picks an answer id and serves that entry's approved text,
+ // so its reply is labelled for what it is, "AI matched", not the NIM tier's
+ // "grounded" (which composes prose). The link and the carried id come from
+ // the entry it chose, looked up in our own answer set: its choice can differ
+ // from the regex match here, and the old code paired the backend's answer
+ // with the local match's link. An id we do not recognise is not served.
  if(backend&&enrichable){
-  try{const response=await fetch(backend,{method:'POST',headers:{'Content-Type':'application/json',...(process.env.CHAT_BACKEND_TOKEN?{'Authorization':`Bearer ${process.env.CHAT_BACKEND_TOKEN}`}:{}),...(client.bucket?{'X-Client-Bucket':client.bucket}:{})},body:JSON.stringify({message:body.message}),signal:AbortSignal.timeout(7000)});if(response.ok){const data=await response.json() as {answer?:string;mode?:string};if(typeof data.answer==='string'){backendOk=true;recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return answered(Response.json(await signed({answer:data.answer.slice(0,4000),mode:data.mode==='ai'?'ai':'faq',source:data.mode==='ai'?'AI · grounded in portfolio':fallback.source,href:fallback.href})))}}backendFailed=!backendOk}catch{backendFailed=true;/* An unavailable model must never block portfolio answers. */}
+  try{const response=await fetch(backend,{method:'POST',headers:{'Content-Type':'application/json',...(process.env.CHAT_BACKEND_TOKEN?{'Authorization':`Bearer ${process.env.CHAT_BACKEND_TOKEN}`}:{}),...(client.bucket?{'X-Client-Bucket':client.bucket}:{})},body:JSON.stringify({message:body.message}),signal:AbortSignal.timeout(7000)});if(response.ok){const data=await response.json() as {answer?:string;mode?:string;id?:unknown};const ai=data.mode==='ai';const chosen=ai&&typeof data.id==='string'?answers.find(entry=>entry.id===data.id):undefined;if(typeof data.answer==='string'&&(!ai||chosen?.id)){backendOk=true;recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return answered(Response.json(await signed(chosen?.id?{answer:data.answer.slice(0,4000),mode:'ai',source:'AI matched · portfolio facts',href:chosen.href,ids:[chosen.id]}:{answer:data.answer.slice(0,4000),mode:'faq',source:fallback.source,href:fallback.href,...(fallback.id?{ids:[fallback.id]}:{})})))}}backendFailed=!backendOk}catch{backendFailed=true;/* An unavailable model must never block portfolio answers. */}
  }
  // NVIDIA NIM, called straight from this Worker.
  //
@@ -136,9 +144,28 @@ export async function POST(request:Request) {
  // reply reaches the visitor, never whether the model is allowed to write
  // one. A stream that fails at any point emits a `fallback` frame carrying
  // the curated answer, and the panel replaces what it has shown.
- if(body.stream===true&&modelEligible&&!backendOk&&nimConfigured()){
+ //
+ // A site-wide ceiling sits in front of both paths: CHAT_MODEL_DAILY_LIMIT
+ // calls per 24 hours, one chat_quota row (chargeModelCall). Charged only
+ // when the model is about to be called, and past it the curated answer is
+ // served as though the model had not been configured: no error, no
+ // "offline" label. Exempt callers are counted and never refused.
+ //
+ // A matched first question in another language is a translation, not a
+ // composition: the model gets the curated answer and the language name and
+ // never the visitor's words (translationTarget in gate.ts). Mid-conversation
+ // the question and history go out as before.
+ const wantsModel=modelEligible&&!backendOk&&nimConfigured();
+ const capped=wantsModel&&!(await chargeModelCall(ready))&&!exempt;
+ if(capped)console.warn('[chat] model daily cap reached; serving the curated answer');
+ const language=wantsModel?translationTarget(fallback,history,body.message):null;
+ const ids=fallback.id?[fallback.id,...carried]:carried;
+ if(body.stream===true&&wantsModel&&!capped){
   const encoder=new TextEncoder();
   const curated=await signed(fallback.id?{...fallback,ids:[fallback.id]}:fallback);
+  // Ours, so cancel() can stop the upstream call when the visitor goes: the
+  // request's own signal does not fire when only the response is abandoned.
+  const local=new AbortController();const signal=AbortSignal.any([request.signal,local.signal]);
   const stream=new ReadableStream({async start(controller){
    const send=(event:string,data:unknown)=>controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
    // Recorded once the terminal frame is known, not when the stream opens.
@@ -146,7 +173,7 @@ export async function POST(request:Request) {
    // looked like a success on the Backend health card.
    let terminal:'done'|'fallback'|null=null;let failed=false;
    try{
-    for await(const part of streamAnswer(body.message,history,fallback.id?[fallback.id,...carried]:carried,request.signal)){
+    for await(const part of language&&fallback.id?streamTranslation([fallback.id],language.name,signal):streamAnswer(body.message,history,ids,signal)){
      if(part.type==='delta')send('delta',{text:part.text});
      else if(part.type==='done'){send('done',await signed({answer:part.answer,href:part.href??fallback.href,ids:part.ids,source:'AI · grounded in portfolio',mode:'ai'}));terminal='done'}
      else {send('fallback',curated);terminal='fallback';failed=true}
@@ -159,13 +186,17 @@ export async function POST(request:Request) {
     // can throw too, when the visitor has gone, so it is guarded here.
     failed=true;if(!terminal)try{send('fallback',curated)}catch{/* nobody is listening */}
    }
-   recordChatHealth({configured:true,ok:!failed,failed,guarded:false});
+   // A visitor who stopped the reply or left is not a model failure. The
+   // abort surfaces as a `fail` part, or as an enqueue throwing, and either
+   // used to count against the Backend health card.
+   const cancelled=signal.aborted;
+   recordChatHealth({configured:true,ok:!failed&&!cancelled,failed:failed&&!cancelled,guarded:false});
    try{controller.close()}catch{/* already closed by a cancelled request */}
-  }});
+  },cancel(){local.abort()}});
   return answered(new Response(stream,{headers:{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'private, no-store','X-Accel-Buffering':'no'}}));
  }
- if(modelEligible&&!backendOk&&nimConfigured()){
-  const picked=await composeAnswer(body.message,history,fallback.id?[fallback.id,...carried]:carried);
+ if(wantsModel&&!capped){
+  const picked=language&&fallback.id?await translateAnswer([fallback.id],language.name):await composeAnswer(body.message,history,ids);
   if(picked){recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return answered(Response.json(await signed({answer:picked.answer.slice(0,4000),mode:'ai',source:'AI · grounded in portfolio',href:picked.href??fallback.href,ids:picked.ids})))}
   modelFailed=true;
  }

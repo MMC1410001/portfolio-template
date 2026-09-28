@@ -9,6 +9,7 @@
  * test runner.
  *
  * Twenty lines here, no new dependency, and the source stays untouched.
+ * The same holds for the two runtime-only imports mapped to stubs below.
  */
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -16,7 +17,21 @@ import { dirname, resolve as resolvePath } from 'node:path';
 
 const ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), '..');
 
+// Runtime modules a bare Node process does not have. `cloudflare:workers` is
+// the Worker runtime (lib/analytics/db.ts reads its binding from it) and
+// `next/server` is a vinext shim; both are why the route handlers under
+// app/api/ could not be imported by a test. Each maps to a small stub in
+// tests/stubs/, which says what it stands in for.
+const STUBS = {
+  'cloudflare:workers': 'tests/stubs/cloudflare-workers.ts',
+  'next/server': 'tests/stubs/next-server.ts',
+};
+
 export async function resolve(specifier, context, next) {
+  if (Object.hasOwn(STUBS, specifier)) {
+    return next(pathToFileURL(resolvePath(ROOT, STUBS[specifier])).href, context);
+  }
+
   // `@/x` is the repo-root alias from tsconfig paths.
   if (specifier.startsWith('@/')) {
     const base = resolvePath(ROOT, specifier.slice(2));

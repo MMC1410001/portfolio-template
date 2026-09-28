@@ -8,6 +8,20 @@
       "when": 1757000000000,
       "tag": "0001_init_analytics",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790588634000,
+      "tag": "0002_chat_quota",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790590663000,
+      "tag": "0003_trusted_networks",
+      "breakpoints": true
     }
   ]
 }

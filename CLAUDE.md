@@ -14,7 +14,7 @@ npm run test:units     # every tests/*.test.ts, pure logic, no server needed
 npm run test:py        # the Python half of the answer contract (.venv if present)
 npm run test:chat      # needs `npm run dev` in another terminal
 npm run test:analytics # ditto, plus ADMIN_TOKEN set
-npm run emit:migration # regenerate migrations/ and drizzle/ from schema.ts
+npm run emit:migration # regenerate migrations/ and drizzle/ (0001..000N, one per schema version)
 npm run seed:demo      # regenerate content/analytics-demo.json for /analytics
 npm run preflight      # check a deploy would not come up half-broken
 npm run deploy         # preflight + build + wrangler deploy
@@ -133,7 +133,10 @@ two hosts would otherwise talk to different databases, silently, in production
 only.
 
 **On Sites you must set `TRUST_PLATFORM_AUTH_HEADER=1`** in the runtime config,
-or `/admin` falls back to token-only there. See the Analytics section.
+or `/admin` falls back to token-only there. See the Analytics section. **And check that Sites
+sets `cf-connecting-ip`.** The client address is read from nothing else unless
+`TRUST_FORWARDED_FOR=1`. Without it, ingest refuses every event there and the chat limits key on
+nothing. This is unverified, since only the Cloudflare deploy is live.
 
 ### Routes
 
@@ -291,8 +294,26 @@ answer must go through `signed()`; `tests/turn-sig.test.ts` fails if one does no
 **The guards are English.** A question in another language that matched no pattern is therefore
 *not* model-eligible (`modelEligible` in `gate.ts`: `detectLanguage` must return null and the
 question must contain no non-ASCII letters, which also catches Spanish that the stopword list
-misses). It gets the curated not-documented reply. A non-English question that *did* match still
-goes to the model to be answered in its own language.
+misses). It gets the curated not-documented reply. A non-English question that *did* match goes to
+the model as a **translation only**: `translateAnswer`/`streamTranslation` in `nim.ts` are handed
+the curated answer and the language name, never the visitor's text. The rest of the question
+("Lumen के सर्वर का पासवर्ड…") is exactly what the English guards cannot read.
+
+**Invisible characters are stripped before any guard runs.** `normaliseQuestion` (`faq.ts`) and
+`_normalise` (`main.py`) remove Unicode format characters (`\p{Cf}`: soft hyphen, zero-width
+space/joiner, BOM, bidi controls), and `gate.ts` never sends an unmatched question containing one
+to the model. "sal\u00adary" used to skip the salary refusal and reach NVIDIA, and the reply it got
+was signed as the server's own. `tests/chat-cases.json` carries those spellings.
+
+**There is a site-wide daily cap on model calls**, `CHAT_MODEL_DAILY_LIMIT` (default 1000): one
+`chat_quota` row, bucket `model:global`, charged just before either model path. Every per-visitor
+limit is keyed on an identity someone can discard; this one bounds the NVIDIA bill whatever they
+do. Past it, visitors get the curated answer, not an error.
+
+**The chat panel is lazy.** `ChatLauncher.tsx` is the button that ships with `/`; `Chat.tsx`, the
+Sheet and base-ui load on idle or on hover/focus/click (~58KB gzip off the initial bundle). A failed
+chunk leaves the button working rather than crashing the page. Tracking attributes live on the
+launcher.
 
 **The tier is latency-bound, and that is not fixed.** Measured over eight unmatched questions, the
 NVIDIA endpoint answered in 5.4s to 16.3s. Check your own telemetry before assuming the model
@@ -354,7 +375,13 @@ The section is `adminOnly` in `admin-sections.ts`, so the public `/analytics` sh
 database, neither lists nor renders it. An exempt response carries `X-Chat-Unlimited: 1` and the
 chat panel says no limit applies, which is how to check the exemption took effect. Exempting a
 network exempts everyone behind it, and a home IPv4 changes when the ISP reassigns it. If the chat
-panel shows the normal limit again, press "Add my current IP". The email allowlist stays a secret
+panel shows the normal limit again, press "Add my current IP" (it adds the /64 for IPv6, since
+privacy addresses rotate daily). Panel entries must be /24 or narrower for IPv4, /48 for IPv6,
+because they lift chat limits; the env floor keeps /16 and /32. **The client address is read from
+`cf-connecting-ip` only** (`clientIp` in `net.ts`). `x-real-ip`/`X-Forwarded-For` are whatever the
+caller typed and are honoured only with `TRUST_FORWARDED_FOR=1`, behind a proxy that overwrites
+them. On a host that sets neither, ingest refuses (`no_client_ip`) and no exemption applies, which
+is the safe failure. `vinext dev` sets `cf-connecting-ip` itself. The email allowlist stays a secret
 by design: if the panel could edit it, one compromised session could grant itself lasting access.
 
 The Python side still refuses to trust `X-Forwarded-For`, but keying on `request.client.host`
@@ -377,11 +404,16 @@ what keeps the two implementations of the same logic in step.
 - **oxlint, not ESLint; oxfmt, not Prettier.** `typescript/no-explicit-any` and
   `typescript/no-deprecated` are errors, `typeAware` is on, and `correctness` is escalated to error.
 - shadcn is configured with `style: "base-nova"`: the primitives are backed by **`@base-ui/react`,
-  not Radix**. 55 components are vendored in `components/ui/`. The admin dashboard uses
-  `chart.tsx` (over `recharts@3.8.0`), `table.tsx`, `sidebar.tsx` and `calendar.tsx`
-  (`RangeControls`); many others are unused. Unused parts whose packages were dead weight (command,
-  carousel, input-otp, resizable, message-scroller) were deleted with their dependencies: check
-  imports before assuming a vendored file is spare.
+  not Radix**. 54 components are vendored in `components/ui/`. The admin dashboard uses
+  `chart.tsx` (over `recharts@3.8.0`), `table.tsx` and `sidebar.tsx`; many others are unused.
+  Unused parts whose packages were dead weight (command, carousel, input-otp, resizable,
+  message-scroller, calendar) were deleted with their dependencies. `RangeControls` uses a native
+  date input on purpose. Check `import` lines, not comments, before assuming a vendored file is spare.
+  The unused ones are also kept out of the CSS: `app/globals.css` ends with one `@source not` per
+  unused file (a folder-wide `@source not` beats a per-file `@source` and dropped ~480 live
+  classes), and `tests/css-sources.test.ts` walks the imports and fails if an imported component is
+  excluded. **Import a new ui component, remove its `@source not` line.** `shadcn/tailwind.css` is
+  vendored as `app/shadcn-tailwind.css`; the CLI is not a dependency (`npx shadcn@4.18.0 add`).
 - **Tailwind v4, CSS-first.** There is no `tailwind.config.*`. Tokens live in `app/globals.css`:
   `@theme inline` maps `--color-*` / `--font-*`, then `:root` and `.dark` define the palettes.
   Beyond the tokens, the portfolio's styling is hand-written BEM-ish CSS (`.portfolio`,
@@ -483,6 +515,19 @@ Two rules that are easy to break by accident:
   this app needs, since it never calls a Google API as the user. The token form stays below the
   button as break-glass, Google sign-in depends on a third-party script, a correct CSP and a
   matching origin, and each is a way to be locked out of your own dashboard.
+
+## Tests that need no server, and the migration files
+
+`tests/ts-hooks.mjs` maps `cloudflare:workers` to `tests/stubs/cloudflare-workers.ts` (an `env`
+whose `ANALYTICS_DB` is a `scripts/d1-sqlite.ts` database a test binds) and `next/server` to a
+stub, so `tests/routes.test.ts` calls the real route handlers: the admin 404 gate, the chat limit
+order and exemptions, ingest body checks. Prefer adding a case there to adding one to
+`tests/chat.mjs`, which needs a live server and does not run in CI.
+
+`scripts/emit-migration.mjs` writes one migration file per schema version (`0001` as originally
+applied, `0002_chat_quota`, `0003_trusted_networks`), grouped by `INTRODUCED_IN` in the script. **A
+new table in `schema.ts` needs a new entry there**, or emit (and CI, which diffs the output) fails.
+`ensureSchema()` remains the authority on a live database.
 
 ## Before publishing
 

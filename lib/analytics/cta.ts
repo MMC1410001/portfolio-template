@@ -18,7 +18,7 @@
  */
 
 import { queueEvent } from './queue';
-import { isUntrackedPath } from './scope';
+import { isUntrackedPath, trackingSuppressed } from './scope';
 import { normaliseTag } from './normalise';
 import { currentSection } from './sections';
 import { currentMode } from './mode';
@@ -127,10 +127,16 @@ function scheduleScan(records: MutationRecord[]): void {
  * panel's contents mount only when the Sheet opens, and ImmersiveSystem mounts
  * lazily on reveal. A one-off querySelectorAll at install time would miss every
  * tag inside both.
+ *
+ * Not installed where nothing would be recorded. /admin re-renders its panels
+ * constantly, so a document-wide MutationObserver there scanned for
+ * impressions that queueEvent() was always going to refuse.
+ * `syncAnalyticsRoute()` installs it on the next navigation that can record.
  */
 export function installCtaVisibility(): void {
   if (observer || typeof window === 'undefined') return;
   if (typeof IntersectionObserver !== 'function') return;
+  if (trackingSuppressed()) return;
 
   observer = new IntersectionObserver(onIntersect, {
     threshold: [0, VISIBLE_RATIO, 1],
@@ -144,6 +150,14 @@ export function installCtaVisibility(): void {
   }
 }
 
+/**
+ * Start the impressions over, for a new page.
+ *
+ * `seen` is per page, so the footer seen on `/`, then again after a round
+ * trip through `/dashboards`, is two impressions in two views. The dashboard
+ * counts distinct sessions, so that cannot inflate a CTA's reach. The pending
+ * timers belong to nodes that are gone.
+ */
 export function resetCtaViews(): void {
   seen = new Set();
   for (const timer of pending.values()) clearTimeout(timer);
@@ -152,8 +166,8 @@ export function resetCtaViews(): void {
   scan();
 }
 
-/** Test seam. Not for application code. */
-export function __resetCtaVisibility(): void {
+/** Take the observers down, for a route where nothing is recorded. */
+export function uninstallCtaVisibility(): void {
   observer?.disconnect();
   scanner?.disconnect();
   observer = null;
@@ -162,7 +176,12 @@ export function __resetCtaVisibility(): void {
     clearTimeout(scanTimer);
     scanTimer = null;
   }
-  seen = new Set();
   for (const timer of pending.values()) clearTimeout(timer);
   pending.clear();
+}
+
+/** Test seam. Not for application code. */
+export function __resetCtaVisibility(): void {
+  uninstallCtaVisibility();
+  seen = new Set();
 }

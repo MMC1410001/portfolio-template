@@ -20,7 +20,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { answers } from '@/content/faq';
-import { composeAnswer, nimConfigured, streamAnswer, type StreamEvent } from '@/lib/chat/nim';
+import { composeAnswer, nimConfigured, streamAnswer, streamTranslation, translateAnswer, type StreamEvent } from '@/lib/chat/nim';
 
 const real = globalThis.fetch;
 
@@ -207,6 +207,45 @@ test('a streamed invented link fails', async () => {
   const events = await drain('where is his cv?');
   globalThis.fetch = real;
   assert.equal(events.at(-1)?.type, 'fail');
+});
+
+test('a translation sends the curated answer and the language, and nothing the visitor wrote', async () => {
+  const { calls } = stub('{"answer":"वह 60 दिन के नोटिस पर हैं।","used":["availability"]}');
+  const picked = await withKey(KEY, () => translateAnswer(['availability'], 'Hindi'));
+  globalThis.fetch = real;
+  assert.equal(picked?.answer, 'वह 60 दिन के नोटिस पर हैं।');
+  assert.deepEqual(picked?.ids, ['availability']);
+  const messages = calls[0].body.messages;
+  assert.deepEqual(messages.map((m) => m.role), ['system', 'user']);
+  assert.equal(messages[1].content, 'Translate SOURCES into Hindi.');
+  const system = messages[0].content;
+  const sources = JSON.parse(system.slice(system.indexOf('<SOURCES>') + 9, system.indexOf('</SOURCES>'))) as { id: string }[];
+  assert.deepEqual(sources.map((s) => s.id), ['availability'], 'only the matched answer, no shortlist');
+});
+
+test('a streamed translation carries no question either, and still checks links', async () => {
+  let sent: { messages: { role: string; content: string }[] } | null = null;
+  const encoder = new TextEncoder();
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    sent = JSON.parse(init.body as string) as typeof sent;
+    const text = `data: ${JSON.stringify({ choices: [{ delta: { content: 'Il est en préavis de 60 jours, avec rachat possible, et peut rejoindre peu après une offre.' } }] })}\n\ndata: [DONE]\n\n`;
+    return new Response(new ReadableStream({ start(controller) { controller.enqueue(encoder.encode(text)); controller.close(); } }));
+  }) as typeof fetch;
+  const events: StreamEvent[] = [];
+  await withKey(KEY, async () => {
+    for await (const event of streamTranslation(['availability'], 'French')) events.push(event);
+  });
+  globalThis.fetch = real;
+  assert.equal(events.at(-1)?.type, 'done');
+  assert.deepEqual(sent!.messages.map((m) => m.role), ['system', 'user']);
+  assert.equal(sent!.messages[1].content, 'Translate SOURCES into French.');
+});
+
+test('a translation of an unknown id makes no call', async () => {
+  const { calls } = stub('{"answer":"x","used":[]}');
+  assert.equal(await withKey(KEY, () => translateAnswer(['no-such-answer'], 'Hindi')), null);
+  assert.equal(calls.length, 0);
+  globalThis.fetch = real;
 });
 
 test('fenced JSON still parses', async () => {

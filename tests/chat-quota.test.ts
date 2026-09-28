@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { openDemoDatabase } from '../scripts/d1-sqlite';
 import { SCHEMA_STATEMENTS } from '../lib/analytics/schema';
-import { applyQuota, chargeChatQuota, chargeQuota, chatExemption, mintBrowserId, readBrowserId, QUOTA_COOKIE, UNLIMITED_VERDICT } from '../lib/analytics/chat-quota';
+import { applyQuota, chargeChatQuota, chargeModelCall, chargeQuota, chatExemption, chatModelDailyLimit, mintBrowserId, readBrowserId, MODEL_BUCKET, QUOTA_COOKIE, UNLIMITED_VERDICT } from '../lib/analytics/chat-quota';
 import { resetTrustedCache } from '../lib/analytics/trusted';
 import { DAILY_QUESTIONS, QUOTA_WINDOW_MS, parseQuota, quotaExpired, readQuota, serialiseQuota } from '../lib/chat/quota';
 
@@ -175,4 +175,30 @@ test('the route skips both limits for an exempt caller, and only for one', () =>
   const route = readFileSync(new URL('../app/api/chat/route.ts', import.meta.url), 'utf8');
   assert.match(route, /if\(!client\.allowed&&!exempt\)return/);
   assert.match(route, /const allowance=exempt\?UNLIMITED_VERDICT:await chargeChatQuota\(/);
+});
+
+test('the site-wide model cap is one row, 1000 a day by default, and degrades open', async () => {
+  const { db, raw, close } = freshDb();
+  try {
+    await withEnv({ CHAT_MODEL_DAILY_LIMIT: undefined }, async () => {
+      assert.equal(chatModelDailyLimit(), 1000);
+    });
+    await withEnv({ CHAT_MODEL_DAILY_LIMIT: '2' }, async () => {
+      assert.equal(await chargeModelCall(db, T0), true);
+      assert.equal(await chargeModelCall(db, T0 + 1), true);
+      assert.equal(await chargeModelCall(db, T0 + 2), false, 'the third call in the window is refused');
+      assert.equal(await chargeModelCall(db, T0 + 1 + QUOTA_WINDOW_MS), true, 'and the window resets');
+    });
+    assert.deepEqual(raw.prepare('SELECT bucket FROM chat_quota').all().map((row) => row.bucket), [MODEL_BUCKET]);
+  } finally {
+    close();
+  }
+  assert.equal(await chargeModelCall(null, T0), true, 'no database means no cap');
+});
+
+test('the route checks the model cap before either model path, and never refuses an exempt caller', () => {
+  const route = readFileSync(new URL('../app/api/chat/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /const capped=wantsModel&&!\(await chargeModelCall\(ready\)\)&&!exempt;/);
+  assert.match(route, /if\(body\.stream===true&&wantsModel&&!capped\)/);
+  assert.match(route, /if\(wantsModel&&!capped\)/);
 });

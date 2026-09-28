@@ -14,11 +14,22 @@ import Link from 'next/link';
 import { RETENTION_DAYS } from '@/lib/analytics/schema';
 import { DAILY_QUESTIONS } from '@/lib/chat/quota';
 import { AnalyticsOptOut } from '@/components/portfolio/AnalyticsOptOut';
+import { profile } from '@/content/portfolio';
 
 export const metadata: Metadata = {
   title: 'Privacy · Alex Rivera',
   description:
     'What this portfolio measures, how long it keeps it, and how to turn it off.',
+  alternates: { canonical: '/privacy' },
+  openGraph: {
+    title: 'Privacy · Alex Rivera',
+    description:
+      'What this portfolio measures, how long it keeps it, and how to turn it off.',
+    url: '/privacy',
+    type: 'website',
+    // A page-level openGraph replaces the layout's whole, share image included.
+    images: [{ url: profile.avatar, width: 720, height: 720, alt: profile.name }],
+  },
 };
 
 export default function PrivacyPage() {
@@ -92,8 +103,12 @@ export default function PrivacyPage() {
             <strong>The name of your network operator</strong>, the internet
             provider or mobile carrier the request came through, as the host
             reports it. It is how a visit from a company network is told apart
-            from one on a home connection; it is not an address, and it does
-            not identify you.
+            from one on a home connection. It is not an address, but it is not
+            anonymous either: a company network is often named after the
+            company, and together with the city it can narrow a visit down to
+            one organisation, and at this site&rsquo;s traffic sometimes to one
+            person. That is why the dashboard showing it is private and read
+            only by me.
           </li>
         </ul>
         <p>
@@ -228,10 +243,15 @@ export default function PrivacyPage() {
         <p>
           Two identifiers make this work, and neither carries anything about
           you: a random id for the current browser tab, and a random id for
-          this browser so a second visit is not counted as a stranger. Both are
-          stored by your browser, not in a cookie, and clearing site data
-          removes them. The one cookie this site sets for visitors is the chat
-          limit&rsquo;s, described above.
+          this browser so a second visit is not counted as a stranger. If you
+          arrived on a link with campaign parameters, the tab also keeps a copy
+          of them until it is closed, so the visit is credited to the link.
+          All of it is stored by your browser, not in a cookie, and clearing
+          site data removes it. Turning measurement off above deletes all
+          three straight away, so turning it back on later starts as a new
+          visitor rather than reconnecting to the old visits. The one cookie
+          this site sets for visitors is the chat limit&rsquo;s, described
+          above.
         </p>
       </section>
 

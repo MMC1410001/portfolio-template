@@ -311,8 +311,9 @@ function HowItWorks() {
     ],
     [
       'No IP address is ever stored',
-      'Only a salted SHA-256 hash (used solely as a rate-limit key) plus a ' +
-        'coarse /24 or /48 network prefix. The salt is required: an unsalted ' +
+      'Only salted SHA-256 hashes (one counts distinct visitors, one keys the ' +
+        'rate limit) plus a coarse /24 or /48 network prefix. The salt is ' +
+        'required: an unsalted ' +
         'hash of the IPv4 space is reversible in minutes, so ingest refuses ' +
         'to write at all when it is unset.',
     ],

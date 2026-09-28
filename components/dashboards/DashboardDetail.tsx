@@ -35,10 +35,21 @@
  * A server component picking the board would look simpler and would not
  * split: @vitejs/plugin-rsc groups client references by the server chunk that
  * imports them, so all of them would still land in one client chunk.
+ *
+ * ── A chunk that never arrives ────────────────────────────────────────────
+ * Splitting has a cost: a board is now a second download, and one that fails
+ * (offline, or a hashed chunk removed by a redeploy while the tab was open)
+ * rejects its `lazy()`, which `<Suspense>` does not catch. Without the
+ * boundary around it that unmounted the whole page. With it, the header,
+ * the explanation and the navigation stay, the board's slot says what
+ * happened, and a plain `<a>` reloads the page, which fetches the current
+ * chunk names. A client-side `<Link>` would reuse the stale ones.
  */
 import { lazy, Suspense, type ComponentType } from 'react';
 import Link from 'next/link';
 import { dashboards, type Dashboard } from '@/content/dashboards';
+import SceneBoundary from '@/components/portfolio/SceneBoundary';
+import { queueEvent } from '@/lib/analytics/queue';
 
 const RECREATIONS: Record<string, ComponentType> = {
   'automation-portfolio': lazy(() => import('./PortfolioBoard').then((m) => ({ default: m.PortfolioBoard }))),
@@ -128,15 +139,32 @@ export function DashboardDetail({ dashboard }: { dashboard: Dashboard }) {
       </section>
 
       {Recreation ? (
-        <Suspense
+        <SceneBoundary
+          scope="dashboard-chunk"
+          onError={(scope) => queueEvent('error', { props: { scope } })}
           fallback={
-            <output className="grid min-h-[60vh] place-items-center rounded-2xl bg-[#eef1f7] text-sm text-[#596579]">
-              Loading the recreation…
-            </output>
+            <div role="alert" className="grid min-h-[60vh] place-items-center rounded-2xl bg-[#eef1f7] p-10 text-center text-sm text-[#596579]">
+              <p>
+                This recreation did not load. That usually means the site was
+                updated while the page was open.{' '}
+                {/* Styled on the span: globals.css resets `a` unlayered, which beats a utility on the element. */}
+                <a href={`/dashboards/${dashboard.id}`} data-track-tag="dashboard-reload">
+                  <span className="font-medium text-[#285ce5] underline underline-offset-4">Reload the page</span>
+                </a>
+              </p>
+            </div>
           }
         >
-          <Recreation />
-        </Suspense>
+          <Suspense
+            fallback={
+              <output className="grid min-h-[60vh] place-items-center rounded-2xl bg-[#eef1f7] text-sm text-[#596579]">
+                Loading the recreation…
+              </output>
+            }
+          >
+            <Recreation />
+          </Suspense>
+        </SceneBoundary>
       ) : (
         <p className="rounded-xl border border-dashed border-[#dce2ec] p-10 text-center text-[#596579]">
           Recreation in progress.

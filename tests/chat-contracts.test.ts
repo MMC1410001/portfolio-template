@@ -192,3 +192,40 @@ test('opening the chat does not cancel the reveal countdown', () => {
     `opening the chat must not touch the reveal clock: ${chatEl[0]}`,
   );
 });
+
+test('the panel is a lazy chunk behind an eager launcher that looks and tracks the same', () => {
+  // The panel, the Sheet and the FAQ corpus were a third of the homepage's
+  // JavaScript. Portfolio.tsx renders the launcher; only the launcher may
+  // import Chat.tsx, and only dynamically.
+  const portfolio = read('components/portfolio/Portfolio.tsx');
+  assert.match(portfolio, /import Chat from '\.\/ChatLauncher';/);
+  assert.ok(!/from '\.\/Chat'/.test(portfolio), 'Portfolio.tsx must not import the panel statically');
+  const launcher = read('components/portfolio/ChatLauncher.tsx');
+  assert.match(launcher, /import\('\.\/Chat'\)/);
+  assert.ok(!/^import [^;]*(?:'\.\/Chat'|content\/faq|ui\/sheet)/m.test(launcher), 'the launcher must stay light');
+  // What clicks.ts, cta.ts and the stylesheet read off the old SheetTrigger.
+  assert.match(launcher, /data-track-tag="chat-open" data-track-cta="chat-open" className="chat-launcher"/);
+  assert.match(launcher, /<MessageCircle size=\{19\}\/><span>Ask about Alex<\/span><span className="chat-dot"\/>/);
+  const chat = read('components/portfolio/Chat.tsx');
+  assert.ok(!chat.includes('SheetTrigger'), 'the launcher owns the trigger; the panel is controlled');
+  assert.match(chat, /trackChatOpen\('launcher'\)/);
+});
+
+test('a JSON reply is checked before it is rendered', () => {
+  const chat = read('components/portfolio/Chat.tsx');
+  assert.ok(!/result=await response\.json\(\)/.test(chat), 'the JSON path must not cast the body');
+  assert.match(chat, /toPayload\(data as Record<string,unknown>\)/);
+});
+
+test('a cancelled stream stops the model call and is not counted as a failure', () => {
+  const route = read('app/api/chat/route.ts');
+  assert.match(route, /cancel\(\)\{local\.abort\(\)\}/);
+  assert.match(route, /AbortSignal\.any\(\[request\.signal,local\.signal\]\)/);
+  assert.match(route, /failed:failed&&!cancelled/);
+});
+
+test('the Python tier is labelled for what it does, with the link of the answer it chose', () => {
+  const route = read('app/api/chat/route.ts');
+  assert.ok(!route.includes("data.mode==='ai'?'AI · grounded in portfolio'"), 'an id-picking tier is not "grounded" prose');
+  assert.match(route, /source:'AI matched · portfolio facts',href:chosen\.href,ids:\[chosen\.id\]/);
+});

@@ -8,9 +8,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { openDemoDatabase } from '../scripts/d1-sqlite';
 import { SCHEMA_STATEMENTS } from '../lib/analytics/schema';
-import { addTrusted, listTrusted, MAX_TRUSTED, normaliseCidr, removeTrusted, resetTrustedCache, trustedCidrs } from '../lib/analytics/trusted';
+import { addTrusted, FALLBACK_CACHE_MS, listTrusted, MAX_TRUSTED, normaliseCidr, removeTrusted, resetTrustedCache, trustedCidrs } from '../lib/analytics/trusted';
 import { chatExemption } from '../lib/analytics/chat-quota';
-import { matchesAnyCidr } from '../lib/analytics/net';
+import { matchesAnyCidr, parseCidrList } from '../lib/analytics/net';
 import { ADMIN_SECTION_IDS, SHOWCASE_SECTION_IDS } from '../components/admin/admin-sections';
 
 function freshDb() {
@@ -38,6 +38,86 @@ test('an address or a range is accepted in canonical form; anything broad or mal
   assert.equal(normaliseCidr('2001:db8::1'), '2001:db8::1/128');
   for (const bad of ['', '0.0.0.0/0', '10.0.0.0/8', '::/0', '2001::/16', '999.1.1.1', 'localhost', '1.2.3.4, 5.6.7.8', '1.2.3.4/33']) {
     assert.equal(normaliseCidr(bad), null, bad);
+  }
+});
+
+test('the stored form is the network: host bits masked, IPv6 compressed, so spellings dedupe', () => {
+  assert.equal(normaliseCidr('203.0.113.7/24'), '203.0.113.0/24');
+  assert.equal(normaliseCidr('2001:0DB8:0000:0000:0000:0000:0000:0001'), '2001:db8::1/128');
+  assert.equal(normaliseCidr('2001:db8:1:2:aaaa:bbbb:cccc:dddd/64'), '2001:db8:1:2::/64');
+  assert.equal(normaliseCidr('2001:db8:0:0:1:0:0:1'), '2001:db8::1:0:0:1/128', 'the first of two equal zero runs');
+  assert.equal(normaliseCidr('2001:db8:0:1:1:1:1:1'), '2001:db8:0:1:1:1:1:1/128', 'a single zero group is not compressed');
+  // Malformed IPv6 used to parse, because empty groups were dropped.
+  for (const bad of ['1:::2', ':1:2:3:4:5:6:7', '1:2:3:4:5:6:7:', 'a::b::c', '12345::1', 'g::1', '1:2:3:4:5:6:7:8::', '1:2:3:4:5:6:7', 'fe80::1%eth0']) {
+    assert.equal(normaliseCidr(bad), null, bad);
+  }
+});
+
+test('the panel floor is /24 and /48; the env floor stays /16 and /32', () => {
+  assert.equal(normaliseCidr('203.0.112.0/23'), null);
+  assert.equal(normaliseCidr('2001:db8::/47'), null);
+  assert.equal(normaliseCidr('2001:db8::/48'), '2001:db8::/48');
+  assert.equal(parseCidrList('10.1.0.0/16')[0]?.raw, '10.1.0.0/16');
+  assert.equal(parseCidrList('2001:db8::/32')[0]?.raw, '2001:db8::/32');
+});
+
+test('two spellings of one network are one row, and a legacy row is still removable', async () => {
+  const { db, raw, close } = freshDb();
+  try {
+    await withEnv(NO_ENV, async () => {
+      await addTrusted(db, '203.0.113.7/24', 'Office', 'x', 1);
+      await addTrusted(db, '203.0.113.0/24', 'Office, again', 'x', 2);
+      assert.deepEqual((await listTrusted(db)).map((e) => [e.cidr, e.label]), [['203.0.113.0/24', 'Office, again']]);
+      // Rows saved before canonical storage, and one wider than today's panel floor.
+      raw.exec(`INSERT INTO trusted_networks (cidr, label, added_at, added_by) VALUES ('198.51.100.9/24', '', 3, ''), ('10.20.0.0/20', '', 4, '')`);
+      assert.deepEqual(await removeTrusted(db, '198.51.100.9/24'), { ok: true });
+      assert.deepEqual(await removeTrusted(db, '10.20.0.0/20'), { ok: true });
+      assert.deepEqual(await removeTrusted(db, '10.20.0.0/20'), { ok: false, error: 'missing' });
+      assert.deepEqual(await removeTrusted(db, '1:::2'), { ok: false, error: 'invalid' });
+    });
+  } finally {
+    close();
+  }
+});
+
+test('an env row spelt with host bits still hides the panel copy and refuses removal', async () => {
+  const { db, raw, close } = freshDb();
+  try {
+    await withEnv({ ...NO_ENV, ANALYTICS_INTERNAL_CIDRS: '203.0.113.7/24' }, async () => {
+      raw.exec(`INSERT INTO trusted_networks (cidr, label, added_at, added_by) VALUES ('203.0.113.0/24', '', 1, '')`);
+      assert.deepEqual((await listTrusted(db)).map((e) => [e.cidr, e.source]), [['203.0.113.0/24', 'env']]);
+      assert.deepEqual(await removeTrusted(db, '203.0.113.0/24'), { ok: false, error: 'env' });
+    });
+  } finally {
+    close();
+  }
+});
+
+test('the env-only fallback is not cached as if it were the list', async () => {
+  const { db, close } = freshDb();
+  try {
+    await withEnv(NO_ENV, async () => {
+      await addTrusted(db, '203.0.113.7', '', 'x');
+      resetTrustedCache();
+      const t = 9_000_000;
+      // No database: env only, and nothing is kept, so the next call with one reads it.
+      assert.equal(matchesAnyCidr('203.0.113.7', await trustedCidrs(null, t)), false);
+      assert.equal(matchesAnyCidr('203.0.113.7', await trustedCidrs(db, t + 1)), true);
+      // A failed read: env only, for FALLBACK_CACHE_MS, then the real list again.
+      resetTrustedCache();
+      const broken = { prepare: () => { throw new Error('D1 is down'); } } as unknown as D1Database;
+      const quiet = console.error;
+      console.error = () => {};
+      try {
+        assert.equal(matchesAnyCidr('203.0.113.7', await trustedCidrs(broken, t)), false);
+      } finally {
+        console.error = quiet;
+      }
+      assert.equal(matchesAnyCidr('203.0.113.7', await trustedCidrs(db, t + 1)), false, 'within the short window');
+      assert.equal(matchesAnyCidr('203.0.113.7', await trustedCidrs(db, t + FALLBACK_CACHE_MS)), true);
+    });
+  } finally {
+    close();
   }
 });
 

@@ -1,12 +1,14 @@
 'use client';
 import { useCallback, useEffect, useState, useRef, lazy, Suspense } from 'react';
 import Link from 'next/link';
-import Chat from './Chat';
+import Chat from './ChatLauncher';
 import { useHeatmapPreview } from '@/hooks/use-heatmap-preview';
 import { useModeTracking } from '@/hooks/use-mode-tracking';
 const ImmersiveSystem=lazy(()=>import('./ImmersiveSystem'));
 import TransformBurst from './TransformBurst';
 import SocialIcons from './SocialIcons';
+import SceneBoundary, { type BoundaryScope } from './SceneBoundary';
+import { queueEvent } from '@/lib/analytics/queue';
 import { ArrowUpRight, ArrowDown, Phone, Code2 as Github, BriefcaseBusiness as Linkedin, AtSign as Twitter, Camera as Instagram, Sparkles, FileText, FileDown, X, Code2, ChevronRight } from 'lucide-react';
 import { profile, projects, erpProject, experience, skills, certifications, certificationSource, learning, work, recommendations, recommendationSource, RELATION_LABEL, publishedAwards, awardSource } from '@/content/portfolio';
 import { dashboards, numberWord } from '@/content/dashboards';
@@ -20,6 +22,16 @@ export const REVEAL_CONFIG = { revealSeconds: 3, behavior: 'auto' as 'auto' | 'i
 // One list for the header nav and the scroll-spy, in document order. The spy
 // used to keep its own four ids, so scrolling through #dashboards or #awards
 // left the highlight on whichever section came before.
+// Small derivatives of `profile.avatar` and `profile.photo*`, cut with sips
+// from the files beside them in public/. The avatar is drawn at 62px and was
+// downloading the 720px, 120KB original, which stays for og:image. The about
+// portrait gains a 1200w step so a 3x phone stops at 1200 instead of the
+// 948KB 1600w, and AVIF copies at a quarter of the JPEG weight.
+const AVATAR_SET='/avatar-128.jpg 128w, /avatar-192.jpg 192w';
+const PHOTO_AVIF='/portrait-900.avif 900w, /portrait-1200.avif 1200w, /portrait-1600.avif 1600w';
+// The rendered width, not an estimate: 24px gutters under 700px and a 440px
+// cap everywhere, which the old `92vw` overstated on every phone.
+const PHOTO_SIZES='(max-width:488px) calc(100vw - 48px), 440px';
 const NAV:readonly (readonly [string,string])[]=[['work','Work'],['dashboards','Dashboards'],...(publishedAwards.length?[['awards','Awards'] as const]:[]),['about','About'],['notes','Learning'],['contact','Contact']];
 export default function Portfolio() {
  const [mode,setMode]=useState<Mode>('resume');
@@ -50,6 +62,13 @@ export default function Portfolio() {
  // itself stable and `still` only moves with `reduced`/`preview`, which the
  // countdown already restarts on, so this adds no restarts of its own.
  const reveal=useCallback((trigger:'timer'|'manual'='manual')=>{note(trigger);setAutoplay(false);setInvite(false);if(still){setMode('immersive');return;}setMode('transitioning');transitionTimer.current=setTimeout(()=>setMode('immersive'),850);},[note,still]);
+ // The Experience chunk never arrived (offline mid-session, or a hashed chunk a
+ // redeploy removed). The boundary around the lazy import catches it, and this
+ // puts the visitor back on the résumé, the page they came for, rather than a
+ // dark, empty stage. `.dark` follows `immersive`, so it clears with the mode;
+ // the pending timer must go too, or it flips the mode straight back. A later
+ // click fails the same way at once: the browser caches a failed module fetch.
+ function sceneFailed(scope:BoundaryScope){if(transitionTimer.current)clearTimeout(transitionTimer.current);setMode('resume');setAutoplay(false);setInvite(false);queueEvent('error',{props:{scope}});}
  function returnToResume(){note('manual');if(transitionTimer.current)clearTimeout(transitionTimer.current);setMode('resume');setAutoplay(false);}
  useEffect(()=>{const m=matchMedia('(prefers-reduced-motion: reduce)');const update=()=>{setReduced(m.matches);if(m.matches)setAutoplay(false)};update();m.addEventListener('change',update);return()=>{m.removeEventListener('change',update);if(transitionTimer.current)clearTimeout(transitionTimer.current)}},[]);
  useEffect(()=>{
@@ -91,7 +110,7 @@ export default function Portfolio() {
   {mode==='transitioning'&&!preview&&<TransformBurst/>}
   {immersive&&!preview&&<div className="transform-afterglow" aria-hidden="true"/>}
   <header className="site-header"><a data-track-tag="nav-home" className="wordmark" href="#main" aria-label={`${profile.fullName} home`} title={profile.fullName}>MMC<i>.</i></a>
-   <nav aria-label="Main navigation">{NAV.map(([id,label])=><a key={id} data-track-tag={`nav-${id}`} href={`#${id}`} className={active===id?'active':''} onClick={()=>setActive(id)}>{label}</a>)}</nav>
+   <nav aria-label="Main navigation">{NAV.map(([id,label])=><a key={id} data-track-tag={`nav-${id}`} href={`#${id}`} className={active===id?'active':''} aria-current={active===id?'location':undefined} onClick={()=>setActive(id)}>{label}</a>)}</nav>
    {/* The PDF is the one thing a recruiter always wants and immersive mode
        used to hide: the aside and the hero’s availability line are both
        résumé-mode only, leaving the footer as the sole route to it. Grouped
@@ -105,15 +124,18 @@ export default function Portfolio() {
     <div className="hero-copy"><div className="eyebrow"><span className="status-dot"/>{profile.role.toUpperCase()} <span className="hero-edition">PORTFOLIO / 2026</span></div>
      <h1 id="hero-title"><span className="resume-title">Alex<br/>Rivera<span className="name-dot">.</span></span><span className="immersive-title">Human ideas.<br/><span>Intelligent</span><br/>experiences<span className="name-dot">.</span></span></h1>
      <div className="intro-identity"><span className="intro-avatar" aria-hidden="true">{/* oxlint-disable-next-line nextjs/no-img-element -- vinext has no next/image; the avatar is already sized and served static */}
-<img src={profile.avatar} width={720} height={720} alt="" decoding="async"/></span><p className="intro-name">{immersive?'Hi, I’m Alex Rivera.':'Python. Interfaces. Applied AI.'}</p></div><p className="hero-description">{profile.summary}</p>
+<img src="/avatar-128.jpg" srcSet={AVATAR_SET} sizes="(max-width:700px) 54px, 62px" width={128} height={128} alt="" decoding="async"/></span><p className="intro-name">{immersive?'Hi, I’m Alex Rivera.':'Python. Interfaces. Applied AI.'}</p></div><p className="hero-description">{profile.summary}</p>
      <div className="hero-actions"><a data-track-tag="hero-explore-work" data-track-cta="hero-explore-work" className="primary-action" href="#work" onClick={()=>setActive('work')}>Explore my work <ArrowUpRight size={18}/></a><a data-track-tag="hero-email" className="text-action" href={`mailto:${profile.email}`}>Let’s talk <ArrowUpRight size={17}/></a></div>
      <p className="hero-availability"><span>{profile.availability}</span><span>{profile.openTo}</span><span>{profile.relocation}</span><a data-track-tag="resume-pdf-hero" data-track-cta="resume-pdf-hero" href="/resume-sample.pdf" target="_blank" rel="noreferrer"><FileText size={15}/> Résumé (PDF)</a></p>
      <div className="hero-socials"><span>{profile.location}</span><span className="separator"/><a data-track-tag="hero-github" href={profile.github} target="_blank" rel="noreferrer">GitHub <ArrowUpRight size={14}/></a><a data-track-tag="hero-linkedin" href={profile.linkedin} target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14}/></a><a data-track-tag="hero-twitter" href={profile.twitter} target="_blank" rel="noreferrer">X <ArrowUpRight size={14}/></a><a data-track-tag="hero-instagram" href={profile.instagram} target="_blank" rel="noreferrer">Instagram <ArrowUpRight size={14}/></a></div>
     </div>
     <div className="resume-aside"><div className="aside-top"><Code2 size={19}/><span>THE SHORT VERSION</span></div><dl><div><dt>Focus</dt><dd>Full stack & applied AI</dd></div><div><dt>Building with</dt><dd>Python · React · FastAPI</dd></div><div><dt>Background</dt><dd>QA automation &rarr; full stack</dd></div><div><dt>Currently</dt><dd>{experience[0].role} at Northwind</dd></div><div className="aside-availability"><dt>Availability</dt><dd>{profile.availability}</dd></div><div><dt>Open to</dt><dd>{profile.openTo}</dd></div><div><dt>Relocation</dt><dd>{profile.relocation}</dd></div></dl><a data-track-tag="resume-pdf-aside" data-track-cta="resume-pdf-aside" href="/resume-sample.pdf" target="_blank" rel="noreferrer"><FileText size={16}/> Résumé (PDF)<ArrowUpRight size={16}/></a></div>
     <div className="stage-column">
-    <div className="system-stage">{immersive&&!preview&&<Suspense fallback={<div className="scene-loading">Connecting the stack…</div>}><ImmersiveSystem reduced={reduced} preview={preview}/></Suspense>}<div className="stage-caption"><span className="live-dot"/> THE CONNECTED STACK <span>EXPLORE ↓</span></div></div>
-    {immersive&&<div className="stage-runway" aria-hidden="true"/>}
+    <div className="system-stage">{immersive&&!preview&&<SceneBoundary scope="immersive-chunk" onError={sceneFailed} fallback={null}><Suspense fallback={<div className="scene-loading">Connecting the stack…</div>}><ImmersiveSystem reduced={reduced} preview={preview}/></Suspense></SceneBoundary>}<div className="stage-caption"><span className="live-dot"/> THE CONNECTED STACK <span>EXPLORE ↓</span></div></div>
+    {/* Not in a heatmap preview: the admin iframe is sized to the page, so a
+        96vh runway grows the frame, which grows the runway, and the recorded
+        clicks stop lining up. The preview never mounts the turntable anyway. */}
+    {immersive&&!preview&&<div className="stage-runway" aria-hidden="true"/>}
     </div>
     <div className="hero-bottom"><span>{immersive?'A little curiosity goes a long way.':'There’s another side to this portfolio.'}</span>{immersive?<button data-track-tag="hero-scroll-explore" onClick={()=>navigate('work')}>SCROLL TO EXPLORE <ArrowDown size={16}/></button>:<div className="reveal-controls"><button data-track-tag="reveal-immersive" data-track-cta="reveal-immersive" className="reveal-link" onClick={()=>reveal('manual')}>See the other side <Sparkles size={16}/></button>{autoplay?<><span className="countdown">in {seconds}s</span><button data-track-tag="reveal-pause" className="pause-reveal" aria-label="Pause automatic reveal" onClick={()=>setAutoplay(false)}><X size={14}/></button></>:<span className="countdown">{invite?'Ready when you are':'Click to transform'}</span>}</div>}</div>
    </section>
@@ -138,8 +160,8 @@ export default function Portfolio() {
    {publishedAwards.length>0&&<section id="awards" className="content-section"><div className="section-heading"><div><p className="eyebrow">RECOGNITION</p><h2>Recognised for the<br/>work itself<span>.</span></h2></div><a data-track-tag="awards-linkedin" className="text-action" href={awardSource} target="_blank" rel="noreferrer">View on LinkedIn <ArrowUpRight size={17}/></a></div>
     <div className="award-grid">{publishedAwards.map(award=><article key={award.id} className="award-card"><span className="product-category">{award.category}</span><h3>{award.name}</h3><p className="award-date">{award.issued}</p><p className="award-citation">{award.citation}</p><span className="award-issuer">{award.issuer}</span></article>)}</div>
    </section>}
-   <section id="about" className="content-section about-section"><div><p className="eyebrow">THE PERSON BEHIND THE CODE</p><h2>Curiosity builds.<br/>Rigor makes it last<span>.</span></h2><p>I’m Alex, a {experience[0].role} at {experience[0].company}, based in Austin. I connect Python backends, useful interfaces, and AI systems that can be evaluated.</p><p>My professional foundation is in quality engineering across FinTech and AI. That experience shapes how I build: understand the system, question the output, and make it reliable.</p><p>I came to software sideways, through a civil engineering degree, then Brookfield, then two and a half years automating tests before moving into development. Breaking software first is why I now build it to be verified.</p><div className="education"><span>EDUCATION</span><strong>PG Diploma in Advanced Computing</strong><p>Brookfield Institute · 2022</p><span>BE, Civil Engineering · 2021</span></div></div><figure className="about-portrait"><div className="portrait-frame">{/* oxlint-disable-next-line nextjs/no-img-element -- vinext has no next/image; srcSet already serves 900w and 1600w */}
-<img src={profile.photo} srcSet={`${profile.photo} 900w, ${profile.photoLarge} 1600w`} sizes="(max-width:700px) 92vw, 440px" width={900} height={1200} alt="Alex Morgan Rivera" loading="lazy" decoding="async"/></div><figcaption><strong>{profile.fullName}</strong><span>{profile.role}</span></figcaption></figure><div className="experience-list"><p className="eyebrow">ENGINEERING EXPERIENCE</p>{experience.map(e=><article key={e.company}><span className="experience-date">{e.dates}</span><h3>{e.url?<a data-track-tag={`employer-${e.company.split(' ')[0].toLowerCase()}`} href={e.url} target="_blank" rel="noreferrer">{e.company}<ArrowUpRight size={16}/></a>:e.company}</h3>{e.about&&<p className="company-about">{e.about}</p>}<p className="role-label">{e.role}</p><p>{e.summary}</p></article>)}</div></section>
+   <section id="about" className="content-section about-section"><div><p className="eyebrow">THE PERSON BEHIND THE CODE</p><h2>Curiosity builds.<br/>Rigor makes it last<span>.</span></h2><p>I’m Alex, a {experience[0].role} at {experience[0].company}, based in Austin. I connect Python backends, useful interfaces, and AI systems that can be evaluated.</p><p>My professional foundation is in quality engineering across FinTech and AI. That experience shapes how I build: understand the system, question the output, and make it reliable.</p><p>I came to software sideways, through a civil engineering degree, then Brookfield, then two and a half years automating tests before moving into development. Breaking software first is why I now build it to be verified.</p><div className="education"><span>EDUCATION</span><strong>PG Diploma in Advanced Computing</strong><p>Brookfield Institute · 2022</p><span>BE, Civil Engineering · 2021</span></div></div><figure className="about-portrait"><div className="portrait-frame">{/* oxlint-disable-next-line nextjs/no-img-element -- vinext has no next/image; srcSet already serves 900w to 1600w */}
+<picture><source type="image/avif" srcSet={PHOTO_AVIF} sizes={PHOTO_SIZES}/><img src={profile.photo} srcSet={`${profile.photo} 900w, /portrait-1200.jpg 1200w, ${profile.photoLarge} 1600w`} sizes={PHOTO_SIZES} width={900} height={1200} alt="Alex Morgan Rivera" loading="lazy" decoding="async"/></picture></div><figcaption><strong>{profile.fullName}</strong><span>{profile.role}</span></figcaption></figure><div className="experience-list"><p className="eyebrow">ENGINEERING EXPERIENCE</p>{experience.map(e=><article key={e.company}><span className="experience-date">{e.dates}</span><h3>{e.url?<a data-track-tag={`employer-${e.company.split(' ')[0].toLowerCase()}`} href={e.url} target="_blank" rel="noreferrer">{e.company}<ArrowUpRight size={16}/></a>:e.company}</h3>{e.about&&<p className="company-about">{e.about}</p>}<p className="role-label">{e.role}</p><p>{e.summary}</p></article>)}</div></section>
    <section id="skills" className="content-section skills-section" aria-labelledby="stack-heading"><div className="section-heading"><div><p className="eyebrow">MY TOOLKIT</p><h2 id="stack-heading">Across the stack<span>.</span></h2></div></div><div className="skills-grid">{skills.map((group,i)=><div key={group.name}><span className="skill-symbol">{['{ }','>_','✳','↗'][i]}</span><h3>{group.name}</h3><ul>{group.items.map(s=><li key={s}>{s}</li>)}</ul></div>)}</div></section>
    <section id="notes" className="content-section"><div className="section-heading"><div><p className="eyebrow">LEARNING IN THE OPEN</p><h2>Build. Understand. Document<span>.</span></h2></div><span className="section-note">Notes and guides</span></div><div className="learning-list">{learning.map(n=><a key={n.href} data-track-tag={`learning-${n.id}`} href={n.href} target="_blank" rel="noreferrer"><div className="note-icon"><FileText size={23}/></div><div><span className="eyebrow">{n.label}</span><h3>{n.title}</h3><p>{n.description}</p></div><ArrowUpRight/></a>)}</div></section>
    <section id="products" className="content-section product-section"><div className="section-heading"><div><p className="eyebrow">PROFESSIONAL WORK</p><h2>What I built, and what I broke<span>.</span></h2></div></div><p className="section-intro">Client and in-house products, split by what I actually did on each: development, or the quality and evaluation engineering I moved into development from.</p>

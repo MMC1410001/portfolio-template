@@ -35,7 +35,7 @@
  */
 
 import { queueEvent, onSessionExit } from './queue';
-import { isUntrackedPath } from './scope';
+import { trackingSuppressed } from './scope';
 import { currentMode } from './mode';
 import {
   DWELL_SECTIONS,
@@ -84,6 +84,15 @@ let scanner: MutationObserver | null = null;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
 let scanTimer: ReturnType<typeof setTimeout> | null = null;
 let registered = false;
+/**
+ * The element each id is observed through.
+ *
+ * Keyed by id because the id is the stable thing and the node is not: a
+ * client-side navigation away from `/` and back renders a fresh `<section
+ * id="work">`, and an observer still holding the detached one reports nothing
+ * for the rest of the session.
+ */
+const observed = new Map<string, Element>();
 
 /** The section currently being dwelt on, and when it became active. */
 let active: string | null = null;
@@ -171,46 +180,83 @@ function onIntersect(entries: IntersectionObserverEntry[]): void {
  *
  * This is the row the source system could not produce, and on a one-page site
  * it is the one worth having.
+ *
+ * ── A tab switch is a provisional exit ─────────────────────────────────────
+ * The hook runs on `visibilitychange -> hidden` as well as on pagehide,
+ * because iOS Safari frequently never fires pagehide and a hide is the only
+ * exit it reports. So a hide ends the current view with `terminal: true`, and
+ * if the visitor comes back, onVisibility() opens a new one. Each visible span
+ * is one row and at most one of them is terminal per hide; queue.ts latches
+ * finalise() so the pagehide that follows a hide on desktop cannot add a
+ * second. A session with several tab switches therefore has several terminal
+ * rows, and **the last one is the exit**: the dashboard counts only that one.
+ *
+ * The row that resumes after a hide carries `from` equal to its own section,
+ * which no ordinary transition can produce (commit() only fires on a change),
+ * so a query can tell a continuation from a fresh view of the section.
  */
 export function flushSectionDwell(): void {
   if (active === null) return;
   emitLeave(active, activeSince, null, true);
-  // Cleared so a pagehide followed by a visibilitychange cannot emit twice.
+  // Cleared so a pagehide followed by a visibilitychange cannot emit twice,
+  // and `previous` set so the resumed row reads as a continuation.
   previous = active;
   active = null;
 }
 
-/** Attach to every section that exists yet. True once they all do. */
-function observeAll(): boolean {
-  if (!observer) return false;
-  let all = true;
+/**
+ * Point the observer at the section nodes that are in the document now.
+ *
+ * Compares node identity rather than asking "is this id observed": after a
+ * client-side navigation back to `/` the ids are the same and every node is
+ * new. A swapped or removed node is unobserved and dropped from `intersecting`
+ * (an unobserved target reports no final entry), and the settle timer is
+ * re-armed so the active section is re-picked from what is really there.
+ */
+function observeAll(): void {
+  if (!observer) return;
+  let changed = false;
   for (const section of DWELL_SECTIONS) {
     const el = document.getElementById(section.id);
-    // observe() is idempotent per element, so re-observing is a no-op.
-    if (el) observer.observe(el);
-    else all = false;
+    const held = observed.get(section.id);
+    if (el === held) continue;
+    changed = true;
+    if (held) {
+      observer.unobserve(held);
+      intersecting.delete(section.id);
+    }
+    if (el) {
+      observer.observe(el);
+      observed.set(section.id, el);
+    } else {
+      observed.delete(section.id);
+    }
   }
-  return all;
+  if (!changed) return;
+  if (settleTimer !== null) clearTimeout(settleTimer);
+  settleTimer = setTimeout(commit, ENTER_SETTLE_MS);
 }
 
 /**
- * Re-scan after DOM changes, debounced, and stop once there is nothing left
- * to find.
+ * Re-scan after DOM changes, debounced, and only for ones that added an element.
  *
- * The undebounced version ran DWELL_SECTIONS.length getElementById calls on
- * every mutation batch in the whole document, every chat message rendered,
- * every mode transition, to compute an answer that stops changing a few
- * hundred milliseconds after load. Cheap individually, and pure waste for the
- * rest of the session.
+ * It used to disconnect itself once every section had been found, which was
+ * right for a one-route site and wrong once `/dashboards` shipped: a
+ * next/link round trip replaces every section node, and with the scanner gone
+ * nothing re-attached them, so the rest of the session had no page_view and
+ * `section: null` on every row. It stays alive now, and pays for it with the
+ * same filter cta.ts uses: the turntable rewrites a text node on every scroll
+ * frame, and no section can arrive in a Text node.
  */
-function scheduleScan(): void {
+function scheduleScan(records: MutationRecord[]): void {
   if (scanTimer !== null) return;
+  const added = records.some((r) =>
+    Array.from(r.addedNodes).some((n) => n.nodeType === 1),
+  );
+  if (!added) return;
   scanTimer = setTimeout(() => {
     scanTimer = null;
-    if (observeAll() && scanner) {
-      scanner.disconnect();
-      scanner = null;
-    }
+    observeAll();
   }, SCAN_DEBOUNCE_MS);
 }
 
@@ -226,7 +272,8 @@ function scheduleScan(): void {
  * until the visitor happened to scroll into a different section.
  *
  * The clock restarts rather than resuming: time spent looking at another tab
- * is not dwell on this one.
+ * is not dwell on this one. `pageshow` covers a restore from the back/forward
+ * cache, which is the same situation reached by another road.
  */
 function onVisibility(): void {
   if (document.visibilityState !== 'visible') return;
@@ -235,11 +282,23 @@ function onVisibility(): void {
   activeSince = Date.now();
 }
 
-/** Install the dwell machine. Idempotent. */
+function onPageShow(event: Event): void {
+  if ((event as PageTransitionEvent).persisted) onVisibility();
+}
+
+/**
+ * Install the dwell machine. Idempotent.
+ *
+ * Bails when recording is suppressed (/admin, the heatmap frame, an opted-out
+ * browser): every row it could produce would be refused by queueEvent()
+ * anyway, so the observers would be pure cost. `syncAnalyticsRoute()` calls
+ * this again on each navigation, so a tab that opened on /admin still gets it
+ * on the way to `/`.
+ */
 export function installSectionTracking(): void {
   if (observer || typeof window === 'undefined') return;
   if (typeof IntersectionObserver !== 'function') return;
-  if (isUntrackedPath(window.location.pathname)) return;
+  if (trackingSuppressed()) return;
 
   observer = new IntersectionObserver(onIntersect, {
     rootMargin: ROOT_MARGIN,
@@ -249,15 +308,17 @@ export function installSectionTracking(): void {
   observeAll();
 
   // The hero is on screen at load, and IntersectionObserver does fire an
-  // initial callback, but ImmersiveSystem and the chat panel mount later, and
-  // a `<details>` opening changes the document height. Watching for added
-  // nodes keeps the observer attached to sections that arrive with a chunk.
+  // initial callback, but ImmersiveSystem and the chat panel mount later, a
+  // `<details>` opening changes the document height, and a navigation back to
+  // `/` renders every section again. Watching for added elements keeps the
+  // observer attached to whichever nodes are current.
   if (typeof MutationObserver === 'function') {
     scanner = new MutationObserver(scheduleScan);
     scanner.observe(document.body, { childList: true, subtree: true });
   }
 
   document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pageshow', onPageShow);
 
   if (!registered) {
     registered = true;
@@ -269,15 +330,8 @@ export function installSectionTracking(): void {
   }
 }
 
-/** Test seam. Not for application code. */
-export function __resetSectionTracking(): void {
-  observer?.disconnect();
-  scanner?.disconnect();
-  observer = null;
-  scanner = null;
-  if (typeof document !== 'undefined') {
-    document.removeEventListener('visibilitychange', onVisibility);
-  }
+/** Forget the view in progress: the observers, timers and every held node. */
+function clearView(): void {
   if (settleTimer !== null) {
     clearTimeout(settleTimer);
     settleTimer = null;
@@ -286,9 +340,52 @@ export function __resetSectionTracking(): void {
     clearTimeout(scanTimer);
     scanTimer = null;
   }
+  for (const el of observed.values()) observer?.unobserve(el);
+  observed.clear();
+  intersecting.clear();
   active = null;
   previous = null;
   activeSince = 0;
-  intersecting.clear();
+}
+
+/**
+ * A client-side navigation happened. Close the section being read and start
+ * over on whatever the new route renders.
+ *
+ * The row for the section being left is emitted here rather than left to the
+ * observer, because a node removed from the document may or may not report a
+ * last entry depending on the browser, and a view must not end on a guess. It
+ * is not terminal: the session is still going. `to` is null, as for any
+ * section left for somewhere that has no sections, and `previous` is reset so
+ * the first row on the next page does not claim a transition across routes.
+ *
+ * By the time this runs the pathname is already the new one, so leaving `/`
+ * for /admin loses that last row to trackingSuppressed(). That is our own
+ * traffic, and the only case it happens in.
+ */
+export function resetSectionTracking(): void {
+  if (active !== null) emitLeave(active, activeSince, null, false);
+  clearView();
+  observeAll();
+}
+
+/** Take the machine down entirely, for a route where nothing is recorded. */
+export function uninstallSectionTracking(): void {
+  clearView();
+  observer?.disconnect();
+  scanner?.disconnect();
+  observer = null;
+  scanner = null;
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', onVisibility);
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('pageshow', onPageShow);
+  }
+}
+
+/** Test seam. Not for application code. */
+export function __resetSectionTracking(): void {
+  uninstallSectionTracking();
   registered = false;
 }

@@ -60,6 +60,17 @@ than a new column, so the schema does not move.
 
 ## Section dwell is measured on leaving, not entering
 
+**Navigation, tab switches and exits.** The section scanner stays alive for the whole visit and
+re-observes when a section's node is replaced. Without that, going `/` → `/dashboards` → back
+(client-side) left it watching detached nodes, and the rest of the session had no dwell. On a
+route change `hooks/analytics-route.ts` emits a non-terminal leave row and resets scroll depth,
+CTA impressions and the click caps, so each page is measured on its own. Scroll milestones and
+`max_scroll_px` are therefore per page, and the dashboard reads the homepage's (`ON_HOME` in
+`sql.ts`). A tab hide is still an exit, because iOS often never fires `pagehide`. It is latched
+once per hidden period. On return, a new view starts whose `from` is its own section, a marker
+no real transition produces. SQL folds those resumed rows into the view they continue
+(`RESUMED_VIEW`), and counts only the **last** terminal row per session as the exit.
+
 The site is one page, so "which page did they leave from" is meaningless and
 the unit of engagement is the in-page section. `path` on a `page_view` row is
 `/#work`, not a route.
@@ -73,9 +84,18 @@ where the visitor stopped, so that is the wrong thing to lose.
 Emitting on leave fixes it for free. `duration_ms` belongs to the row that
 names it (so average dwell is a plain `AVG … GROUP BY`, no window function),
 `flushSectionDwell()` emits the terminal row from the exit hook so every
-section entry produces exactly one row with a real dwell, and the exit section
-is `props.terminal` rather than `row_number() … DESC`: which is robust to a
-beacon batch arriving out of order.
+visible span of a section produces exactly one row with a real dwell, and the
+exit section is `props.terminal` rather than `row_number() … DESC`: which is
+robust to a beacon batch arriving out of order.
+
+A tab switch is a provisional exit. The exit hook runs on
+`visibilitychange → hidden` as well as `pagehide`, because iOS Safari often
+fires only the first, so a hide ends the view with `terminal: true`. Coming
+back opens a new row whose `from` is its own section, which no ordinary
+transition produces, and the next hide or pagehide is a second exit. So a
+session can hold several terminal rows and **the last one is the exit**. The
+queue latches one exit per hidden period, so the `pagehide` that follows a
+hide on desktop adds nothing.
 
 ### `/dashboards` is tracked, and has no sections
 
@@ -339,6 +359,11 @@ Prefixes broader than `/16` (v4) or `/32` (v6) are **skipped with a warning,
 not applied**: a stray `/0` would mark every visitor internal and zero the
 panel, and the failure presents as "no traffic" rather than as an error.
 
+The client address that all of this keys on comes from `cf-connecting-ip` alone, unless
+`TRUST_FORWARDED_FOR=1` (see `net.ts`). Trusted networks added from the panel must be /24 (IPv4)
+or /48 (IPv6) or narrower, and "Add my current IP" adds the /64 for IPv6. A failed read of the list
+is cached for 3 seconds, not 30.
+
 Filtering is a **whole-session** verdict, not per-event. The source system
 measured its own office leaving by three different ISPs across three
 consecutive requests; an event-level filter leaves every internal session
@@ -470,8 +495,8 @@ data, so the showcase costs the homepage nothing.
 
 There is nowhere to attach one: vinext's worker entry exports only `fetch`,
 and the generated `wrangler.json` has empty `triggers`. So the sweep is
-opportunistic, on every admin read (behind `after()`, so it never delays the
-dashboard), on roughly 1 ingest in 500, and via the `retention-sweep` action.
+opportunistic, on the dashboard's `analytics` read (one claim per load, not
+one per panel; behind `after()`, so it never delays the dashboard), on roughly 1 ingest in 500, and via the `retention-sweep` action.
 It claims the slot *before* deleting anything, with one conditional
 `UPDATE … WHERE CAST(value AS INTEGER) <= ? RETURNING` (after an
 `INSERT OR IGNORE` for the first run), and sweeps only if a row came back. The

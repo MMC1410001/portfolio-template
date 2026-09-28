@@ -3,7 +3,8 @@
  * Chart marks for the `/dashboards` recreations.
  *
  * ── Hand-rolled SVG, not a charting library ───────────────────────────────
- * `recharts` is installed and unused, and it stays that way here. Every chart
+ * `recharts` is installed for the /admin panels (via components/ui/chart.tsx),
+ * and it stays out of these pages on purpose. Every chart
  * on these pages is a donut, a column run, a horizontal bar or a single
  * stacked row, four shapes, each a dozen lines of SVG. Pulling a charting
  * runtime into a statically-rendered showcase to draw them would cost more

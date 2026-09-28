@@ -31,6 +31,22 @@ export function ensureSessionId(): string {
 }
 
 /**
+ * Drop the tab's session id, so the next event mints a new one.
+ *
+ * For the /privacy opt-out, alongside forgetAttribution() in utm.ts. Keeping
+ * it would file the visits made after measurement is turned back on under the
+ * session recorded before it was turned off, and the session id is what links
+ * a visit row to its visitor id.
+ */
+export function forgetSessionId(): void {
+  try {
+    sessionStorage.removeItem(SESSION_ID_KEY);
+  } catch {
+    /* private mode, nothing was stored to begin with */
+  }
+}
+
+/**
  * Record the session's opening row. Never awaited, never throws.
  *
  * `reduced` is passed in rather than read here: Portfolio.tsx already resolves

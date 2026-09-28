@@ -48,16 +48,25 @@ jobs:
 # on:
 #   push:
 #     branches: [main]
-#     # Nothing here reaches the built Worker. No markdown is imported by the
-#     # app, and assets/ is where source media is conventionally kept in this
-#     # repo: committed as a backup rather than served. A push that touches
-#     # only these does not need a deploy, and GitHub Actions minutes are
-#     # metered on private repositories -- the deploy nobody asked for is the
-#     # one that exhausts the allowance before the one you needed.
+#     # Nothing here reaches the built Worker. These markdown files are docs
+#     # and skills for people and agents working on the repo, and assets/ holds the
+#     # source media the turntable frames were cut from, which is committed as a
+#     # backup rather than served. A push that touches only these does not need
+#     # a deploy, and on a metered account a deploy nobody asked for is the one
+#     # that exhausts the allowance before the one you needed.
+#     #
+#     # Named one by one rather than '**.md' on purpose: ANALYTICS.md IS
+#     # imported, it is rendered at /analytics/design-notes, so an edit to it
+#     # must deploy. Add another markdown file here only once you have checked
+#     # nothing under app/ or components/ imports it.
 #     #
 #     # A push that mixes ignored and non-ignored paths still runs.
 #     paths-ignore:
-#       - '**.md'
+#       - 'README.md'
+#       - 'CLAUDE.md'
+#       - 'AGENTS.md'
+#       - '.claude/skills/**'
+#       - '.agents/skills/**'
 #       - 'assets/**'
 #       - '.gitignore'
 #       - '.env.example'
@@ -79,9 +88,16 @@ jobs:
 #     timeout-minutes: 15
 #     environment: production
 #     steps:
-#       - uses: actions/checkout@v4
+#       # Actions are pinned to full commit SHAs, not tags: a tag can be moved to
+#       # new code, and this job holds the Cloudflare deploy token. The trailing
+#       # comment is the tag the SHA was resolved from.
+#       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+#         with:
+#           # Nothing here pushes, so the GITHUB_TOKEN need not sit in .git/config
+#           # for every later step (npm install scripts included) to read.
+#           persist-credentials: false
 #
-#       - uses: actions/setup-node@v4
+#       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
 #         with:
 #           # Matches the engines floor in README: `node --experimental-strip-types`
 #           # is used by the unit tests and the demo seeder.
@@ -110,12 +126,14 @@ jobs:
 #       # tests/chat-cases.json through faq() with no server, so a guard regex
 #       # that JavaScript accepts and Python's `re` does not fails here rather
 #       # than in a FastAPI deploy nobody is watching.
-#       - uses: actions/setup-python@v5
+#       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
 #         with:
 #           python-version: '3.12'
+#       # --require-hashes: the lock carries a sha256 for every file of every
+#       # pin, so a re-uploaded or substituted wheel fails the install.
 #       - name: Python tests
 #         run: |
-#           pip install -r backend/requirements-lock.txt
+#           pip install --require-hashes -r backend/requirements-lock.txt
 #           python -m unittest discover -s tests -p 'test_*.py'
 #
 #       # Fails on a placeholder database_id, a missing runtime secret, or
@@ -136,9 +154,20 @@ jobs:
 #       - name: knowledge.json is committed in sync
 #         run: git diff --exit-code backend/knowledge.json
 #
+#       # The same check for the schema. scripts/emit-migration.mjs also exits
+#       # non-zero when a statement in lib/analytics/schema.ts is not claimed by
+#       # a schema version, which is what stops a new table being filed under a
+#       # migration the remote database has already applied.
+#       - name: Migrations are committed in sync
+#         run: node scripts/emit-migration.mjs && git diff --exit-code migrations/ drizzle/
+#
 #       # Migrations before the deploy, not after: the new Worker may read a
-#       # column the old schema lacks, and every statement in migrations/ is
-#       # `IF NOT EXISTS`, so applying them early is safe for the running one.
+#       # table the old schema lacks. wrangler records applied migrations by
+#       # file name and skips those, so only the new version files run; each
+#       # schema version is its own file for exactly that reason (an edit to an
+#       # applied file is never seen). Every statement is additive and
+#       # `IF NOT EXISTS`, so the running Worker is unaffected, and ensureSchema()
+#       # in lib/analytics/db.ts creates the same objects at runtime regardless.
 #       - name: Apply D1 migrations
 #         run: npm run db:migrate
 #         env:

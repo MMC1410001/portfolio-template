@@ -1,15 +1,18 @@
 /**
  * Campaign attribution, which link brought this person here.
  *
- * Three stores, each answering a different question:
+ * Two stores, each answering a different question:
  *
  *   pfVisitorId   localStorage    which browser is this (across sessions)
- *   pfFirstTouch  localStorage    which campaign ACQUIRED them (write-once)
  *   pfLastTouch   sessionStorage  which campaign started THIS session
  *
- * First touch is what a campaign gets credit for; last touch is what the
- * current session's rows are stamped with. They differ for anyone who arrives
- * twice, and conflating them lets a second visit steal the acquisition.
+ * There used to be a third, `pfFirstTouch`: the campaign that first acquired
+ * the browser, kept in localStorage for 90 days. Nothing ever read it (it was
+ * never sent, and no panel asked for it) and /privacy did not disclose it, so
+ * it was a 90-day record of where someone came from, held for no purpose. It
+ * is no longer written, and captureAttribution() deletes any left behind.
+ * Acquisition is still answerable server-side, from the earliest `visit` row
+ * carrying the visitor id.
  *
  * Dropped from the source system: stampFirstTouchOnce() (no accounts to stamp
  * onto) and campaignParams() (no dataLayer, GTM and GA4 are deliberately not
@@ -28,18 +31,9 @@ import {
 } from './normalise';
 
 const VISITOR_ID_KEY = 'pfVisitorId';
-const FIRST_TOUCH_KEY = 'pfFirstTouch';
 const LAST_TOUCH_KEY = 'pfLastTouch';
-
-/**
- * How long a first touch keeps its claim.
- *
- * Not a privacy figure, a shared-device mitigation. Without an expiry, the
- * second person to open the site on a borrowed laptop inherits the first
- * person's campaign forever.
- */
-const FIRST_TOUCH_TTL_DAYS = 90;
-const FIRST_TOUCH_TTL_MS = FIRST_TOUCH_TTL_DAYS * 24 * 60 * 60 * 1000;
+/** Retired, see the header. Named only so it can be deleted. */
+const RETIRED_FIRST_TOUCH_KEY = 'pfFirstTouch';
 
 /** The params we own. Everything else on the URL is left exactly as it was. */
 const UTM_PARAMS = [
@@ -65,11 +59,6 @@ export interface Attribution {
   click_id_source: 'gclid' | 'fbclid' | null;
   landing_path: string | null;
   visitor_id: string | null;
-}
-
-export interface FirstTouch extends Attribution {
-  /** ISO timestamp of the claim. Also what the TTL is measured against. */
-  first_touch_at: string;
 }
 
 /**
@@ -199,32 +188,30 @@ function cleanUrl(params: URLSearchParams): void {
   }
 }
 
-function claimFirstTouch(touch: Attribution): void {
-  const existing = readJson<FirstTouch>(localStorage, FIRST_TOUCH_KEY);
-  if (existing?.first_touch_at) {
-    const age = Date.now() - Date.parse(existing.first_touch_at);
-    // NaN (a corrupt timestamp) is not > TTL, so a bad value keeps its claim
-    // rather than letting every later visit overwrite it.
-    if (!(age > FIRST_TOUCH_TTL_MS)) return;
+function removeStore(store: Storage, key: string): void {
+  try {
+    store.removeItem(key);
+  } catch {
+    /* private mode, nothing was stored to begin with */
   }
-  const first: FirstTouch = {
-    ...touch,
-    first_touch_at: new Date().toISOString(),
-  };
-  writeStore(localStorage, FIRST_TOUCH_KEY, JSON.stringify(first));
 }
 
 /**
  * Read the campaign off this page load. Call once, before anything renders.
  *
  * An **untagged** load deliberately does nothing beyond minting the visitor id:
- * it must not clear the session's last touch, and it must not claim first touch
- * as `direct`: which would permanently mark someone as organic and make every
- * campaign they later arrive from look like it acquired nobody.
+ * it must not clear the session's last touch, which a tagged landing followed
+ * by an untagged reload would otherwise lose.
  */
 export function captureAttribution(): void {
   if (captured) return;
   captured = true;
+
+  // Before the suppression check: deleting a retired record is owed to an
+  // opted-out browser as much as to anyone.
+  if (typeof localStorage !== 'undefined') {
+    removeStore(localStorage, RETIRED_FIRST_TOUCH_KEY);
+  }
 
   try {
     if (trackingSuppressed()) return;
@@ -237,7 +224,6 @@ export function captureAttribution(): void {
     const withVisitor: Attribution = { ...touch, visitor_id: visitorId };
     memoryTouch = withVisitor;
     writeStore(sessionStorage, LAST_TOUCH_KEY, JSON.stringify(withVisitor));
-    claimFirstTouch(withVisitor);
     cleanUrl(params);
   } catch {
     /* crypto or storage unavailable, must never break boot */
@@ -277,23 +263,25 @@ export function visitAttribution(): Partial<Attribution> | null {
 }
 
 /**
- * The campaign that first brought this browser here, while its claim holds.
+ * Forget this browser: the visitor id, the tab's campaign, and the in-memory
+ * copies of both. Called when the visitor opts out on /privacy.
  *
- * The expiry is checked on READ, not only on write. Checking it solely in
- * claimFirstTouch() meant the TTL governed replacement and nothing else: a
- * stored claim never lapsed on its own, so the shared-laptop case the TTL
- * exists for still happened unless the next person arrived on a differently
- * tagged link, and an untagged arrival writes nothing by design, which is
- * exactly the arrival a colleague makes.
+ * Without it, opting out stopped the recording but kept the id, so turning
+ * measurement back on joined the new visits to the old ones, which is the one
+ * thing someone who switched it off would not expect. The memory copies matter
+ * too: ensureVisitorId() falls back to `memoryVisitorId` when storage reads
+ * empty, which would hand the deleted id straight back on this page load.
  */
-export function firstTouchAttribution(): FirstTouch | null {
-  const stored = readJson<FirstTouch>(localStorage, FIRST_TOUCH_KEY);
-  if (!stored) return null;
-  if (stored.first_touch_at) {
-    const age = Date.now() - Date.parse(stored.first_touch_at);
-    if (age > FIRST_TOUCH_TTL_MS) return null;
+export function forgetAttribution(): void {
+  memoryTouch = null;
+  memoryVisitorId = null;
+  if (typeof localStorage !== 'undefined') {
+    removeStore(localStorage, VISITOR_ID_KEY);
+    removeStore(localStorage, RETIRED_FIRST_TOUCH_KEY);
   }
-  return stored;
+  if (typeof sessionStorage !== 'undefined') {
+    removeStore(sessionStorage, LAST_TOUCH_KEY);
+  }
 }
 
 /** Test seam. Clears the module's latch and its in-memory fallbacks. */

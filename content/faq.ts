@@ -278,6 +278,10 @@ const SCOPED_DURATION=`\\byears?\\b[^.?!]{0,25}?\\b(?:of|in|with|using)\\s+(?!${
  * comes out as mangled Latin, which matches nothing and reaches the
  * not-documented answer, which is where it was going anyway.
  */
+/** Unicode format characters: soft hyphen, zero-width space/joiners, word joiner, BOM, bidi controls. See normaliseQuestion(). */
+const FORMAT_CHARS=/\p{Cf}/gu;
+/** Whether the raw text carries any of them. lib/chat/gate.ts keeps such a question away from the model. */
+export const hasFormatChars=(text:string):boolean=>/\p{Cf}/u.test(text);
 export const HOMOGLYPHS:Record<string,string>={'\u0430':'a','\u0432':'b','\u0441':'c','\u0501':'d','\u0435':'e','\u04bb':'h','\u043d':'h','\u0456':'i','\u0458':'j','\u043a':'k','\u04cf':'l','\u043c':'m','\u043e':'o','\u0440':'p','\u0455':'s','\u0442':'t','\u0443':'y','\u0445':'x','\u03b1':'a','\u03b2':'b','\u03b5':'e','\u03b9':'i','\u03ba':'k','\u03bd':'v','\u03bf':'o','\u03c1':'p','\u03c4':'t','\u03c5':'u','\u03c7':'x'};
 export const guard = {
  abuse:'\\b(?:ignore|disregard|override|jailbreak|system prompt|developer message|secret|api key|passwords?(?! management)|pretend|roleplay|role-play|act as|insult|hate|stupid|idiot|dumb|useless|worthless|nonsense|rubbish|shut up|garbage bot|trash bot|bakwas|chut(?:i)?ya|chutya|gandu|madarch(?:o|oo)d|b(?:e|he)henchod|bhenchod|bsdk|harami|kamina|nalayak|ghatiya|faltu|bewakoof|pagal|fuck|sex|your (?:instructions|rules|guidelines|prompt|training data)|instructions verbatim|repeat after me|forget (?:your|the|all|previous|everything)|you are (?:now )?dan|dan mode|(?:no|without|bypass|remove|ignore) (?:your |all |any )?restrictions?|unrestricted)\\b',
@@ -325,22 +329,46 @@ export type Answer={answer:string;href?:string;mode:'faq'|'ai';source:string;id?
  * grounds that the model could only choose an answer id, and it stopped
  * being one when the NIM tier began composing prose. `HOMOGLYPHS` above now
  * folds them, after lowercasing, so the guards see the string a human reads.
+ *
+ * Format characters (Unicode category Cf) are deleted outright. A soft hyphen
+ * or a zero-width space inside `sal\u00adary` or `api\u200b key` is invisible
+ * on screen and breaks every pattern at the character, so "What is his
+ * salary?" with a soft hyphen in it walked past guard.unknown to the no-match answer, which is
+ * model-eligible. NFKD leaves Cf alone. backend/main.py drops the same
+ * category, and lib/chat/gate.ts keeps any question that contained one local.
  */
 export function normaliseQuestion(question:string):string {
- return question.normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[‘’‛]/g,'\'').toLowerCase().replace(/[\u0400-\u04ff\u0370-\u03ff\u0500-\u052f]/g,ch=>HOMOGLYPHS[ch]??ch).trim();
+ return question.normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(FORMAT_CHARS,'').replace(/[‘’‛]/g,'\'').toLowerCase().replace(/[\u0400-\u04ff\u0370-\u03ff\u0500-\u052f]/g,ch=>HOMOGLYPHS[ch]??ch).trim();
+}
+/**
+ * Every regex answerQuestion() runs, built once and on first use.
+ *
+ * It used to build them per call: five guards and one RegExp per pattern,
+ * about 1,170 of them, on every question in the Worker and on every screened
+ * history turn. Each entry's patterns are one alternation, `\b(?:a|b)\b`,
+ * which matches exactly when some `\ba\b` or `\bb\b` would: the engine
+ * tries every alternative at every position. Lazy rather than at import, so
+ * a module that only wants `answers` or `guard` pays nothing for it.
+ */
+type Compiled={sensitive:RegExp;abuse:RegExp;personal:RegExp;unknown:RegExp;offTopic:RegExp;patterns:RegExp[]};
+let regexes:Compiled|null=null;
+const escapeRegExp=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function compiled():Compiled {
+ return regexes??={sensitive:new RegExp(guard.sensitive,'i'),abuse:new RegExp(guard.abuse,'i'),personal:new RegExp(guard.personal,'i'),unknown:new RegExp(guard.unknown,'i'),offTopic:new RegExp(guard.offTopic,'i'),
+  // An entry with no patterns must match nothing, and `\b(?:)\b` matches almost anything.
+  patterns:answers.map(a=>a.patterns.length?new RegExp(`\\b(?:${a.patterns.map(escapeRegExp).join('|')})\\b`,'i'):/(?!)/)};
 }
 export function answerQuestion(question:string):Answer {
- const q=normaliseQuestion(question);
+ const q=normaliseQuestion(question);const re=compiled();
  const privateWorkBoundary='I can share only safe public summaries of Alex’s work. I do not provide credentials, internal infrastructure, client data, source code, test data, security findings, or private links.';
- if(new RegExp(guard.sensitive,'i').test(q))return {answer:privateWorkBoundary,mode:'faq',source:'Safety boundary'};
- if(new RegExp(guard.abuse,'i').test(q))return {answer:'I can help with professional questions about Alex’s projects, skills, certifications, and experience.',mode:'faq',source:'Portfolio guide'};
+ if(re.sensitive.test(q))return {answer:privateWorkBoundary,mode:'faq',source:'Safety boundary'};
+ if(re.abuse.test(q))return {answer:'I can help with professional questions about Alex’s projects, skills, certifications, and experience.',mode:'faq',source:'Portfolio guide'};
  // No contact details in this one, on purpose. See guard.personal above.
- if(new RegExp(guard.personal,'i').test(q))return {answer:'That is personal information, and not something this portfolio covers. I can answer questions about Alex’s work, skills, experience, education and availability.',mode:'faq',source:'Out of scope'};
- if(new RegExp(guard.unknown,'i').test(q))return {answer:`That detail is not in the portfolio. Please ask Alex directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,mode:'faq',source:'Not documented'};
- if(new RegExp(guard.offTopic,'i').test(q))return {answer:'I answer questions about Alex’s work. Ask about his projects, skills, certifications, or experience.',mode:'faq',source:'Portfolio guide'};
+ if(re.personal.test(q))return {answer:'That is personal information, and not something this portfolio covers. I can answer questions about Alex’s work, skills, experience, education and availability.',mode:'faq',source:'Out of scope'};
+ if(re.unknown.test(q))return {answer:`That detail is not in the portfolio. Please ask Alex directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,mode:'faq',source:'Not documented'};
+ if(re.offTopic.test(q))return {answer:'I answer questions about Alex’s work. Ask about his projects, skills, certifications, or experience.',mode:'faq',source:'Portfolio guide'};
  if(/^(hi|hello|hey|thanks|thank you)[!. ]*$/i.test(q))return {answer:'Hello! I can help you explore Alex’s AI projects, full stack work, skills, certifications, and engineering experience.',mode:'faq',source:'Portfolio guide'};
- const escapeRegExp=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
- const found=answers.find(a=>a.patterns.some(word=>new RegExp(`\\b${escapeRegExp(word)}\\b`,'i').test(q)));
+ const found=answers.find((_,at)=>re.patterns[at].test(q));
  if(found)return {answer:found.answer,href:found.href,mode:'faq',source:'From the portfolio',id:found.id};
  return {answer:`I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, availability or experience. You can also reach him directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,mode:'faq',source:'Not documented',unmatched:true};
 }

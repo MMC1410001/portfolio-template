@@ -12,7 +12,7 @@
  */
 
 import { queueEvent, onSessionExit } from './queue';
-import { isUntrackedPath } from './scope';
+import { isUntrackedPath, trackingSuppressed } from './scope';
 import { currentSection } from './sections';
 import { currentMode } from './mode';
 
@@ -36,7 +36,13 @@ let installed = false;
 let registered = false;
 let reached = new Set<number>();
 let timer: ReturnType<typeof setTimeout> | null = null;
-/** The deepest point reached all session, for the session_end row. */
+/**
+ * The deepest point reached on this page, for the session_end row.
+ *
+ * Per page, not per session, since `/dashboards` shipped: the pair is only
+ * readable if both numbers describe one document, and the max of a homepage
+ * offset and a dashboard's height describes neither.
+ */
 let maxScrollPx = 0;
 let maxDocH = 0;
 
@@ -105,9 +111,13 @@ function onScroll(): void {
  * non-passive scroll listener blocks the compositor on every frame. resize is
  * included because rotating a phone changes both the viewport and the document
  * height, so the same scroll offset becomes a different depth.
+ *
+ * Not installed where nothing would be recorded (see trackingSuppressed());
+ * `syncAnalyticsRoute()` installs it on the next navigation that can record.
  */
 export function installScrollTracking(): void {
   if (installed || typeof window === 'undefined') return;
+  if (trackingSuppressed()) return;
   installed = true;
 
   window.addEventListener('scroll', onScroll, { passive: true });
@@ -125,8 +135,18 @@ export function installScrollTracking(): void {
   onScroll();
 }
 
+/**
+ * Start the page over: milestones, the deepest point and its height.
+ *
+ * Called on every client-side navigation. Without it a visit that reached
+ * 100% of `/` could never report a milestone on the page it went to next, and
+ * the reverse, and max_scroll_px mixed one route's offset with another's
+ * height.
+ */
 export function resetScrollDepth(): void {
   reached = new Set();
+  maxScrollPx = 0;
+  maxDocH = 0;
   if (timer !== null) {
     clearTimeout(timer);
     timer = null;
@@ -134,15 +154,22 @@ export function resetScrollDepth(): void {
   if (installed) onScroll();
 }
 
-/** Test seam. Not for application code. */
-export function __resetScrollTracking(): void {
+/** Detach the listeners, for a route where nothing is recorded. */
+export function uninstallScrollTracking(): void {
   if (installed && typeof window !== 'undefined') {
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onScroll);
   }
   installed = false;
+  if (timer !== null) {
+    clearTimeout(timer);
+    timer = null;
+  }
+}
+
+/** Test seam. Not for application code. */
+export function __resetScrollTracking(): void {
+  uninstallScrollTracking();
   registered = false;
-  maxScrollPx = 0;
-  maxDocH = 0;
   resetScrollDepth();
 }

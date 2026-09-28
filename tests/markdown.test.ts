@@ -62,3 +62,13 @@ test('ANALYTICS.md parses with nothing lost', () => {
   // Every table row has as many cells as its header.
   for (const b of blocks) if (b.kind === 'table') for (const row of b.rows) assert.equal(row.length, b.head.length, row.join('|'));
 });
+
+test('link hrefs: ordinary ones pass, protocol-relative and script ones do not', () => {
+  // Read out of the component as text: a bare Node process cannot import JSX.
+  const source = readFileSync(new URL('../components/showcase/Markdown.tsx', import.meta.url), 'utf8');
+  const pattern = /const SAFE_HREF = \/(.+)\/;\n/.exec(source)?.[1];
+  assert.ok(pattern, 'SAFE_HREF is no longer a one-line regex literal');
+  const safe = new RegExp(pattern);
+  for (const href of ['https://x.test', 'http://x.test/a', '/analytics', '/', '#the-ev-cte']) assert.ok(safe.test(href), href);
+  for (const href of ['//evil.test', '/\\evil.test', 'javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.test', 'evil.test']) assert.ok(!safe.test(href), href);
+});

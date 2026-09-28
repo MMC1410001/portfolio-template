@@ -28,10 +28,26 @@
  * English question with an accented name gets the curated not-documented
  * answer instead of a composed one: a worse reply, never a wrong one.
  *
+ * ── Why an unmatched question with an invisible character stays local ─────
+ * normaliseQuestion() deletes format characters (soft hyphen, zero-width
+ * space and joiners, bidi controls) before the guards run, so "sal\u00adary"
+ * is refused like "salary". Nobody types one by accident into a question that
+ * then matches nothing, though, and what reaches the model is the raw text,
+ * so an unmatched question that carried any is kept on the curated answer.
+ * History turns go through the same unmatchedMayCompose(), so one cannot ride
+ * along as context either.
+ *
+ * ── Why a matched question in another language is translated, not asked ───
+ * With no conversation behind it, the only reason a matched question reaches
+ * the model is its language. The model is then handed the curated answer and
+ * the language name, and never the visitor's words: the question has already
+ * done its job by matching, and English guards cannot vouch for the rest of
+ * what it says. See translationTarget() and translateAnswer() in nim.ts.
+ *
  * No DOM and no React, so `npm run test:units` can import it.
  */
-import { answerQuestion, type Answer } from '@/content/faq';
-import { detectLanguage } from './language';
+import { answerQuestion, hasFormatChars, type Answer } from '@/content/faq';
+import { detectLanguage, type DetectedLanguage } from './language';
 import type { ChatTurn } from './nim';
 
 /** Letters only, any of them outside ASCII. Punctuation such as ¿ or ’ does not count. */
@@ -42,7 +58,7 @@ const hasForeignLetters = (text: string): boolean => /\P{ASCII}/u.test(text.repl
  * English only, by both tests above.
  */
 function unmatchedMayCompose(question: string): boolean {
-  return detectLanguage(question) === null && !hasForeignLetters(question);
+  return detectLanguage(question) === null && !hasForeignLetters(question) && !hasFormatChars(question);
 }
 
 /**
@@ -53,6 +69,17 @@ function unmatchedMayCompose(question: string): boolean {
 export function modelEligible(fallback: Answer, history: ChatTurn[], question: string): boolean {
   if (fallback.unmatched === true) return unmatchedMayCompose(question);
   return fallback.source === 'From the portfolio' && (history.length > 0 || detectLanguage(question) !== null);
+}
+
+/**
+ * The language to translate the curated answer into, when that is ALL the
+ * model is being asked to do: a matched question, in another language, with
+ * no conversation behind it. Null otherwise, including mid-conversation,
+ * where the model composes from the question and the history as before.
+ */
+export function translationTarget(fallback: Answer, history: ChatTurn[], question: string): DetectedLanguage | null {
+  if (fallback.source !== 'From the portfolio' || !fallback.id || history.length > 0) return null;
+  return detectLanguage(question);
 }
 
 /**

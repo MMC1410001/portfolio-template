@@ -46,9 +46,15 @@ def _normalise(question: str) -> str:
     ones. This must stay in step with normaliseQuestion() in content/faq.ts:
     the two implementations share guard patterns through knowledge.json, so a
     difference here is a difference in what each one refuses.
+
+    Format characters (category Cf: soft hyphen, zero-width space and
+    joiners, word joiner, BOM, bidi controls) are dropped too, the same
+    \\p{Cf} normaliseQuestion() deletes. They are invisible, and one inside
+    'sal\\u00adary' or 'api\\u200b key' broke the guard pattern at that point.
     """
     decomposed = unicodedata.normalize('NFKD', question)
-    folded = ''.join(c for c in decomposed if not unicodedata.combining(c))
+    folded = ''.join(c for c in decomposed
+                     if not unicodedata.combining(c) and unicodedata.category(c) != 'Cf')
     for curly in ('\u2018', '\u2019', '\u201b'):
         folded = folded.replace(curly, "'")
     lowered = folded.lower()
@@ -63,8 +69,11 @@ def _normalise(question: str) -> str:
 
 def faq(question: str) -> dict:
     q = _normalise(question)
-    def result(answer, source='Portfolio guide', href=None):
-        return dict(answer=answer, source=source, mode='faq', href=href)
+    def result(answer, source='Portfolio guide', href=None, answer_id=None):
+        out = dict(answer=answer, source=source, mode='faq', href=href)
+        if answer_id:
+            out.update(id=answer_id, ids=[answer_id])
+        return out
     if re.search(DATA['guard']['sensitive'], q, re.I):
         return result('I can share only safe public summaries of Alex’s work. I do not provide credentials, internal infrastructure, client data, source code, test data, security findings, or private links.', 'Safety boundary')
     if re.search(DATA['guard']['abuse'], q, re.I):
@@ -88,7 +97,7 @@ def faq(question: str) -> dict:
         return result('Hello! I can help you explore Alex’s AI projects, full stack work, skills, certifications, and engineering experience.')
     for entry in DATA['answers']:
         if any(re.search(r'\b' + re.escape(word) + r'\b', q, re.I) for word in entry['patterns']):
-            return result(entry['answer'], 'From the portfolio', entry.get('href'))
+            return result(entry['answer'], 'From the portfolio', entry.get('href'), entry.get('id'))
     return result(f'I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, availability or experience. You can also reach him directly at {contact}.', 'Not documented', DATA['profile']['linkedin'])
 
 @app.get('/health')
@@ -98,7 +107,12 @@ def health():
 @app.post('/chat')
 async def chat(body: ChatRequest, request: Request):
     secret = os.getenv('CHAT_BACKEND_TOKEN')
-    if secret and not hmac.compare_digest(request.headers.get('authorization', ''), 'Bearer ' + secret):
+    # Bytes, not str: compare_digest raises TypeError on a str holding any
+    # non-ASCII character, so a header like 'Bearer é' was a 500 instead of a
+    # 401. Starlette decodes headers as latin-1, and encoding back gives the
+    # bytes that arrived; the secret is encoded as UTF-8, as it was typed.
+    if secret and not hmac.compare_digest(request.headers.get('authorization', '').encode('latin-1', 'replace'),
+                                          ('Bearer ' + secret).encode('utf-8')):
         raise HTTPException(401, 'Unauthorized')
     if not body.message.strip():
         raise HTTPException(422, 'Message cannot be blank')
@@ -167,8 +181,11 @@ async def chat(body: ChatRequest, request: Request):
         if not entry:
             return fallback
         # The model selects an entry; only approved, source-backed prose is served.
+        # The id goes back with it, so the Worker takes the link and the
+        # carried subject from the entry that was chosen, not from its own
+        # regex match, which may be a different answer.
         result = dict(answer=entry['answer'], href=entry.get('href'), mode='ai',
-                      source='AI matched · portfolio facts')
+                      source='AI matched · portfolio facts', id=entry['id'], ids=[entry['id']])
         CACHE[cache_key] = (now, result)
         while len(CACHE) > 256:
             CACHE.popitem(last=False)

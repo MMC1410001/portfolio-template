@@ -14,6 +14,8 @@ import {
   DAY_GRID,
   EV_CTE,
   IST_DAY,
+  ON_HOME,
+  RESUMED_VIEW,
   SESS_CTE,
   WITH_EV,
   WITH_SESS,
@@ -93,8 +95,25 @@ function toBreakdown(list: Row[], total: number): Breakdown[] {
  * batch's snapshot. The cost is a row written between the two reads being
  * judged by a set a few milliseconds old, on an admin panel that is already a
  * snapshot of a moving log.
+ *
+ * ── Cached per isolate, per window, for INTERNAL_CACHE_MS ─────────────────
+ * One dashboard load fires six actions with the same from/to at once, and
+ * each used to run this scan itself: six GROUP BYs over the whole window to
+ * produce one answer. The promise is cached, so concurrent requests share one
+ * read too. The set does not depend on excludeInternal, so neither does the
+ * key. Staleness is bounded and small: ingest stamps created_at with the
+ * server's clock, so a row can only land inside a window whose `until` is
+ * still in the future (short of a browser clock running ahead of the
+ * server's), and is_internal never changes after the write (the
+ * documented backfill UPDATE aside, which is then visible within a minute).
+ * Keyed by the database object first, so tests and the demo seeder, which
+ * open several, can never read one database's set for another.
  */
-async function internalSessionIds(
+const INTERNAL_CACHE_MS = 60_000;
+const INTERNAL_CACHE_MAX = 16;
+const internalCache = new WeakMap<D1Database, Map<string, { until: number; ids: Promise<string[]> }>>();
+
+async function readInternalSessionIds(
   db: D1Database,
   o: QueryOptions,
 ): Promise<string[]> {
@@ -107,6 +126,27 @@ async function internalSessionIds(
     .bind(o.window.since, o.window.until)
     .all<{ session_id: string }>();
   return (result.results ?? []).map((r) => r.session_id);
+}
+
+function internalSessionIds(
+  db: D1Database,
+  o: QueryOptions,
+): Promise<string[]> {
+  const now = Date.now();
+  let perDb = internalCache.get(db);
+  if (!perDb) internalCache.set(db, (perDb = new Map()));
+  const key = `${o.window.since}:${o.window.until}`;
+  const hit = perDb.get(key);
+  if (hit && now < hit.until) return hit.ids;
+
+  for (const [k, v] of perDb) if (now >= v.until) perDb.delete(k);
+  if (perDb.size >= INTERNAL_CACHE_MAX) perDb.clear();
+
+  const ids = readInternalSessionIds(db, o);
+  // A failed read is not an answer: dropped so the next request retries.
+  void ids.catch(() => { if (perDb.get(key)?.ids === ids) perDb.delete(key); });
+  perDb.set(key, { until: now + INTERNAL_CACHE_MS, ids });
+  return ids;
 }
 
 /** ?1/?2/?3, the window and the internal sessions to leave out. See EV_CTE. */
@@ -144,7 +184,9 @@ export async function overview(
   const q = (sql: string) => db.prepare(sql).bind(...p);
 
   const results = await db.batch<Row>([
-    // 0, funnel
+    // 0, funnel and engagement, including two medians. One statement, not
+    //     two: both are single-row aggregates over the same rollup, and each
+    //     statement rebuilt `sess` from the raw log on its own.
     q(`${WITH_SESS}
        SELECT COUNT(*) AS sessions,
               SUM(CASE WHEN section_views > 1 OR duration_ms >= 10000
@@ -153,12 +195,7 @@ export async function overview(
               SUM(did_chat) AS chat_opened,
               SUM(did_ask) AS chat_asked,
               SUM(CASE WHEN did_contact = 1 OR did_resume = 1
-                        OR did_outbound = 1 THEN 1 ELSE 0 END) AS reached_out
-         FROM sess`),
-
-    // 1, engagement, including two medians
-    q(`${WITH_SESS}
-       SELECT COUNT(*) AS sessions,
+                        OR did_outbound = 1 THEN 1 ELSE 0 END) AS reached_out,
               ROUND(COALESCE(AVG(duration_ms), 0) / 1000.0, 1) AS avg_seconds,
               ROUND(COALESCE(${medianOf('sess', 'duration_ms')}, 0) / 1000.0, 1)
                 AS median_seconds,
@@ -168,24 +205,42 @@ export async function overview(
               COALESCE(${medianOf('sess', 'max_scroll_px')}, 0) AS median_scroll_px
          FROM sess`),
 
-    // 2, sections and where people leave. Dwell belongs to the row that
-    //     names it, because page_view is emitted on LEAVE (see sections.ts),
-    //     so this needs no window function at all.
-    q(`${WITH_EV}
+    // 1, sections and where people leave. Dwell belongs to the row that
+    //     names it, because page_view is emitted on LEAVE (see sections.ts).
+    //     Two corrections for tab switches, each of which flushes a terminal
+    //     row: a row resuming the same section (RESUMED_VIEW) adds its dwell
+    //     to the view it continues rather than counting as a view of its
+    //     own, and only the session's LAST terminal row is its exit. Counting
+    //     every terminal row put an exit on a section each time a visitor
+    //     glanced at another tab and came back.
+    q(`${WITH_EV}, pv AS (
+         SELECT path, session_id, duration_ms,
+                ${RESUMED_VIEW} AS resumed,
+                CASE WHEN ${prop('terminal')} = 1 THEN 1 ELSE 0 END AS terminal,
+                ROW_NUMBER() OVER (
+                  PARTITION BY session_id,
+                               CASE WHEN ${prop('terminal')} = 1 THEN 1 ELSE 0 END
+                  ORDER BY created_at DESC, COALESCE(seq, id) DESC) AS rn
+           FROM ev
+          WHERE event = 'page_view' AND path IS NOT NULL),
+       marked AS (
+         SELECT path, session_id, duration_ms, 1 - resumed AS starts,
+                CASE WHEN terminal = 1 AND rn = 1 THEN 1 ELSE 0 END AS is_exit
+           FROM pv)
        SELECT path,
-              COUNT(*) AS views,
+              SUM(starts) AS views,
               COUNT(DISTINCT session_id) AS sessions,
-              ROUND(COALESCE(AVG(duration_ms), 0) / 1000.0, 1) AS avg_seconds,
-              SUM(CASE WHEN ${prop('terminal')} = 1 THEN 1 ELSE 0 END) AS exits,
-              ROUND(100.0 * SUM(CASE WHEN ${prop('terminal')} = 1 THEN 1 ELSE 0 END)
-                    / MAX(COUNT(*), 1), 1) AS exit_pct
-         FROM ev
-        WHERE event = 'page_view' AND path IS NOT NULL
+              ROUND(COALESCE(SUM(duration_ms) * 1.0 / NULLIF(SUM(
+                      CASE WHEN starts = 1 AND duration_ms IS NOT NULL
+                           THEN 1 ELSE 0 END), 0), 0) / 1000.0, 1) AS avg_seconds,
+              SUM(is_exit) AS exits,
+              ROUND(100.0 * SUM(is_exit) / MAX(SUM(starts), 1), 1) AS exit_pct
+         FROM marked
         GROUP BY path
         ORDER BY views DESC
         LIMIT 50`),
 
-    // 3, what gets clicked
+    // 2, what gets clicked
     q(`${WITH_EV}
        SELECT COALESCE(${prop('tag')}, ${prop('selector')}, '(unidentified)')
                 AS label,
@@ -199,10 +254,11 @@ export async function overview(
         ORDER BY clicks DESC
         LIMIT 50`),
 
-    // 4, scroll reach. The denominator is sessions that STARTED, not sessions
+    // 3, scroll reach. The denominator is sessions that STARTED, not sessions
     //     that reported a milestone: scoping to reporters divides by only the
     //     people who scrolled and puts every depth at ~100%, which says the
-    //     opposite of the truth.
+    //     opposite of the truth. Milestones are per page, so only the
+    //     homepage's count (ON_HOME): a one-screen /privacy reports 100%.
     q(`${WITH_EV}, starts AS (
          SELECT COUNT(DISTINCT session_id) AS n FROM ev WHERE event = 'visit')
        SELECT (SELECT n FROM starts) AS sessions,
@@ -211,9 +267,9 @@ export async function overview(
               COUNT(DISTINCT CASE WHEN d >= 75  THEN session_id END) AS d75,
               COUNT(DISTINCT CASE WHEN d >= 100 THEN session_id END) AS d100
          FROM (SELECT session_id, CAST(${prop('depth')} AS INTEGER) AS d
-                 FROM ev WHERE event = 'scroll_depth')`),
+                 FROM ev WHERE event = 'scroll_depth' AND ${ON_HOME})`),
 
-    // 5, CTA seen vs clicked. FULL OUTER JOIN replaced by a key set.
+    // 4, CTA seen vs clicked. FULL OUTER JOIN replaced by a key set.
     q(`${WITH_EV}, tags AS (
          SELECT DISTINCT ${prop('tag')} AS tag FROM ev
           WHERE event IN ('cta_view','click') AND ${prop('tag')} IS NOT NULL),
@@ -241,7 +297,7 @@ export async function overview(
         ORDER BY seen_sessions DESC, clicks DESC
         LIMIT 50`),
 
-    // 6, friction. Grouped by section, because "somewhere on the page" is not
+    // 5, friction. Grouped by section, because "somewhere on the page" is not
     //     actionable on a page this tall.
     q(`${WITH_EV}
        SELECT CASE event WHEN 'dead_click' THEN 'dead' ELSE 'rage' END AS kind,
@@ -255,7 +311,7 @@ export async function overview(
         ORDER BY events DESC
         LIMIT 50`),
 
-    // 7, last click before leaving, split by whether the session then
+    // 6, last click before leaving, split by whether the session then
     //     reached out. Without the split the dead end and the win rank alike.
     q(`${WITH_EV}, ${SESS_CTE}, ranked AS (
          SELECT session_id,
@@ -275,7 +331,7 @@ export async function overview(
         ORDER BY sessions DESC
         LIMIT 25`),
 
-    // 8/9/10: devices, browsers, referrer sources
+    // 7/8/9: devices, browsers, referrer sources
     q(`${WITH_SESS}
        SELECT COALESCE(device,'(unknown)') AS label, COUNT(*) AS sessions
          FROM sess GROUP BY 1 ORDER BY sessions DESC`),
@@ -286,12 +342,13 @@ export async function overview(
        SELECT COALESCE(referrer_host,'(direct)') AS label, COUNT(*) AS sessions
          FROM sess GROUP BY 1 ORDER BY sessions DESC LIMIT 25`),
 
-    // 11, daily series over a day grid, so a quiet day is an explicit 0
+    // 10, daily series over a day grid, so a quiet day is an explicit 0
     q(`WITH RECURSIVE ${DAY_GRID}, ${EV_CTE}, ${SESS_CTE},
        s AS (SELECT ${IST_DAY('first_seen')} AS day, COUNT(*) n
                FROM sess GROUP BY 1),
        v AS (SELECT ${IST_DAY('created_at')} AS day, COUNT(*) n
-               FROM ev WHERE event = 'page_view' GROUP BY 1),
+               FROM ev WHERE event = 'page_view' AND ${RESUMED_VIEW} = 0
+              GROUP BY 1),
        c AS (SELECT ${IST_DAY('created_at')} AS day, COUNT(*) n
                FROM ev WHERE event = 'chat_ask' GROUP BY 1)
        SELECT d.day,
@@ -304,7 +361,7 @@ export async function overview(
          LEFT JOIN c ON c.day = d.day
         ORDER BY d.day`),
 
-    // 12, résumé vs immersive. Does the 3D view hold people longer?
+    // 11, résumé vs immersive. Does the 3D view hold people longer?
     q(`${WITH_SESS}
        SELECT CASE WHEN saw_immersive = 1 THEN 'immersive' ELSE 'resume' END
                 AS mode,
@@ -315,7 +372,7 @@ export async function overview(
   ]);
 
   const f = one(results, 0);
-  const e = one(results, 1);
+  const e = f;
   const sessions = num(e.sessions);
 
   return {
@@ -337,7 +394,7 @@ export async function overview(
       sectionsPerSession: num(e.sections_per_session),
       medianScrollPx: Math.round(num(e.median_scroll_px)),
     },
-    sections: rows(results, 2).map((r) => ({
+    sections: rows(results, 1).map((r) => ({
       path: str(r.path) ?? '/',
       views: num(r.views),
       sessions: num(r.sessions),
@@ -345,7 +402,7 @@ export async function overview(
       exits: num(r.exits),
       exitPct: num(r.exit_pct),
     })),
-    clicks: rows(results, 3).map((r) => ({
+    clicks: rows(results, 2).map((r) => ({
       label: str(r.label) ?? '(unidentified)',
       tagged: num(r.tagged) === 1,
       section: str(r.section),
@@ -353,7 +410,7 @@ export async function overview(
       sessions: num(r.sessions),
     })),
     scroll: (() => {
-      const s = one(results, 4);
+      const s = one(results, 3);
       return {
         sessions: num(s.sessions),
         d25: num(s.d25),
@@ -362,36 +419,36 @@ export async function overview(
         d100: num(s.d100),
       };
     })(),
-    ctas: rows(results, 5).map((r) => ({
+    ctas: rows(results, 4).map((r) => ({
       tag: str(r.tag) ?? '(unnamed)',
       seenSessions: num(r.seen_sessions),
       clicks: num(r.clicks),
       clickedSessions: num(r.clicked_sessions),
       ctr: r.ctr === null || r.ctr === undefined ? null : num(r.ctr),
     })),
-    friction: rows(results, 6).map((r) => ({
+    friction: rows(results, 5).map((r) => ({
       kind: str(r.kind) === 'dead' ? 'dead' : 'rage',
       section: str(r.section),
       selector: str(r.selector),
       events: num(r.events),
       sessions: num(r.sessions),
     })),
-    exitClicks: rows(results, 7).map((r) => ({
+    exitClicks: rows(results, 6).map((r) => ({
       label: str(r.label) ?? '(unidentified)',
       section: str(r.section),
       sessions: num(r.sessions),
       converted: num(r.converted),
     })),
-    devices: toBreakdown(rows(results, 8), sessions),
-    browsers: toBreakdown(rows(results, 9), sessions),
-    sources: toBreakdown(rows(results, 10), sessions),
-    daily: rows(results, 11).map((r) => ({
+    devices: toBreakdown(rows(results, 7), sessions),
+    browsers: toBreakdown(rows(results, 8), sessions),
+    sources: toBreakdown(rows(results, 9), sessions),
+    daily: rows(results, 10).map((r) => ({
       day: str(r.day) ?? '',
       sessions: num(r.sessions),
       sectionViews: num(r.section_views),
       chatQuestions: num(r.chat_questions),
     })),
-    modes: rows(results, 12).map((r) => ({
+    modes: rows(results, 11).map((r) => ({
       mode: str(r.mode) ?? 'resume',
       sessions: num(r.sessions),
       avgSeconds: num(r.avg_seconds),
@@ -411,31 +468,33 @@ export async function audience(
   const q = (sql: string) => db.prepare(sql).bind(...p);
 
   const results = await db.batch<Row>([
-    // 0, new vs returning. The correlated EXISTS deliberately reads OUTSIDE
+    // 0, the single-row numbers, in one statement over one rollup (they were
+    //     three, each rebuilding `sess` from the raw log):
+    //   - new vs returning. The correlated EXISTS deliberately reads OUTSIDE
     //     the window, which is why the retention horizon is reported next to
     //     it: a visitor last seen 200 days ago now looks new.
+    //   - engagement rate. Same threshold as the source system, adapted
+    //     denominator (section views instead of page views).
+    //   - is geo present at all? Read from the data, never assumed.
     q(`${WITH_SESS}, visitors AS (
          SELECT DISTINCT visitor_id FROM sess WHERE visitor_id IS NOT NULL)
        SELECT
-         SUM(CASE WHEN EXISTS (SELECT 1 FROM events pe
-                                WHERE pe.visitor_id = v.visitor_id
-                                  AND pe.created_at < ?1)
-                  THEN 1 ELSE 0 END) AS returning_v,
-         SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM events pe
-                                    WHERE pe.visitor_id = v.visitor_id
-                                      AND pe.created_at < ?1)
-                  THEN 1 ELSE 0 END) AS new_v,
-         (SELECT COUNT(*) FROM sess WHERE visitor_id IS NULL) AS unknown_v
-         FROM visitors v`),
-
-    // 1, engagement rate. Same threshold as the source system, adapted
-    //     denominator (section views instead of page views).
-    q(`${WITH_SESS}
-       SELECT COUNT(*) AS sessions,
-              SUM(CASE WHEN section_views > 1 OR duration_ms >= 10000
-                       THEN 1 ELSE 0 END) AS engaged
+         (SELECT SUM(CASE WHEN EXISTS (SELECT 1 FROM events pe
+                                        WHERE pe.visitor_id = v.visitor_id
+                                          AND pe.created_at < ?1)
+                          THEN 1 ELSE 0 END) FROM visitors v) AS returning_v,
+         (SELECT SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM events pe
+                                            WHERE pe.visitor_id = v.visitor_id
+                                              AND pe.created_at < ?1)
+                          THEN 1 ELSE 0 END) FROM visitors v) AS new_v,
+         SUM(CASE WHEN visitor_id IS NULL THEN 1 ELSE 0 END) AS unknown_v,
+         COUNT(*) AS sessions,
+         SUM(CASE WHEN section_views > 1 OR duration_ms >= 10000
+                  THEN 1 ELSE 0 END) AS engaged,
+         SUM(CASE WHEN city IS NOT NULL THEN 1 ELSE 0 END) AS geo_sessions
          FROM sess`),
 
+    // 1/2, devices and operating systems
     q(`${WITH_SESS}
        SELECT COALESCE(device,'(unknown)') AS label, COUNT(*) AS sessions
          FROM sess GROUP BY 1 ORDER BY sessions DESC`),
@@ -443,14 +502,14 @@ export async function audience(
        SELECT COALESCE(os,'(unknown)') AS label, COUNT(*) AS sessions
          FROM sess GROUP BY 1 ORDER BY sessions DESC`),
 
-    // 4, cities. Region carried alongside because two states share city
+    // 3, cities. Region carried alongside because two states share city
     //     names and "Springfield" alone means little.
     q(`${WITH_SESS}
        SELECT city, region, country, COUNT(*) AS sessions
          FROM sess WHERE city IS NOT NULL
         GROUP BY city, region, country ORDER BY sessions DESC LIMIT 25`),
 
-    // 5, the raw ingredients for the source ladder; precedence is applied in
+    // 4, the raw ingredients for the source ladder; precedence is applied in
     //     TS by resolveSource(), where the ad-before-referrer order lives.
     q(`${WITH_SESS}
        SELECT utm_source, utm_medium, click_id_source, referrer_host,
@@ -458,16 +517,12 @@ export async function audience(
          FROM sess
         GROUP BY utm_source, utm_medium, click_id_source, referrer_host
         ORDER BY sessions DESC LIMIT 50`),
-
-    // 6, is geo present at all? Read from the data, never assumed.
-    q(`${WITH_SESS}
-       SELECT COUNT(*) AS geo_sessions FROM sess WHERE city IS NOT NULL`),
   ]);
 
   const v = one(results, 0);
-  const eng = one(results, 1);
+  const eng = v;
   const sessions = num(eng.sessions);
-  const geoSessions = num(one(results, 6).geo_sessions);
+  const geoSessions = num(v.geo_sessions);
 
   return {
     meta: meta(o),
@@ -478,15 +533,15 @@ export async function audience(
       unknown: num(v.unknown_v),
     },
     engagementRate: share(num(eng.engaged), sessions),
-    devices: toBreakdown(rows(results, 2), sessions),
-    os: toBreakdown(rows(results, 3), sessions),
-    cities: rows(results, 4).map((r) => ({
+    devices: toBreakdown(rows(results, 1), sessions),
+    os: toBreakdown(rows(results, 2), sessions),
+    cities: rows(results, 3).map((r) => ({
       city: str(r.city) ?? '(unknown)',
       region: str(r.region),
       country: str(r.country),
       sessions: num(r.sessions),
     })),
-    sourceMedium: rows(results, 5).map((r) => {
+    sourceMedium: rows(results, 4).map((r) => {
       const resolved = resolveSource({
         utm_source: str(r.utm_source),
         utm_medium: str(r.utm_medium),
@@ -578,13 +633,26 @@ export async function chatStats(
   const q = (sql: string) => db.prepare(sql).bind(...p);
 
   const results = await db.batch<Row>([
-    q(`${WITH_EV}
+    // 0, the single-row numbers: volumes, the answer-source rates and the
+    //    latency median. One pass over the window where there were three
+    //    (the median used to be a statement of its own, outside the batch).
+    q(`${WITH_EV}, lat AS (
+         SELECT CAST(${prop('latency_ms')} AS INTEGER) AS ms FROM ev
+          WHERE event = 'chat_answer' AND ${prop('latency_ms')} IS NOT NULL)
        SELECT
          SUM(CASE WHEN event = 'chat_ask'    THEN 1 ELSE 0 END) AS asked,
          SUM(CASE WHEN event = 'chat_answer' THEN 1 ELSE 0 END) AS answered,
          SUM(CASE WHEN event = 'chat_open'   THEN 1 ELSE 0 END) AS opened,
          SUM(CASE WHEN event = 'chat_close' AND ${prop('asked')} = 0
-                  THEN 1 ELSE 0 END) AS abandoned
+                  THEN 1 ELSE 0 END) AS abandoned,
+         SUM(CASE WHEN event = 'chat_answer' AND ${prop('source')} = 'Not documented'
+                  THEN 1 ELSE 0 END) AS gap,
+         SUM(CASE WHEN event = 'chat_answer'
+                   AND ${prop('source')} IN (${GUARD_SOURCES.map((s) => `'${s}'`).join(', ')})
+                  THEN 1 ELSE 0 END) AS guard,
+         SUM(CASE WHEN event = 'chat_answer' AND ${prop('offline')} = 1
+                  THEN 1 ELSE 0 END) AS offline,
+         (SELECT COALESCE(${medianOf('lat', 'ms')}, 0)) AS median_ms
          FROM ev`),
 
     // Source distribution. The seed greeting is excluded explicitly, or the
@@ -655,28 +723,7 @@ export async function chatStats(
        SELECT d.day, COALESCE(a.n,0) AS asked, COALESCE(u.n,0) AS unmatched
          FROM days d LEFT JOIN a ON a.day = d.day LEFT JOIN u ON u.day = d.day
         ORDER BY d.day`),
-
-    q(`${WITH_EV}
-       SELECT COUNT(*) AS n,
-              SUM(CASE WHEN ${prop('source')} = 'Not documented'
-                       THEN 1 ELSE 0 END) AS gap,
-              SUM(CASE WHEN ${prop('source')} IN (${GUARD_SOURCES.map((s) => `'${s}'`).join(', ')})
-                       THEN 1 ELSE 0 END) AS guard,
-              SUM(CASE WHEN ${prop('offline')} = 1 THEN 1 ELSE 0 END) AS offline
-         FROM ev WHERE event = 'chat_answer'`),
   ]);
-
-  // Latency median needs its own statement shape; run it separately rather
-  // than contorting the batch.
-  const latency = await db
-    .prepare(
-      `WITH ${EV_CTE}, lat AS (
-         SELECT CAST(${prop('latency_ms')} AS INTEGER) AS ms FROM ev
-          WHERE event = 'chat_answer' AND ${prop('latency_ms')} IS NOT NULL)
-       SELECT COALESCE(${medianOf('lat', 'ms')}, 0) AS median_ms`,
-    )
-    .bind(...p)
-    .first<{ median_ms: number }>();
 
   const backend = await db
     .prepare(
@@ -689,8 +736,8 @@ export async function chatStats(
     .all<Row>();
 
   const head = one(results, 0);
-  const r = one(results, 7);
-  const answers = num(r.n);
+  const r = head;
+  const answers = num(r.answered);
 
   return {
     meta: meta(o),
@@ -702,7 +749,7 @@ export async function chatStats(
     coverageGapPct: share(num(r.gap), answers),
     guardHitPct: share(num(r.guard), answers),
     offlinePct: share(num(r.offline), answers),
-    medianLatencyMs: Math.round(num(latency?.median_ms)),
+    medianLatencyMs: Math.round(num(head.median_ms)),
     sources: toBreakdown(rows(results, 1), answers),
     failures: toBreakdown(rows(results, 2), answers),
     rejections: toBreakdown(rows(results, 3), num(head.asked)),

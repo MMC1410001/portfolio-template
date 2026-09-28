@@ -51,6 +51,8 @@ let hooksInstalled = false;
 /** See QueuedEvent.seq. Never reset outside the test seam. */
 let seqCounter = 0;
 let sessionEnded = false;
+/** An exit was recorded for the current hidden period. See installFlushHooks. */
+let exitRecorded = false;
 
 /**
  * Contributors to the final `session_end` row.
@@ -86,6 +88,22 @@ function sessionStartedAt(): number {
     return now;
   } catch {
     return Date.now();
+  }
+}
+
+/**
+ * Drop the persisted session start, with the queue, for the /privacy
+ * opt-out. The next session measures its duration from its own first event,
+ * not from one the visitor asked to have forgotten. Unlike
+ * endAnalyticsSession() this does not end recording for the page: opting back
+ * in has to work without a reload.
+ */
+export function forgetSessionClock(): void {
+  queue = [];
+  try {
+    sessionStorage.removeItem(SESSION_START_KEY);
+  } catch {
+    /* private mode. Nothing was stored to begin with */
   }
 }
 
@@ -262,6 +280,15 @@ export function installFlushHooks(): void {
    */
   const finalise = () => {
     if (sessionEnded || disabled()) return;
+    // One exit per hidden period. On desktop, closing a tab fires both
+    // visibilitychange and pagehide, and the second used to queue a second
+    // session_end; every tab switch then produced its own pair. Anything
+    // queued since the first is still beaconed.
+    if (exitRecorded) {
+      void flushEvents(true);
+      return;
+    }
+    exitRecorded = true;
 
     let props: Record<string, unknown> = {};
     for (const hook of exitHooks) {
@@ -277,9 +304,20 @@ export function installFlushHooks(): void {
     void flushEvents(true);
   };
 
+  /**
+   * A hide is kept as an exit, not dropped, because on iOS it is frequently
+   * the only one there is. Coming back re-arms it: the visitor who returns
+   * and then leaves exits a second time, and the later terminal row is the
+   * one that describes it (see flushSectionDwell() in sections.ts).
+   */
   window.addEventListener('pagehide', finalise);
   window.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') finalise();
+    else exitRecorded = false;
+  });
+  // A back/forward-cache restore is the page coming back without a reload.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) exitRecorded = false;
   });
 }
 
@@ -316,6 +354,7 @@ export function __resetQueue(): void {
   hooksInstalled = false;
   seqCounter = 0;
   sessionEnded = false;
+  exitRecorded = false;
   exitHooks.length = 0;
 }
 

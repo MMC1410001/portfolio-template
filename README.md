@@ -252,7 +252,7 @@ Use a current Python 3 installation. Python 3.10 or newer is recommended.
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r backend/requirements-lock.txt
+pip install --require-hashes -r backend/requirements-lock.txt
 uvicorn backend.main:app --reload --port 8000
 ```
 
@@ -290,8 +290,9 @@ FastAPI does not load a `.env` file by itself. Set Python service values in the 
 | `npm run dev` | Starts the local development website |
 | `npm run typecheck` | Checks TypeScript types |
 | `npm run check:links` | Opens every link in `content/portfolio.ts` as a stranger would |
-| `npm test` | Runs every JavaScript check (needs `npm run dev` in another terminal) |
-| `npm run test:units` | Runs the pure-logic checks only. Needs no server |
+| `npm test` | Runs `test:units`, `test:py`, `test:chat` and `test:analytics` in that order (the last two need `npm run dev` in another terminal) |
+| `npm run test:units` | Runs the pure-logic checks and the route-handler tests. Needs no server |
+| `npm run test:py` | Runs the Python chatbot checks, with `.venv` if it exists |
 | `npm run test:chat` | Runs chat checks while `npm run dev` is still running in another terminal |
 | `npm run test:analytics` | Runs analytics checks. Needs `ADMIN_TOKEN` set |
 | `npm run build` | Creates a production build and refreshes Python knowledge |
@@ -375,7 +376,8 @@ npm run db:migrate
 ```
 
 Answer `y` when it asks to confirm against the remote database. It applies
-`migrations/0001_init_analytics.sql`.
+every file in `migrations/` it has not applied before, one per schema version
+(`0001_init_analytics.sql`, `0002_chat_quota.sql`, `0003_trusted_networks.sql`).
 
 ### 5. First deploy
 

@@ -39,7 +39,8 @@ function quoteList(values: readonly string[]): string {
  * partly counted, which produces a plausible number that is wrong.
  *
  * ?3 is `'[]'` when internal traffic is included, and otherwise the set
- * `internalSessionIds()` in queries.ts computed ONCE for the request. It used
+ * `internalSessionIds()` in queries.ts computed ONCE per window and cached
+ * for a minute, so one dashboard load's six actions share it. It used
  * to be `?3 = 1` and a CTE that re-ran the `GROUP BY session_id HAVING
  * MAX(is_internal) = 1` scan over the whole window inside every statement,
  * thirteen times for one overview. Bound as one parameter, so the 100-parameter
@@ -94,6 +95,31 @@ export const prop = (key: string) =>
   `CASE WHEN json_valid(props) THEN json_extract(props, '$.${key}') END`;
 
 /**
+ * 1 when a page_view row continues the view before it rather than starting a
+ * new one, else 0.
+ *
+ * The browser treats `visibilitychange -> hidden` as an exit, so every tab
+ * switch flushes a terminal row for the section on screen, and on return the
+ * same section is picked up again with `previous` still naming it. The row
+ * that closes the resumed stretch therefore carries `from` equal to its own
+ * section, which no real transition can produce (commit() only moves between
+ * two different sections). Counting it as a view made one read of `#work`
+ * with two tab switches three views, and a one-section visit "engaged".
+ */
+export const RESUMED_VIEW = `(CASE WHEN event = 'page_view' AND path LIKE '/#%'
+       AND ${prop('from')} = substr(path, 3) THEN 1 ELSE 0 END)`;
+
+/**
+ * The row was recorded on the homepage: `/`, or one of its `/#section` paths.
+ *
+ * Scroll milestones and `max_scroll_px` are per page since the recorders
+ * learned about client-side navigation, so a 100% on /privacy (one screen
+ * tall) is a real milestone of a different page. Mixed in, it read as the
+ * visitor having reached the foot of the portfolio.
+ */
+export const ON_HOME = `(path = '/' OR path LIKE '/#%')`;
+
+/**
  * Per-session rollup.
  *
  * `MIN(CASE WHEN event='visit' …)` for the campaign columns is exact here in a
@@ -112,7 +138,8 @@ export const SESS_CTE = `
       session_id,
       MIN(created_at) AS first_seen,
       MAX(created_at) AS last_seen,
-      SUM(CASE WHEN event = 'page_view' THEN 1 ELSE 0 END) AS section_views,
+      SUM(CASE WHEN event = 'page_view' AND ${RESUMED_VIEW} = 0
+               THEN 1 ELSE 0 END) AS section_views,
       COALESCE(
         MAX(CASE WHEN event = 'session_end' THEN duration_ms END),
         MAX(created_at) - MIN(created_at)
@@ -130,7 +157,7 @@ export const SESS_CTE = `
                THEN 1 ELSE 0 END) AS did_outbound,
       MAX(CASE WHEN event = 'mode_change' AND ${prop('to')} = 'immersive'
                THEN 1 ELSE 0 END) AS saw_immersive,
-      MAX(CASE WHEN event = 'session_end'
+      MAX(CASE WHEN event = 'session_end' AND ${ON_HOME}
                THEN CAST(${prop('max_scroll_px')} AS INTEGER) END)
         AS max_scroll_px,
       MAX(CASE WHEN event = 'session_end'

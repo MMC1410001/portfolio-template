@@ -192,6 +192,38 @@ export async function chargeChatQuota(
   }
 }
 
+/**
+ * A site-wide ceiling on model-tier calls, per 24 hours. CHAT_MODEL_DAILY_LIMIT.
+ *
+ * The per-browser and per-network allowances bound what one visitor can ask;
+ * nothing bounded what the whole site could spend on NVIDIA. This is one
+ * counter row in chat_quota, bucket `model:global`, charged by the same
+ * statement and on the same 24-hour window as the others, and it is charged
+ * only when a question is about to go to the model, not per question.
+ */
+export const MODEL_BUCKET = 'model:global';
+export function chatModelDailyLimit(): number {
+  return positive(process.env.CHAT_MODEL_DAILY_LIMIT, 1000);
+}
+
+/**
+ * Charge one model call. False means today's ceiling is spent and the caller
+ * serves the curated answer instead, which is not an error to the visitor.
+ *
+ * Degrades open, like everything here: no database, or a failure counting,
+ * allows the call. Exempt callers (chatExemption) are charged, so the
+ * counter tells the truth about spend, but the route does not refuse them.
+ */
+export async function chargeModelCall(db: D1Database | null, now: number = Date.now()): Promise<boolean> {
+  if (!db) return true;
+  try {
+    return (await chargeQuota(db, MODEL_BUCKET, chatModelDailyLimit(), now)).allowed;
+  } catch (error) {
+    console.error('[chat] model cap check failed', error);
+    return true;
+  }
+}
+
 /** The allowance as response headers, plus the cookie when one was minted. */
 export function applyQuota(response: Response, verdict: QuotaVerdict): Response {
   if (verdict.quota) {

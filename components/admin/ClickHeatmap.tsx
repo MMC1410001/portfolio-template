@@ -94,6 +94,7 @@ export function ClickHeatmap({
   const frameRef = useRef<HTMLIFrameElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const observerRef = useRef<ResizeObserver | null>(null);
 
   const [mounted, setMounted] = useState(false);
   const [hidePage, setHidePage] = useState(false);
@@ -148,9 +149,16 @@ export function ClickHeatmap({
     return () => observer.disconnect();
   }, []);
 
+  /**
+   * Also disconnects the frame's ResizeObserver. It used to be created on
+   * every load and never released, so each reload of the frame left one more
+   * observer calling a stale measure.
+   */
   const clearTimers = useCallback(() => {
     for (const t of timersRef.current) clearTimeout(t);
     timersRef.current = [];
+    observerRef.current?.disconnect();
+    observerRef.current = null;
   }, []);
 
   /**
@@ -210,14 +218,32 @@ export function ClickHeatmap({
     // measurement under the previous device band or mode.
   }, [layoutKey]);
 
-  const onLoad = useCallback(() => {
+  /**
+   * The latest `measure`, for callbacks armed before the layout changed.
+   *
+   * A device switch changes only the frame's width, not its `src`, so onLoad
+   * never fires again and the timers and ResizeObserver it armed kept calling
+   * the `measure` of the previous device: every read was filed under the old
+   * layout key, `current` discarded it, and the preview sat on the estimated
+   * height until the mode was toggled. Written in an effect, never during
+   * render, which the compiler rule requires.
+   */
+  const measureRef = useRef(measure);
+  useEffect(() => {
+    measureRef.current = measure;
+  }, [measure]);
+
+  /** The src the frame last finished loading, for the re-arm below. */
+  const loadedSrcRef = useRef<string | null>(null);
+
+  const arm = useCallback(() => {
     clearTimers();
     // A ResizeObserver on the frame's own documentElement is strictly better
     // than timers, but the timer ladder stays as a fallback: this page has two
     // very large images and three webfonts, so height keeps changing for
     // several seconds after load.
     for (const delay of MEASURE_AT) {
-      timersRef.current.push(setTimeout(measure, delay));
+      timersRef.current.push(setTimeout(() => measureRef.current(), delay));
     }
     try {
       const doc = frameRef.current?.contentDocument;
@@ -226,13 +252,32 @@ export function ClickHeatmap({
         const Observer = (
           win as unknown as { ResizeObserver: typeof ResizeObserver }
         ).ResizeObserver;
-        const ro = new Observer(() => measure());
+        const ro = new Observer(() => measureRef.current());
         ro.observe(doc.documentElement);
+        observerRef.current = ro;
       }
     } catch {
       /* cross-origin, or no ResizeObserver, the timers cover it */
     }
-  }, [clearTimers, measure]);
+  }, [clearTimers]);
+
+  const onLoad = useCallback(() => {
+    loadedSrcRef.current = frameRef.current?.getAttribute('src') ?? null;
+    arm();
+  }, [arm]);
+
+  const src =
+    `/?embed=true&preview=heatmap` +
+    (mode === 'immersive' ? '&preview_mode=immersive' : '');
+
+  /**
+   * Re-measure on a device switch. Only when the loaded document is the one
+   * being shown: a mode switch changes `src`, and measuring the outgoing page
+   * under the new key would be a wrong reading; its own onLoad re-arms.
+   */
+  useEffect(() => {
+    if (loadedSrcRef.current === src) arm();
+  }, [layoutKey, src, arm]);
 
   useEffect(() => clearTimers, [clearTimers]);
 
@@ -312,10 +357,6 @@ export function ClickHeatmap({
       section: nearest?.id ?? null,
     };
   });
-
-  const src =
-    `/?embed=true&preview=heatmap` +
-    (mode === 'immersive' ? '&preview_mode=immersive' : '');
 
   return (
     <Card className="gap-3 py-4">

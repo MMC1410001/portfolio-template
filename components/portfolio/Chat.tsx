@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, ArrowUpRight, Send, Sparkles, Volume2, Square, User, X } from 'lucide-react';
-import { Sheet,SheetTrigger,SheetContent,SheetHeader,SheetTitle,SheetDescription } from '@/components/ui/sheet';
+import { memo, useEffect, useRef, useState, type RefObject } from 'react';
+import { ArrowUpRight, Send, Sparkles, Volume2, Square, User, X } from 'lucide-react';
+import { Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { answerQuestion,GUARD_SOURCES,type Answer } from '@/content/faq';
 import { profile } from '@/content/portfolio';
@@ -9,15 +9,19 @@ import { trackChatOpen, trackChatAsk, trackChatAnswer, trackChatClose, classifyF
 import { pickVoice, speakable, speechFailureHint } from '@/lib/chat/speech-text';
 import { TURN_CHARS } from '@/lib/chat/turn-sig';
 import { nextKey, trimTranscript } from '@/lib/chat/session';
-import { paceChars, readChatStream } from '@/lib/chat/stream-client';
+import { paceChars, readChatStream, toPayload } from '@/lib/chat/stream-client';
 import { linkLabel, linkSegments } from '@/lib/chat/linkify';
 import { sessionLapsed, touchSession, useSessionExpired } from '@/hooks/use-idle';
 import { useStored } from '@/hooks/use-stored';
 import { DAILY_LIMIT_CODE, DAILY_QUESTIONS, QUOTA_HEADERS, QUOTA_WARN_AT, UNLIMITED, parseQuota, quotaExpired, readQuota, serialiseQuota } from '@/lib/chat/quota';
 import { speechSupported, stopSpeaking, useSpeakingId, useSpeechBroken, useVoiceToggle, useVoices } from '@/hooks/use-speech';
-// No lazy chunk for the voice: hooks/use-speech.ts and lib/chat/speech-text.ts
-// are a couple of KB between them and Chat.tsx already sits in the Portfolio
-// chunk, so splitting them out would cost a round trip to save nothing.
+// This whole file is a lazy chunk now, loaded by ChatLauncher.tsx when the
+// browser is idle or the launcher is hovered, focused or pressed. The Sheet,
+// the input and the FAQ corpus behind the offline answer were about a third of
+// the homepage's own JavaScript, all of it for a panel most visitors never
+// open. The launcher button itself lives there, rendered eagerly, and owns
+// `open`: this panel is controlled by it. The voice stays in this chunk:
+// hooks/use-speech.ts and lib/chat/speech-text.ts are a couple of KB.
 //
 // `key` is a monotonic id from lib/chat/session.ts, not an array index. The
 // transcript can now lose its head (trimTranscript) and gain a divider in the
@@ -56,6 +60,15 @@ const COUNTER_FROM=420;
 // waiting with no deadline at all.
 const HEADER_CEILING_MS=8500;
 const RESET_NOTE='New thread. The last conversation timed out after ten minutes of quiet, so this question is answered on its own.';
+type RowProps={m:Message;live:boolean;writing:boolean;canSpeak:boolean;replyRef?:RefObject<HTMLDivElement|null>;toggleVoice:(id:string,text:string)=>void};
+// One transcript entry, memoised. A streamed reply replaces only its own
+// message object per animation frame (pump() returns every other entry as it
+// was), so every row but the one being written bails out here instead of
+// re-running linkSegments over the whole conversation on every frame.
+// The <img> is the 26px avatar. vinext has no next/image, so the rule's
+// advice cannot be taken; the file is already sized and loads lazily.
+// oxlint-disable-next-line nextjs/no-img-element -- no next/image under vinext; see above
+const Row=memo(function Row({m,live,writing,canSpeak,replyRef,toggleVoice}:RowProps){if(m.role==='system')return <p className="chat-divider">{m.text}</p>;const id=`m${m.key}`;return <div ref={replyRef} className={`message message-${m.role}`}>{m.role==='assistant'?<span className="message-label"><img className={`message-avatar${live?' is-speaking':''}`} src={profile.avatar} width={26} height={26} alt="" decoding="async" loading="lazy"/>ALEX’S PORTFOLIO</span>:<span className="message-label"><span className="message-avatar message-avatar-you" aria-hidden="true"><User size={14}/></span>YOU</span>}<p>{linkSegments(m.text).map((part,at)=>part.href?<a key={at} className="msg-link" href={part.href} target="_blank" rel="noreferrer">{linkLabel(part.href)}<ArrowUpRight size={11}/></a>:<span key={at}>{part.text}</span>)}{writing&&<span className="writing" aria-hidden="true"/>}</p>{m.href&&<a data-track-tag="chat-source-link" href={m.href} target="_blank" rel="noreferrer">View source <ArrowUpRight size={13}/></a>}{m.role==='assistant'&&<span className="message-foot">{m.source&&<small>{m.source}</small>}{canSpeak&&<button type="button" data-track-tag="chat-speak" className={`msg-speak${live?' is-speaking':''}`} onClick={()=>{touchSession();toggleVoice(id,speakable(m.text))}} aria-label={live?'Stop reading this answer':'Read this answer aloud'} title={live?'Stop':'Read aloud'}>{live?<Square size={11}/>:<Volume2 size={13}/>}<span>{live?'Stop':'Listen'}</span></button>}</span>}</div>});
 // No `onOpen` hook any more, and its absence is the point. It used to call
 // setAutoplay(false) in Portfolio.tsx, which does not pause the three-second
 // reveal countdown but cancels it outright — nothing sets autoplay back — so
@@ -65,8 +78,8 @@ const RESET_NOTE='New thread. The last conversation timed out after ten minutes 
 // can happen behind it. REVEAL_CONFIG's own comment already settled the
 // principle, having been through this once for scrolling and reading — only
 // a hidden tab pauses the clock.
-export default function Chat() {
- const [storedQuota,setStoredQuota]=useStored(QUOTA_KEY,'');const quota=parseQuota(storedQuota);const exhausted=quota!==null&&quota.remaining===0;const lowQuota=quota!==null&&quota.remaining>0&&quota.remaining<=QUOTA_WARN_AT;const unlimited=storedQuota===UNLIMITED;const [open,setOpen]=useState(false);const [messages,setMessages]=useState<Message[]>([{key:0,role:'assistant',text:'Hi there. I’m Alex’s portfolio guide. Ask me about his AI projects, skills, certifications, or engineering experience.',source:'Answers from the portfolio'}]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const [streaming,setStreaming]=useState(false);const [slow,setSlow]=useState(false);const [writingKey,setWritingKey]=useState<number|null>(null);const [notice,setNotice]=useState<string|null>(null);const inputRef=useRef<HTMLInputElement>(null);const lastReply=useRef<HTMLDivElement>(null);const box=useRef<HTMLDivElement>(null);const inflight=useRef<AbortController|null>(null);
+export default function Chat({open,onOpenChange}:{open:boolean;onOpenChange:(open:boolean)=>void}) {
+ const [storedQuota,setStoredQuota]=useStored(QUOTA_KEY,'');const quota=parseQuota(storedQuota);const exhausted=quota!==null&&quota.remaining===0;const lowQuota=quota!==null&&quota.remaining>0&&quota.remaining<=QUOTA_WARN_AT;const unlimited=storedQuota===UNLIMITED;const [messages,setMessages]=useState<Message[]>([{key:0,role:'assistant',text:'Hi there. I’m Alex’s portfolio guide. Ask me about his AI projects, skills, certifications, or engineering experience.',source:'Answers from the portfolio'}]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const [streaming,setStreaming]=useState(false);const [slow,setSlow]=useState(false);const [writingKey,setWritingKey]=useState<number|null>(null);const [notice,setNotice]=useState<string|null>(null);const inputRef=useRef<HTMLInputElement>(null);const lastReply=useRef<HTMLDivElement>(null);const box=useRef<HTMLDivElement>(null);const inflight=useRef<AbortController|null>(null);
  // The chat is stateless on the server, so the client is what remembers.
  // Four turns is enough for a follow-up chain to resolve a pronoun without
  // shipping a whole session; `carriedRef` holds the answer ids the last
@@ -90,6 +103,16 @@ export default function Chat() {
  const toggleVoice=useVoiceToggle(voice,speakingId);
  const tooLong=input.length>MAX_QUESTION;
  const turn=useRef(0);const asked=useRef(0);const answered=useRef(0);const openedAt=useRef(0);const lastSource=useRef<string|null>(null);
+ // What opening and closing do, keyed on `open` now that the launcher owns
+ // it. The launcher toggles it, and so do Escape and the close button through
+ // onOpenChange below, so one effect sees every transition from either side:
+ // open is tracked as it begins, close in the cleanup as it ends. Same calls,
+ // same order as the Sheet's own onOpenChange used to make them. A stale
+ // allowance is forgotten while the panel is open, which covers the moment
+ // it opens; it is its own effect so an answer updating the allowance does
+ // not re-run the open/close pair.
+ useEffect(()=>{if(open&&staleQuota(storedQuota))setStoredQuota('')},[open,storedQuota,setStoredQuota]);
+ useEffect(()=>{if(!open)return;touchSession();openedAt.current=trackChatOpen('launcher');return()=>{stopSpeaking();trackChatClose({asked:asked.current,answered:answered.current,openedAt:openedAt.current,lastSource:lastSource.current})}},[open]);
  // A long answer is up to 1200 characters, and scrolling the end sentinel
  // into view dropped the visitor on its last line with the whole reply above
  // them. Anchor on the top of the newest reply instead, and fall back to the
@@ -239,7 +262,11 @@ export default function Chat() {
     setMessages(m=>m.filter(entry=>entry.key!==replyKey));clearTimeout(slowTimer);setSlow(false);setWritingKey(null);setStreaming(false);setBusy(true);
     throw new Error('stream');
    }
-   result=await response.json();guarded=GUARD_SOURCES.includes(result.source)}catch(error){clearTimeout(headerTimer);
+   // Checked, not cast: a 200 whose body is not an answer (a proxy's error
+   // page, a truncated body) used to reach `.slice()` and throw in the
+   // success path. Anything toPayload() refuses takes the offline answer.
+   const data:unknown=await response.json();const payload=data&&typeof data==='object'?toPayload(data as Record<string,unknown>):null;if(!payload)throw new Error('payload');
+   result=payload;guarded=GUARD_SOURCES.includes(result.source)}catch(error){clearTimeout(headerTimer);
    // The daily allowance, not an outage: nothing is answered, offline or
    // otherwise, and the input closes. See the note on QUOTA_KEY.
    if(limited){result={answer:'That is today’s limit of questions for this guide. The chat reopens once the 24 hours are up, and Alex is happy to answer anything else directly.',mode:'faq',source:'Daily limit reached'};guarded=true}
@@ -275,8 +302,5 @@ export default function Chat() {
  //
  // `data-track-private` on the transcript: it holds the visitor's own words,
  // and the click tracker skips text inside it.
- // The <img> is the 26px avatar. vinext has no next/image, so the rule's
- // advice cannot be taken; the file is already sized and loads lazily.
- // oxlint-disable-next-line nextjs/no-img-element -- no next/image under vinext; see above
- return <Sheet open={open} modal={false} disablePointerDismissal onOpenChange={value=>{setOpen(value);if(value){if(staleQuota(storedQuota))setStoredQuota('');touchSession();openedAt.current=trackChatOpen('launcher')}else {stopSpeaking();trackChatClose({asked:asked.current,answered:answered.current,openedAt:openedAt.current,lastSource:lastSource.current})}}}><SheetTrigger data-track-tag="chat-open" data-track-cta="chat-open" className="chat-launcher"><MessageCircle size={19}/><span>Ask about Alex</span><span className="chat-dot"/></SheetTrigger><SheetContent showOverlay={false} className="chat-panel"><SheetHeader className="chat-header"><div className="assistant-symbol"><Sparkles size={23}/></div><SheetTitle>Meet the mind behind the work.</SheetTitle><SheetDescription>Portfolio guide · answers from documented work</SheetDescription></SheetHeader><div ref={box} className="chat-messages" role="log" aria-label="Conversation" data-track-private>{messages.map(m=>{if(m.role==='system')return <p key={m.key} className="chat-divider">{m.text}</p>;const id=`m${m.key}`;const live=speakingId===id;return <div key={m.key} ref={m.key===messages.at(-1)?.key&&m.role==='assistant'?lastReply:undefined} className={`message message-${m.role}`}>{m.role==='assistant'?<span className="message-label"><img className={`message-avatar${live?' is-speaking':''}`} src={profile.avatar} width={26} height={26} alt="" decoding="async" loading="lazy"/>ALEX’S PORTFOLIO</span>:<span className="message-label"><span className="message-avatar message-avatar-you" aria-hidden="true"><User size={14}/></span>YOU</span>}<p>{linkSegments(m.text).map((part,at)=>part.href?<a key={at} className="msg-link" href={part.href} target="_blank" rel="noreferrer">{linkLabel(part.href)}<ArrowUpRight size={11}/></a>:<span key={at}>{part.text}</span>)}{m.key===writingKey&&<span className="writing" aria-hidden="true"/>}</p>{m.href&&<a data-track-tag="chat-source-link" href={m.href} target="_blank" rel="noreferrer">View source <ArrowUpRight size={13}/></a>}{m.role==='assistant'&&<span className="message-foot">{m.source&&<small>{m.source}</small>}{canSpeak&&<button type="button" data-track-tag="chat-speak" className={`msg-speak${live?' is-speaking':''}`} onClick={()=>{touchSession();toggleVoice(id,speakable(m.text))}} aria-label={live?'Stop reading this answer':'Read this answer aloud'} title={live?'Stop':'Read aloud'}>{live?<Square size={11}/>:<Volume2 size={13}/>}<span>{live?'Stop':'Listen'}</span></button>}</span>}</div>})}{busy&&<output aria-live="off" className="thinking">{slow?'Still working on it — this one is being written rather than looked up':'Finding that in the portfolio'}<span className="dots" aria-hidden="true"><i/><i/><i/></span></output>}{notice&&<output aria-live="off" className="thinking">{notice}</output>}{expired&&messages.length>1&&<output aria-live="off" className="thinking">This conversation has been quiet for ten minutes, so it has ended. Your next question starts a fresh thread.</output>}{speechBroken&&<output aria-live="off" className="thinking">{speechFailureHint(navigator.userAgent)}</output>}</div><div className="chat-bottom">{(messages.length===1||expired)&&<div className="chat-suggestions">{prompts.map((p,i)=><button key={p} data-track-tag={`chat-suggestion-${i}`} onClick={()=>send(p,i)}>{p}<ArrowUpRight size={13}/></button>)}</div>}{exhausted&&quota?<div className="chat-limit"><p>You’ve asked today’s {quota.limit} questions. The chat reopens {resetLabel(quota.resetAt)}.</p><p>For anything else, <a data-track-tag="chat-limit-email" href={`mailto:${profile.email}`}>email Alex</a> or <a data-track-tag="chat-limit-linkedin" href={profile.linkedin} target="_blank" rel="noreferrer">message him on LinkedIn</a>.</p></div>:<><p className={`chat-quota${lowQuota?' is-low':''}`} aria-live="polite">{unlimited?'No daily question limit here: signed in as admin, or on a trusted network.':lowQuota&&quota?`${quota.remaining} question${quota.remaining===1?'':'s'} left today, of ${quota.limit}.`:`You can ask up to ${quota?.limit??DAILY_QUESTIONS} questions about Alex a day.`}</p><form onSubmit={e=>{e.preventDefault();void send(input)}}><label htmlFor="chat-input" className="sr-only">Your question about Alex</label><Input ref={inputRef} id="chat-input" value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask about my work…" readOnly={busy} aria-busy={busy} aria-invalid={tooLong||undefined} aria-describedby={tooLong?'chat-input-error':input.length>=COUNTER_FROM?'chat-input-count':undefined}/>{busy||streaming?<button type="button" data-track-tag="chat-stop" onClick={()=>inflight.current?.abort('user')} aria-label="Stop this question" title="Stop"><X size={18}/></button>:<button data-track-tag="chat-send" type="submit" disabled={!input.trim()||tooLong} aria-label="Send question"><Send size={18}/></button>}</form>{tooLong?<p id="chat-input-error" className="chat-invalid" role="alert">{input.length-MAX_QUESTION} characters over the {MAX_QUESTION} limit. Shorten the question to send it.</p>:input.length>=COUNTER_FROM?<p id="chat-input-count" className="chat-count">{MAX_QUESTION-input.length} characters left</p>:null}</>}<div className="chat-footnote"><span>Grounded in Alex’s published work.</span><a data-track-tag="chat-email" href={`mailto:${profile.email}`}>Email Alex <ArrowUpRight size={11}/></a></div></div></SheetContent></Sheet>
+ return <Sheet open={open} modal={false} disablePointerDismissal onOpenChange={value=>{if(!value)onOpenChange(false)}}><SheetContent showOverlay={false} className="chat-panel"><SheetHeader className="chat-header"><div className="assistant-symbol"><Sparkles size={23}/></div><SheetTitle>Meet the mind behind the work.</SheetTitle><SheetDescription>Portfolio guide · answers from documented work</SheetDescription></SheetHeader><div ref={box} className="chat-messages" role="log" aria-label="Conversation" data-track-private>{messages.map(m=><Row key={m.key} m={m} live={speakingId===`m${m.key}`} writing={m.key===writingKey} canSpeak={canSpeak} replyRef={m.key===messages.at(-1)?.key&&m.role==='assistant'?lastReply:undefined} toggleVoice={toggleVoice}/>)}{busy&&<output aria-live="off" className="thinking">{slow?'Still working on it — this one is being written rather than looked up':'Finding that in the portfolio'}<span className="dots" aria-hidden="true"><i/><i/><i/></span></output>}{notice&&<output aria-live="off" className="thinking">{notice}</output>}{expired&&messages.length>1&&<output aria-live="off" className="thinking">This conversation has been quiet for ten minutes, so it has ended. Your next question starts a fresh thread.</output>}{speechBroken&&<output aria-live="off" className="thinking">{speechFailureHint(navigator.userAgent)}</output>}</div><div className="chat-bottom">{(messages.length===1||expired)&&<div className="chat-suggestions">{prompts.map((p,i)=><button key={p} data-track-tag={`chat-suggestion-${i}`} onClick={()=>send(p,i)}>{p}<ArrowUpRight size={13}/></button>)}</div>}{exhausted&&quota?<div className="chat-limit"><p>You’ve asked today’s {quota.limit} questions. The chat reopens {resetLabel(quota.resetAt)}.</p><p>For anything else, <a data-track-tag="chat-limit-email" href={`mailto:${profile.email}`}>email Alex</a> or <a data-track-tag="chat-limit-linkedin" href={profile.linkedin} target="_blank" rel="noreferrer">message him on LinkedIn</a>.</p></div>:<><p className={`chat-quota${lowQuota?' is-low':''}`} aria-live="polite">{unlimited?'No daily question limit here: signed in as admin, or on a trusted network.':lowQuota&&quota?`${quota.remaining} question${quota.remaining===1?'':'s'} left today, of ${quota.limit}.`:`You can ask up to ${quota?.limit??DAILY_QUESTIONS} questions about Alex a day.`}</p><form onSubmit={e=>{e.preventDefault();void send(input)}}><label htmlFor="chat-input" className="sr-only">Your question about Alex</label><Input ref={inputRef} id="chat-input" value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask about my work…" readOnly={busy} aria-busy={busy} aria-invalid={tooLong||undefined} aria-describedby={tooLong?'chat-input-error':input.length>=COUNTER_FROM?'chat-input-count':undefined}/>{busy||streaming?<button type="button" data-track-tag="chat-stop" onClick={()=>inflight.current?.abort('user')} aria-label="Stop this question" title="Stop"><X size={18}/></button>:<button data-track-tag="chat-send" type="submit" disabled={!input.trim()||tooLong} aria-label="Send question"><Send size={18}/></button>}</form>{tooLong?<p id="chat-input-error" className="chat-invalid" role="alert">{input.length-MAX_QUESTION} characters over the {MAX_QUESTION} limit. Shorten the question to send it.</p>:input.length>=COUNTER_FROM?<p id="chat-input-count" className="chat-count">{MAX_QUESTION-input.length} characters left</p>:null}</>}<div className="chat-footnote"><span>Grounded in Alex’s published work.</span><a data-track-tag="chat-email" href={`mailto:${profile.email}`}>Email Alex <ArrowUpRight size={11}/></a></div></div></SheetContent></Sheet>
 }

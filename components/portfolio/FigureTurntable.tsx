@@ -54,7 +54,19 @@
  * decoded 700x560 frames is ~94MB of image memory, which on a phone is the
  * difference between a scrub and a reload. Halving the count costs a phone
  * 12 degrees a step, which the cross-fade covers; not halving it costs the
- * page. The device tier is read through
+ * page. Reduced motion and the heatmap preview load only `f-00`: both hold
+ * frame 0 and register no scroll, so the other 59 were pure download.
+ *
+ * ── First paint is frame 0, not the whole set ─────────────────────────────
+ * This used to wait for every frame to decode before drawing anything, about
+ * 1MB over the network, so on a slow link the stage sat empty for seconds
+ * after the reveal. It now paints the moment frame 0 decodes and fills in as
+ * the rest arrive, requested coarse to fine (every 8th, then every 4th, ...),
+ * and a frame that has not arrived yet is drawn as the nearest one that has.
+ * Early scrubbing is steppier for a moment, and never blank. The frame
+ * geometry and the blend are untouched: only what counts as loaded changed.
+ *
+ * The device tier is read through
  * `useSyncExternalStore` rather than an effect plus setState, per the pattern
  * in `hooks/use-stored.ts`: react-compiler rejects the latter.
  */
@@ -113,9 +125,21 @@ export default function FigureTurntable({reduced,preview,children}:{reduced:bool
   const context=surface.getContext('2d');
   if(!context)return;
   let live=true;
-  const sources=light?ALL_FRAMES.filter((_,i)=>i%2===0):ALL_FRAMES;
-  const images=sources.map(src=>{const img=new Image();img.decoding='async';img.src=src;return img});
-  let ready=false,progress=0,drawn=-1;
+  const sources=reduced||preview?ALL_FRAMES.slice(0,1):light?ALL_FRAMES.filter((_,i)=>i%2===0):ALL_FRAMES;
+  const images=sources.map(()=>new Image());
+  const loaded=sources.map(()=>false);
+  let progress=0,drawn=-1;
+  // Coarse to fine: 0, 8, 16, ... then 4, 12, ... so that whatever has arrived
+  // is spread round the circle and the nearest stand-in is never far off.
+  const order:number[]=[];
+  for(const stride of [8,4,2,1])for(let i=0;i<sources.length;i+=stride)if(!order.includes(i))order.push(i);
+  // The frame to draw for `index`: itself once decoded, else the closest one
+  // round the circle that is, else none.
+  const nearest=(index:number)=>{
+   const n=images.length;
+   for(let d=0;d<=n>>1;d++){if(loaded[(index+d)%n])return (index+d)%n;if(loaded[(index-d+n)%n])return (index-d+n)%n}
+   return -1;
+  };
 
   const fit=()=>{
    const dpr=Math.min(devicePixelRatio||1,2);
@@ -124,7 +148,9 @@ export default function FigureTurntable({reduced,preview,children}:{reduced:bool
    if(surface.width!==w||surface.height!==h){surface.width=w;surface.height=h;drawn=-1}
   };
   const paint=(index:number,alpha:number)=>{
-   const img=images[index];
+   const at=nearest(index);
+   if(at<0)return;
+   const img=images[at];
    if(!img?.complete||!img.naturalWidth)return;
    // Contain, bottom-anchored: the pipeline places the subject inside a fixed
    // canvas, so every frame maps to exactly the same rectangle.
@@ -134,7 +160,8 @@ export default function FigureTurntable({reduced,preview,children}:{reduced:bool
    context.drawImage(img,(surface.width-w)/2,surface.height-h,w,h);
   };
   const draw=(p:number)=>{
-   if(!ready)return;
+   // Frame 0 first, always: a stand-in for 0 degrees would open on a side view.
+   if(!loaded[0])return;
    fit();
    const exact=p*images.length;
    // Nothing has moved far enough to be worth a repaint. Scaled by the frame
@@ -167,9 +194,13 @@ export default function FigureTurntable({reduced,preview,children}:{reduced:bool
    // unrelated earlier one it would have relabelled.
    if(p>0.9&&!seen.current){seen.current=true;trackSyntheticTag('scene-rotation',{frames:images.length})}
   };
-  // Decode before the first paint, or the canvas shows one frame arriving at a
-  // time as the network delivers them.
-  void Promise.all(images.map(img=>img.decode().catch(()=>undefined))).then(()=>{if(live){ready=true;draw(progress)}});
+  // Each decoded frame forces a repaint, so the stand-in is replaced as soon as
+  // the real frame exists. `drawn=-1` defeats the repaint threshold, which
+  // would otherwise skip it when the visitor has not scrolled.
+  for(const i of order){
+   const img=images[i];img.decoding='async';img.src=sources[i];
+   img.decode().then(()=>{if(!live)return;loaded[i]=true;drawn=-1;draw(progress)},()=>undefined);
+  }
   const onResize=()=>{drawn=-1;draw(progress)};
   window.addEventListener('resize',onResize);
   update(0);

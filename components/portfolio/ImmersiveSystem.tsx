@@ -11,10 +11,12 @@
  * narrow or data-saving devices by itself, and reduced motion resolves to a
  * single frame. So the controls went with the scene.
  *
- * `SceneBoundary` stays. The failure it was written for was never WebGL, it
- * was `import()` of this chunk rejecting (offline mid-session, or a stale
- * hashed chunk after a redeploy) and taking the whole page down with it. That
- * failure mode is unchanged.
+ * The chunk-load boundary is not here any more. It was, and could never have
+ * fired: a boundary inside this module cannot catch this module failing to
+ * download. `Portfolio.tsx` now wraps the lazy import itself and falls back to
+ * the résumé. The `SceneBoundary` left here is the narrower one, for the
+ * turntable throwing after the chunk arrived, and keeps the stack cards'
+ * flat fallback for that.
  */
 import { useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
@@ -27,7 +29,7 @@ export default function ImmersiveSystem({reduced,preview}:{reduced:boolean;previ
  useEffect(()=>{queueEvent('mode_change',{props:{to:'immersive',trigger:'scene-mount',reduced}})},[reduced]);
  const fallback=<div className="system-fallback" aria-hidden="true"><span>INTERFACE</span><span>INTELLIGENCE</span><span>INFRASTRUCTURE</span></div>;
  return <div className={`immersive-system ${failed?'system-flat':''}`}>
-  {failed?fallback:<SceneBoundary onError={scope=>{setFailed(true);queueEvent('error',{props:{scope}})}} fallback={fallback}>
+  {failed?fallback:<SceneBoundary scope="immersive-scene" onError={scope=>{setFailed(true);queueEvent('error',{props:{scope}})}} fallback={fallback}>
    <FigureTurntable reduced={reduced} preview={preview}>
     {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a <fieldset> would name the group too, but brings its own box model into an absolutely positioned parallax layer; role=group is the same semantics without it */}
     <div className="system-nodes" role="group" aria-label="Explore the connected stack">{layers.map((l,i)=><button key={l.name} data-track-tag={`scene-node-${i}`} data-parallax={i===0?'1':i===1?'-0.7':'0.5'} className={`node node-${i} ${selected===i?'selected':''}`} onClick={()=>setSelected(i)} aria-pressed={selected===i}><span className="node-signal"/>{l.name}<ArrowUpRight size={13}/></button>)}</div>

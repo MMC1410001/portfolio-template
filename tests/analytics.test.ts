@@ -66,8 +66,11 @@ import {
 import { classifyUserAgent, viewportClass } from '../lib/analytics/user-agent';
 import {
   budgetKey,
+  canonicalCidr,
+  clientIp,
   expandIpv6,
   hashIp,
+  hostNetwork,
   internalVisitorIds,
   ipPrefix,
   matchesAnyCidr,
@@ -524,6 +527,47 @@ test('matchesAnyCidr matches inside the prefix and not outside', () => {
   assert.ok(!matchesAnyCidr('203.0.114.47', list));
   // A v4 address must never match a v6 rule.
   assert.ok(!matchesAnyCidr('203.0.113.47', parseCidrList('2405:201::/32')));
+});
+
+test('clientIp believes cf-connecting-ip only, unless TRUST_FORWARDED_FOR says a proxy rewrites the rest', async () => {
+  const req = (headers: Record<string, string>) => new Request('https://x.test/api/track', { method: 'POST', headers });
+  const forged = { 'x-real-ip': '198.51.100.1', 'x-forwarded-for': '198.51.100.2, 10.0.0.1' };
+  await withEnv({ TRUST_FORWARDED_FOR: undefined }, () => {
+    assert.equal(clientIp(req({ 'cf-connecting-ip': '203.0.113.7', ...forged })).ip, '203.0.113.7');
+    // No trusted address is no address: no budget, no write, no exemption.
+    assert.equal(clientIp(req(forged)).ip, null);
+    assert.equal(clientIp(req({ 'x-forwarded-for': '198.51.100.2' })).chain, '198.51.100.2');
+    assert.equal(clientIp(req({ 'cf-connecting-ip': '1:::2' })).ip, null, 'malformed IPv6 is junk');
+  });
+  await withEnv({ TRUST_FORWARDED_FOR: '1' }, () => {
+    assert.equal(clientIp(req({ 'cf-connecting-ip': '203.0.113.7', ...forged })).ip, '203.0.113.7', 'still first');
+    assert.equal(clientIp(req(forged)).ip, '198.51.100.1');
+    assert.equal(clientIp(req({ 'x-forwarded-for': '198.51.100.2, 10.0.0.1' })).ip, '198.51.100.2');
+  });
+});
+
+test('canonicalCidr masks host bits and compresses IPv6; hostNetwork widens IPv6 to its /64', () => {
+  assert.equal(canonicalCidr('203.0.113.7/24'), '203.0.113.0/24');
+  assert.equal(canonicalCidr('10.1.2.3/16'), '10.1.0.0/16');
+  assert.equal(canonicalCidr('10.1.2.3/15'), null, 'the env floor still applies');
+  assert.equal(canonicalCidr('2001:DB8::/32'), '2001:db8::/32');
+  assert.equal(canonicalCidr('::/128'), '::/128');
+  assert.equal(canonicalCidr('203.0.113.7/24/1'), null);
+  assert.equal(canonicalCidr('203.0.113.7'), null, 'a bare address has no prefix');
+  assert.equal(hostNetwork('2001:db8:1:2:aaaa:bbbb:cccc:dddd'), '2001:db8:1:2::/64');
+  assert.equal(hostNetwork('203.0.113.7'), '203.0.113.7/32');
+  assert.equal(hostNetwork('garbage'), null);
+  // An env list is matched and displayed in the same canonical form.
+  assert.deepEqual(parseCidrList('203.0.113.7/24, 2001:0db8:0:0::/48').map((c) => c.raw), ['203.0.113.0/24', '2001:db8::/48']);
+  assert.ok(matchesAnyCidr('2001:db8:1:2:ffff::1', parseCidrList(hostNetwork('2001:db8:1:2::9') ?? '')));
+});
+
+test('expandIpv6 refuses what the lax reader accepted', () => {
+  for (const bad of ['1:::2', ':1:2:3:4:5:6:7', '1:2:3:4:5:6:7:', 'a::b::c', '12345::1', '1:2:3:4:5:6:7:8::', '1:2:3:4:5:6:7']) {
+    assert.equal(expandIpv6(bad), null, bad);
+  }
+  assert.deepEqual(expandIpv6('::'), Array(8).fill('0000'));
+  assert.deepEqual(expandIpv6('1::'), ['0001', ...Array(7).fill('0000')]);
 });
 
 test('ipPrefix coarsens, and never returns the address', () => {

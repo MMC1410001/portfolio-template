@@ -75,7 +75,35 @@ export function useAdminSectionNav(ids: readonly string[]): string | null {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     }
-    return () => observer.disconnect();
+
+    /**
+     * The snap, on scroll as well. The observer only calls back when a
+     * section crosses its band, and reaching the very bottom of the page past
+     * a short last panel crosses nothing, so the edge rule above never ran at
+     * the one moment it exists for. rAF-throttled: one check per frame however
+     * many scroll events arrive, and passive, since it never cancels one.
+     */
+    let frame = 0;
+    const onScroll = () => {
+      if (frame !== 0) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const edge = edgeSectionId(
+          watched,
+          window.scrollY,
+          window.innerHeight,
+          document.documentElement.scrollHeight,
+        );
+        if (edge) setActive(edge);
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', onScroll);
+      if (frame !== 0) cancelAnimationFrame(frame);
+    };
   }, [key]);
 
   return active;

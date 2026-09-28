@@ -26,7 +26,7 @@
 
 import type { ClickPoint } from './events';
 import { queueEvent } from './queue';
-import { isUntrackedPath } from './scope';
+import { isUntrackedPath, trackingSuppressed } from './scope';
 import { normalisePoint, normaliseText, normaliseTag } from './normalise';
 import { currentSection } from './sections';
 import { currentMode } from './mode';
@@ -45,9 +45,10 @@ const DEAD_SAMPLE_RATE = 1;
 /**
  * Per-view caps, rescoped.
  *
- * "Per view" meant per route change in the source system. Here one view is the
- * whole session, so Lumen's 8 and 3 would be far tighter in practice than
- * they were there. Raised to keep the same effective generosity.
+ * "Per view" means per route, as in the source system: resetPageInteractions()
+ * runs on every client-side navigation. But `/` is one long route that most
+ * sessions never leave, so Lumen's 8 and 3 would be far tighter in practice
+ * than they were there. Raised to keep the same effective generosity.
  */
 const DEAD_MAX_PER_VIEW = 20;
 const RAGE_MAX_PER_VIEW = 6;
@@ -213,9 +214,18 @@ function isRageBurst(event: MouseEvent): boolean {
 
 let handler: ((event: Event) => void) | null = null;
 
-/** Install the listener. Idempotent, a remount must not double-count. */
+/**
+ * Install the listener. Idempotent, a remount must not double-count.
+ *
+ * Not installed where nothing would be recorded (see trackingSuppressed()),
+ * which is /admin, the heatmap frame and an opted-out browser;
+ * `syncAnalyticsRoute()` installs it on the next navigation that can record.
+ * The path check inside the handler stays, for the click that lands between
+ * a navigation and that sync.
+ */
 export function installClickTracking(): void {
   if (handler || typeof document === 'undefined') return;
+  if (trackingSuppressed()) return;
 
   handler = (raw: Event) => {
     try {
@@ -289,16 +299,21 @@ export function installClickTracking(): void {
 }
 
 /**
- * Test seam. Not for application code.
+ * Detach the listener, for a route where nothing is recorded.
  *
  * Detaches rather than only clearing the flag: leaving the old listener bound
- * while allowing a reinstall stacks one listener per reset, and every click
+ * while allowing a reinstall stacks one listener per install, and every click
  * then counts once per stacked listener.
  */
-export function __resetClickTracking(): void {
+export function uninstallClickTracking(): void {
   if (handler && typeof document !== 'undefined') {
     document.removeEventListener('click', handler, true);
   }
   handler = null;
+}
+
+/** Test seam. Not for application code. */
+export function __resetClickTracking(): void {
+  uninstallClickTracking();
   resetPageInteractions();
 }

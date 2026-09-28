@@ -37,25 +37,45 @@ function looksLikeIp(value: string): boolean {
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(value)) {
     return value.split('.').every((o) => Number(o) <= 255);
   }
-  return /^[0-9a-fA-F:]+$/.test(value) && value.includes(':');
+  return value.includes(':') && expandIpv6(value) !== null;
+}
+
+/**
+ * Whether a proxy we trust overwrites `x-real-ip` and `x-forwarded-for`.
+ *
+ * Opt-in, like TRUST_PLATFORM_AUTH_HEADER in admin-auth.ts, and for the same
+ * reason: nothing inside a Worker can tell a header its ingress set from one
+ * the client typed. Cloudflare sets `cf-connecting-ip` itself and replaces any
+ * inbound copy, so on a Worker that header is a fact and the other two are
+ * whatever the caller chose.
+ */
+function forwardedForTrusted(): boolean {
+  const flag = process.env.TRUST_FORWARDED_FOR?.trim().toLowerCase();
+  return flag === '1' || flag === 'true';
 }
 
 /**
  * The caller's address, from infrastructure headers only.
  *
  * A browser cannot read its own public IP and anything in a request body is
- * trivially forged, so this never looks at the body. Order is
- * most-trustworthy first: `cf-connecting-ip` and `x-real-ip` are set by the
- * proxy and overwrite whatever the client sent; `x-forwarded-for` is a chain
- * the client can prefix, so its leftmost entry is a hint, not a fact.
+ * trivially forged, so this never looks at the body. By default only
+ * `cf-connecting-ip` counts. This used to fall back to `x-real-ip` and the
+ * leftmost `x-forwarded-for` entry, and on a host that does not set
+ * `cf-connecting-ip` both are client-controlled: one typed header chose the
+ * rate-limit bucket, the daily chat allowance, the trusted-network exemption
+ * and the internal mark. TRUST_FORWARDED_FOR=1 brings them back, for a proxy
+ * that overwrites them. With no trusted address the answer is null, which
+ * every caller already treats as no budget, no write and no exemption.
+ *
+ * Local dev needs no exception: `vinext dev` (Miniflare) sets
+ * `cf-connecting-ip` on every request, 127.0.0.1 from this machine.
  */
 export function clientIp(request: Request): ClientIp {
   const chain = request.headers.get('x-forwarded-for');
-  const candidates = [
-    request.headers.get('cf-connecting-ip'),
-    request.headers.get('x-real-ip'),
-    chain?.split(',')[0],
-  ];
+  const candidates = [request.headers.get('cf-connecting-ip')];
+  if (forwardedForTrusted()) {
+    candidates.push(request.headers.get('x-real-ip'), chain?.split(',')[0] ?? null);
+  }
 
   for (const raw of candidates) {
     const value = raw?.trim();
@@ -128,18 +148,28 @@ export function ipPrefix(ip: string): string | null {
   return `${parts[0]}.${parts[1]}.${parts[2]}.0/24`;
 }
 
-/** Full eight-group form, so `::` cannot make two addresses look different. */
+const HEX_GROUP = /^[0-9a-f]{1,4}$/i;
+
+/**
+ * Full eight-group form, so `::` cannot make two addresses look different.
+ *
+ * Strict: every group is one to four hex digits and `::` appears at most once
+ * and stands for at least one group. The old reader dropped empty groups, so
+ * `1:::2`, `:1:2:3:4:5:6:7` and `a::b::c` all parsed as something.
+ */
 export function expandIpv6(ip: string): string[] | null {
-  const [head, tail] = ip.split('::');
-  const left = head ? head.split(':').filter(Boolean) : [];
-  const right = tail ? tail.split(':').filter(Boolean) : [];
-  if (ip.includes('::')) {
+  const halves = ip.split('::');
+  if (halves.length > 2) return null;
+  const groupsOf = (part: string) => (part === '' ? [] : part.split(':'));
+  const left = groupsOf(halves[0]);
+  const right = halves.length === 2 ? groupsOf(halves[1]) : [];
+  if (![...left, ...right].every((g) => HEX_GROUP.test(g))) return null;
+  if (halves.length === 2) {
     const fill = 8 - left.length - right.length;
-    if (fill < 0) return null;
-    return [...left, ...Array(fill).fill('0'), ...right].map(pad);
+    if (fill < 1) return null;
+    return [...left, ...Array<string>(fill).fill('0'), ...right].map(pad);
   }
-  const groups = ip.split(':');
-  return groups.length === 8 ? groups.map(pad) : null;
+  return left.length === 8 ? left.map(pad) : null;
 }
 
 function pad(group: string): string {
@@ -150,6 +180,7 @@ export interface Cidr {
   /** Big-endian bit string of the network portion. */
   bits: string;
   v6: boolean;
+  /** Canonical network form, see canonicalCidr. */
   raw: string;
 }
 
@@ -167,12 +198,13 @@ export function parseCidrList(raw: string | undefined): Cidr[] {
     const value = entry.trim();
     if (!value) continue;
 
-    const [addr, prefixText] = value.split('/');
-    const prefix = Number(prefixText);
-    if (!addr || !Number.isInteger(prefix) || prefix < 0) {
+    const parts = value.split('/');
+    if (parts.length !== 2 || !parts[0] || !/^\d{1,3}$/.test(parts[1])) {
       console.warn(`[analytics] skipping malformed CIDR: ${value}`);
       continue;
     }
+    const [addr, prefixText] = parts;
+    const prefix = Number(prefixText);
 
     const v6 = addr.includes(':');
     const min = v6 ? MIN_IPV6_PREFIX : MIN_IPV4_PREFIX;
@@ -189,10 +221,76 @@ export function parseCidrList(raw: string | undefined): Cidr[] {
       console.warn(`[analytics] skipping unparseable CIDR: ${value}`);
       continue;
     }
-    out.push({ bits: bits.slice(0, prefix), v6, raw: value });
+    const network = bits.slice(0, prefix);
+    out.push({ bits: network, v6, raw: formatNetwork(network, v6) });
   }
 
   return out;
+}
+
+/**
+ * One CIDR in canonical network form, or null when malformed or broader than
+ * `/min4` (IPv4) or `/min6` (IPv6).
+ *
+ * Canonical means host bits masked off and IPv6 compressed and lowercase
+ * (RFC 5952), so `203.0.113.7/24` is stored as `203.0.113.0/24` and
+ * `2001:DB8:0:0::/48` and `2001:db8::/48` are one entry, not two.
+ */
+export function canonicalCidr(
+  value: string,
+  min4: number = MIN_IPV4_PREFIX,
+  min6: number = MIN_IPV6_PREFIX,
+): string | null {
+  const parts = value.trim().split('/');
+  if (parts.length !== 2 || !parts[0] || !/^\d{1,3}$/.test(parts[1])) return null;
+  const v6 = parts[0].includes(':');
+  const prefix = Number(parts[1]);
+  const bits = toBits(parts[0], v6);
+  if (bits === null || prefix > bits.length || prefix < (v6 ? min6 : min4)) return null;
+  return formatNetwork(bits.slice(0, prefix), v6);
+}
+
+/**
+ * The network one address stands for: its /64 for IPv6, the address itself
+ * (/32) for IPv4, canonical. The same widening as budgetKey, for the same
+ * reason: a single IPv6 address rotates within its /64 on its own, so a /128
+ * trusted today is a stranger tomorrow.
+ */
+export function hostNetwork(ip: string): string | null {
+  return canonicalCidr(`${ip}/${ip.includes(':') ? 64 : 32}`);
+}
+
+/** `network/prefix`, from the network bits, with the host bits zeroed. */
+function formatNetwork(network: string, v6: boolean): string {
+  const full = network.padEnd(v6 ? 128 : 32, '0');
+  if (!v6) {
+    const octets = [0, 8, 16, 24].map((i) => parseInt(full.slice(i, i + 8), 2));
+    return `${octets.join('.')}/${network.length}`;
+  }
+  const groups = Array.from({ length: 8 }, (_, i) =>
+    parseInt(full.slice(i * 16, i * 16 + 16), 2).toString(16),
+  );
+  return `${compressIpv6(groups)}/${network.length}`;
+}
+
+/** RFC 5952: the longest run of two or more zero groups becomes `::`, the first on a tie. */
+function compressIpv6(groups: string[]): string {
+  let best = -1;
+  let bestLen = 1;
+  let run = -1;
+  for (let i = 0; i <= groups.length; i += 1) {
+    if (i < groups.length && groups[i] === '0') {
+      if (run < 0) run = i;
+      continue;
+    }
+    if (run >= 0 && i - run > bestLen) {
+      best = run;
+      bestLen = i - run;
+    }
+    run = -1;
+  }
+  if (best < 0) return groups.join(':');
+  return `${groups.slice(0, best).join(':')}::${groups.slice(best + bestLen).join(':')}`;
 }
 
 function toBits(addr: string, v6: boolean): string | null {

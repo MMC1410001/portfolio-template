@@ -1,26 +1,39 @@
 'use client';
 /**
- * Catches a failure in the lazy 3D scene and renders the 2D fallback instead.
+ * Catches a failure below a lazy boundary and renders a fallback instead of
+ * letting it take the page down.
  *
- * This closes a real gap the analytics work uncovered rather than one it
- * created. `ImmersiveSystem` wraps `<Scene>` in `<Suspense>`, and SystemScene
- * has its own boundary around the R3F canvas, but nothing sat between
- * `Suspense` and a **chunk-load** rejection. `import('./SystemScene')` failing
- * (offline mid-session, or a stale hashed chunk after a redeploy) threw past
- * Suspense and took the whole page down, résumé and all.
+ * The failure this was written for is a **chunk-load** rejection: `import()`
+ * of a lazy chunk failing, offline mid-session or a stale hashed chunk after a
+ * redeploy. `<Suspense>` only handles the pending state; a rejected import
+ * throws straight past it, and without a boundary above it the whole page
+ * unmounts, résumé and all.
+ *
+ * Which is why placement is the whole point. This used to sit *inside*
+ * `ImmersiveSystem`, the very chunk whose download it was meant to survive: a
+ * boundary in a module that never arrived cannot catch anything, so the one
+ * failure it existed for still crashed the page. It now wraps the
+ * `<Suspense>` around the lazy import in `Portfolio.tsx`, and around each lazy
+ * recreation in `DashboardDetail.tsx`. `ImmersiveSystem` keeps an inner one
+ * for the turntable itself, which is a different failure (the chunk arrived,
+ * the canvas code threw) and gets a different fallback.
  *
  * A class component because `componentDidCatch` has no hook equivalent.
  *
- * `scope` is what makes the two failures distinguishable in the panel:
- * 'immersive-chunk' is a download that never arrived, 'immersive-scene' is
- * WebGL giving up once it did. They have entirely different fixes.
+ * `scope` is what makes the failures distinguishable in the panel's error
+ * rows: 'immersive-chunk' and 'dashboard-chunk' are downloads that never
+ * arrived, 'immersive-scene' is the turntable failing once it did. They have
+ * entirely different fixes.
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+
+export type BoundaryScope = 'immersive-chunk' | 'immersive-scene' | 'dashboard-chunk';
 
 interface Props {
   children: ReactNode;
   fallback: ReactNode;
-  onError: (scope: 'immersive-chunk') => void;
+  scope: BoundaryScope;
+  onError?: (scope: BoundaryScope) => void;
 }
 
 export default class SceneBoundary extends Component<Props, { failed: boolean }> {
@@ -32,9 +45,9 @@ export default class SceneBoundary extends Component<Props, { failed: boolean }>
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Reported, not rethrown: the visitor keeps a working page and we still
-    // learn the scene is unreachable for them.
-    console.error('[portfolio] immersive scene failed to load', error, info);
-    this.props.onError('immersive-chunk');
+    // learn the feature is unreachable for them.
+    console.error(`[portfolio] ${this.props.scope} failed`, error, info);
+    this.props.onError?.(this.props.scope);
   }
 
   render() {

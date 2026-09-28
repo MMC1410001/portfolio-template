@@ -4,7 +4,8 @@
  *
  * Generated rather than a file in public/, so a dashboard added to
  * `content/dashboards.ts` is listed without anyone remembering to. `/admin`
- * is left out on purpose: it answers 404 to strangers and is `noindex`.
+ * is left out on purpose: to a stranger it is a sign-in form (a 404 only when
+ * no ADMIN_TOKEN is configured), and it is `noindex`.
  *
  * The origin must match `metadataBase` in app/layout.tsx; a sitemap on another
  * host is ignored by crawlers. tests/dashboards.test.ts checks the two agree.

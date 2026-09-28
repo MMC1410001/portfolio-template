@@ -16,13 +16,12 @@
  * cached here and only replaced when its contents actually change.
  *
  * There is no `speaking` event. `speechSynthesis.speaking` is a poll-only
- * flag, so the state below is driven from the utterance's own `start`, `end`,
- * `error` and `boundary` callbacks instead.
+ * flag, so the state below is driven from the utterance's own `start`, `end`
+ * and `error` callbacks instead.
  *
- * `boundary` is the only progress signal the API exposes: a character index,
- * on Chromium and Firefox, and not at all in Safari. It is enough to move a
- * portrait in time with the words and nothing like enough for lip-sync, which
- * is why `SpeakingPortrait.tsx` does not pretend to do that.
+ * `boundary`, the per-word progress event, is deliberately not listened to.
+ * A hook exposed it, nothing read it, and every spoken word still notified
+ * every subscriber: a re-render of the chat panel per word for no output.
  */
 import { useCallback, useSyncExternalStore } from 'react';
 import { chunkForSpeech } from '@/lib/chat/speech-text';
@@ -90,24 +89,16 @@ export function useVoices(): SpeechSynthesisVoice[] {
  * flag would light all of them up at once.
  */
 let speakingId: string | null = null;
-/** Character offset of the word being spoken, or -1 when that is unknown. */
-let boundaryAt = -1;
 
 function setSpeakingId(next: string | null): void {
   if (speakingId === next) return;
   speakingId = next;
-  if (next === null) boundaryAt = -1;
   notify();
 }
 
 /** The id passed to `speak()`, or null when nothing is being spoken. */
 export function useSpeakingId(): string | null {
   return useSyncExternalStore(subscribe, () => speakingId, () => null);
-}
-
-/** Moves once per spoken word where the browser reports it, else stays -1. */
-export function useBoundary(): number {
-  return useSyncExternalStore(subscribe, () => boundaryAt, () => -1);
 }
 
 // ── Control ───────────────────────────────────────────────────────────────
@@ -218,10 +209,6 @@ export function speak(id: string, text: string, voice: SpeechSynthesisVoice | nu
         // already moved it on, so this is a no-op there and a real end here.
         clearStartTimer();
         if (mine === generation) setSpeakingId(null);
-      };
-      utterance.onboundary = (event) => {
-        boundaryAt = event.charIndex;
-        notify();
       };
       speechSynthesis.speak(utterance);
       // Chrome can leave the engine paused after a previous cancel, in which

@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
+@import './shadcn-tailwind.css';
 @custom-variant dark (&:is(.dark *));
 @theme inline { --color-background:var(--background);--color-foreground:var(--foreground);--font-sans:var(--font-body);--font-mono:var(--font-code);--font-heading:var(--font-display);--color-primary:var(--primary);--color-primary-foreground:var(--primary-foreground);--color-muted:var(--muted);--color-muted-foreground:var(--muted-foreground);--color-border:var(--border);--color-input:var(--border);--color-ring:var(--primary);--color-popover:var(--popover);--color-popover-foreground:var(--foreground);--color-accent:var(--accent);--color-accent-foreground:var(--foreground);--color-card:var(--card);--color-card-foreground:var(--foreground);--color-secondary:var(--muted);--color-secondary-foreground:var(--foreground);--radius-lg:12px;--radius-md:8px;--radius-sm:5px; --color-destructive:var(--destructive);--color-destructive-foreground:var(--destructive-foreground);--color-sidebar:var(--sidebar);--color-sidebar-foreground:var(--sidebar-foreground);--color-sidebar-accent:var(--sidebar-accent);--color-sidebar-accent-foreground:var(--sidebar-accent-foreground);--color-sidebar-border:var(--sidebar-border);--color-sidebar-ring:var(--sidebar-ring);--color-chart-1:var(--chart-1);--color-chart-2:var(--chart-2);--color-chart-3:var(--chart-3);--color-chart-4:var(--chart-4);--color-chart-5:var(--chart-5); }
 :root {--background:#fbfcff;--foreground:#172235;--primary:#285ce5;--primary-foreground:#fff;--muted:#f0f3f9;--muted-foreground:#596579;--border:#dce2ec;--popover:#fff;--accent:#ebf0ff;--card:#fff;--radius:.6rem;--destructive:#dc2626;--destructive-foreground:#fff;--sidebar:#f4f7fc;--sidebar-foreground:#172235;--sidebar-accent:#e6ecfa;--sidebar-accent-foreground:#285ce5;--sidebar-border:#dce2ec;--sidebar-ring:#285ce5;--chart-1:#2a78d6;--chart-2:#eb6834;--chart-3:#1baf7a;--chart-4:#eda100;--chart-5:#e87ba4;}
@@ -177,3 +177,49 @@
     in view, and it lands the hero-bottom row right after the turn finishes. */
  .stage-runway{height:96vh;pointer-events:none}
 }
+
+/* What Tailwind does not scan. `components/ui/` is 55 vendored shadcn files
+   and the app imports 19 of them; scanning the other 36 put their utilities,
+   about 100KB, into the one render-blocking stylesheet every page loads.
+   Excluded file by file rather than as a directory, on purpose: Tailwind's
+   `@source not` beats any `@source` naming a file inside it, so the directory
+   form would need every used file re-included and would silently drop the
+   classes of any it missed. This way a newly vendored component is scanned by
+   default, and the one mistake left, importing a file still listed here, is
+   what tests/css-sources.test.ts fails on. Delete the line when you start
+   using the component. */
+@source not "../components/ui/accordion.tsx";
+@source not "../components/ui/alert-dialog.tsx";
+@source not "../components/ui/alert.tsx";
+@source not "../components/ui/aspect-ratio.tsx";
+@source not "../components/ui/attachment.tsx";
+@source not "../components/ui/avatar.tsx";
+@source not "../components/ui/breadcrumb.tsx";
+@source not "../components/ui/bubble.tsx";
+@source not "../components/ui/button-group.tsx";
+@source not "../components/ui/checkbox.tsx";
+@source not "../components/ui/collapsible.tsx";
+@source not "../components/ui/combobox.tsx";
+@source not "../components/ui/context-menu.tsx";
+@source not "../components/ui/dialog.tsx";
+@source not "../components/ui/direction.tsx";
+@source not "../components/ui/drawer.tsx";
+@source not "../components/ui/field.tsx";
+@source not "../components/ui/hover-card.tsx";
+@source not "../components/ui/item.tsx";
+@source not "../components/ui/kbd.tsx";
+@source not "../components/ui/marker.tsx";
+@source not "../components/ui/menubar.tsx";
+@source not "../components/ui/message.tsx";
+@source not "../components/ui/native-select.tsx";
+@source not "../components/ui/navigation-menu.tsx";
+@source not "../components/ui/pagination.tsx";
+@source not "../components/ui/popover.tsx";
+@source not "../components/ui/progress.tsx";
+@source not "../components/ui/radio-group.tsx";
+@source not "../components/ui/scroll-area.tsx";
+@source not "../components/ui/select.tsx";
+@source not "../components/ui/slider.tsx";
+@source not "../components/ui/switch.tsx";
+@source not "../components/ui/tabs.tsx";
+@source not "../components/ui/toast.tsx";

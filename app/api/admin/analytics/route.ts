@@ -19,7 +19,7 @@ import {
 } from '@/lib/analytics/admin-auth';
 import { getDbHandle, ensureSchema } from '@/lib/analytics/db';
 import { readWindow } from '@/lib/analytics/time';
-import { clientIp, internalVisitorIds } from '@/lib/analytics/net';
+import { clientIp, hostNetwork, internalVisitorIds, matchesAnyCidr, parseCidrList } from '@/lib/analytics/net';
 import { addTrusted, listTrusted, removeTrusted, trustedCidrs } from '@/lib/analytics/trusted';
 import { sweepIfDue, sweep } from '@/lib/analytics/retention';
 import {
@@ -71,6 +71,9 @@ export async function POST(request: Request) {
 
   if (action === 'whoami') {
     const cf = (request as CfRequest).cf;
+    // On a cold isolate the table may not exist yet, and a failed read would
+    // report the env floor as the whole list.
+    if (handle) await ensureSchema(handle.db);
     return Response.json(
       {
         identity,
@@ -123,7 +126,11 @@ export async function POST(request: Request) {
     // Trusted networks: excluded from analytics, held to no chat limit. The
     // same admin gate as every read above, and the pa_admin cookie is
     // SameSite=Strict, so another site cannot make an admin's browser post
-    // here. `yourIp` is what the "Add my current IP" button adds.
+    // here. `yourNetwork` is what the "Add my current IP" button adds: the
+    // address for IPv4, its /64 for IPv6, which rotates within that /64 on its
+    // own, so a /128 stopped matching within a day. Coverage is judged here,
+    // by the same matcher ingest and the chat limits use, so a listed range
+    // that covers the caller counts, not only an exact /32.
     if (action === 'trusted-list' || action === 'trusted-add' || action === 'trusted-remove') {
       if (action !== 'trusted-list') {
         const cidr = typeof body.cidr === 'string' ? body.cidr : '';
@@ -133,17 +140,31 @@ export async function POST(request: Request) {
             : await removeTrusted(db, cidr);
         if (!change.ok) return Response.json({ error: change.error }, { status: 400, headers: HEADERS });
       }
+      const yourIp = clientIp(request).ip;
+      const entries = (await listTrusted(db)).map((entry) => ({
+        ...entry,
+        coversYou: yourIp !== null && matchesAnyCidr(yourIp, parseCidrList(entry.cidr)),
+      }));
       return Response.json(
-        { entries: await listTrusted(db), yourIp: clientIp(request).ip },
+        {
+          entries,
+          yourIp,
+          yourNetwork: yourIp ? hostNetwork(yourIp) : null,
+          yourIpCovered: entries.some((e) => e.coversYou),
+        },
         { headers: HEADERS },
       );
     }
 
+    // Once per dashboard load, not once per panel: every load fires six
+    // actions at once, and each used to claim the slot (two writes apiece).
     // Deterministic and free, and it never delays the dashboard.
-    try {
-      after(() => sweepIfDue(db, Date.now()));
-    } catch {
-      void sweepIfDue(db, Date.now());
+    if (action === 'analytics') {
+      try {
+        after(() => sweepIfDue(db, Date.now()));
+      } catch {
+        void sweepIfDue(db, Date.now());
+      }
     }
 
     switch (action) {
@@ -184,9 +205,12 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     // Surfaced, not zeroed. The panel must be able to say "this failed".
-    console.error(`[admin] ${action} failed`, error);
+    // The error itself stays in the log: a D1 message can quote SQL, table
+    // names and bound values. `ref` finds this line in the Worker log.
+    const ref = crypto.randomUUID().slice(0, 8);
+    console.error(`[admin] ${action} failed, ref ${ref}`, error);
     return Response.json(
-      { error: 'query_failed', detail: String(error) },
+      { error: 'query_failed', ref },
       { status: 500, headers: HEADERS },
     );
   }

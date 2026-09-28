@@ -22,6 +22,18 @@
  * that saved a change drops its copy at once, so an edit reaches every
  * request within half a minute without a D1 read per event.
  *
+ * Only a real read is cached. With no database the list is the env floor,
+ * which costs nothing to rebuild, and after a failed read it is kept for
+ * FALLBACK_CACHE_MS only: caching the floor for the full 30 seconds meant one
+ * D1 hiccup dropped every panel-added network, the owner's exemption and
+ * internal mark with them, for half a minute after D1 had recovered.
+ *
+ * ── Why the panel's floor is narrower than the env's ────────────────────────
+ * A network added here lifts the chat limits for everyone behind it, and one
+ * compromised admin session can add one. So the panel takes nothing wider
+ * than /24 (IPv4) or /48 (IPv6): an office, a home, a site. The env floor
+ * keeps parseCidrList's /16 and /32, since editing the Worker is a deploy.
+ *
  * ── What it cannot do ──────────────────────────────────────────────────────
  * A session is marked internal when it is recorded, because the address it
  * came from is never stored. Adding a network excludes the next visit from
@@ -30,11 +42,15 @@
  * No `db.ts` import, so `npm run test:units` can run it against
  * scripts/d1-sqlite.ts; callers pass the database in.
  */
-import { parseCidrList, type Cidr } from './net';
+import { canonicalCidr, parseCidrList, type Cidr } from './net';
 
 export const TRUSTED_CACHE_MS = 30_000;
+export const FALLBACK_CACHE_MS = 3_000;
 /** Enough for every home, office and phone network one person uses. */
 export const MAX_TRUSTED = 50;
+/** Broadest range the panel accepts. See the header. */
+export const PANEL_MIN_IPV4_PREFIX = 24;
+export const PANEL_MIN_IPV6_PREFIX = 48;
 const MAX_LABEL = 60;
 
 export interface TrustedEntry {
@@ -45,18 +61,23 @@ export interface TrustedEntry {
   source: 'panel' | 'env';
 }
 
-/**
- * One address or range, in canonical form, or null when it is not usable.
- *
- * A bare address becomes a single-host range (/32 or /128). The breadth rule
- * is parseCidrList's: nothing wider than /16 for IPv4 or /32 for IPv6, since
- * a stray /0 would mark every visitor internal and lift every chat limit.
- */
-export function normaliseCidr(input: string): string | null {
+/** Trimmed, lowercase, and a bare address given its single-host prefix. Null when it cannot be a CIDR. */
+function typed(input: string): string | null {
   const value = input.trim().toLowerCase();
   if (!value || value.includes(',') || value.length > 64) return null;
-  const withPrefix = value.includes('/') ? value : `${value}/${value.includes(':') ? 128 : 32}`;
-  return parseCidrList(withPrefix).length === 1 ? withPrefix : null;
+  return value.includes('/') ? value : `${value}/${value.includes(':') ? 128 : 32}`;
+}
+
+/**
+ * One address or range as the panel may add it, in canonical form, or null.
+ *
+ * A bare address becomes a single-host range (/32 or /128), host bits are
+ * masked and IPv6 is compressed (canonicalCidr), so two spellings of one
+ * network are one row. Nothing wider than the panel floor, /24 or /48.
+ */
+export function normaliseCidr(input: string): string | null {
+  const value = typed(input);
+  return value ? canonicalCidr(value, PANEL_MIN_IPV4_PREFIX, PANEL_MIN_IPV6_PREFIX) : null;
 }
 
 function envEntries(): TrustedEntry[] {
@@ -86,29 +107,38 @@ export async function listTrusted(db: D1Database | null): Promise<TrustedEntry[]
     : [];
   const env = envEntries();
   const envSet = new Set(env.map((e) => e.cidr));
+  // A row saved before canonical storage may be spelt differently from the
+  // env entry it duplicates, so compare networks rather than strings.
   return [
     ...env,
     ...rows
-      .filter((r) => !envSet.has(r.cidr))
+      .filter((r) => !envSet.has(canonicalCidr(r.cidr) ?? r.cidr))
       .map((r) => ({ cidr: r.cidr, label: r.label, addedAt: r.added_at, addedBy: r.added_by, source: 'panel' as const })),
   ];
 }
 
-let cache: { at: number; cidrs: Cidr[] } | null = null;
+let cache: { until: number; cidrs: Cidr[] } | null = null;
 
-/** The merged list as matchers, cached per isolate. Never throws: a failed read is the env floor. */
+const matchers = (entries: TrustedEntry[]) => parseCidrList(entries.map((e) => e.cidr).join(','));
+
+/**
+ * The merged list as matchers, cached per isolate. Never throws: a failed
+ * read is the env floor, kept for FALLBACK_CACHE_MS rather than the full
+ * window, and no database is the env floor, not cached at all.
+ */
 export async function trustedCidrs(db: D1Database | null, now: number = Date.now()): Promise<Cidr[]> {
-  if (cache && now - cache.at < TRUSTED_CACHE_MS) return cache.cidrs;
-  let entries: TrustedEntry[];
+  if (!db) return matchers(envEntries());
+  if (cache && now < cache.until) return cache.cidrs;
   try {
-    entries = await listTrusted(db);
+    const cidrs = matchers(await listTrusted(db));
+    cache = { until: now + TRUSTED_CACHE_MS, cidrs };
+    return cidrs;
   } catch (error) {
     console.error('[trusted] list read failed, using env only', error);
-    entries = envEntries();
+    const cidrs = matchers(envEntries());
+    cache = { until: now + FALLBACK_CACHE_MS, cidrs };
+    return cidrs;
   }
-  const cidrs = parseCidrList(entries.map((e) => e.cidr).join(','));
-  cache = { at: now, cidrs };
-  return cidrs;
 }
 
 /** Test seam, and what a write in this isolate calls so its own next read is fresh. */
@@ -141,11 +171,24 @@ export async function addTrusted(
   return { ok: true };
 }
 
+/**
+ * Remove one row, by the string it is stored as or by its network.
+ *
+ * Judged against the env floor, not the panel's: a row added before the
+ * panel floor existed (a /20, say) must still be removable. And matched on
+ * both spellings, because rows saved before canonical storage keep the text
+ * they were typed as, which is what the panel sends back.
+ */
 export async function removeTrusted(db: D1Database, input: string): Promise<TrustedChange> {
-  const cidr = normaliseCidr(input);
-  if (!cidr) return { ok: false, error: 'invalid' };
-  if (envEntries().some((e) => e.cidr === cidr)) return { ok: false, error: 'env' };
-  const result = await db.prepare(`DELETE FROM trusted_networks WHERE cidr = ?1`).bind(cidr).run();
+  const value = typed(input);
+  if (!value) return { ok: false, error: 'invalid' };
+  const cidr = canonicalCidr(value);
+  if (cidr && envEntries().some((e) => e.cidr === cidr)) return { ok: false, error: 'env' };
+  const result = await db
+    .prepare(`DELETE FROM trusted_networks WHERE cidr IN (?1, ?2)`)
+    .bind(value, cidr ?? value)
+    .run();
   resetTrustedCache();
-  return (result.meta?.changes ?? 0) > 0 ? { ok: true } : { ok: false, error: 'missing' };
+  if ((result.meta?.changes ?? 0) > 0) return { ok: true };
+  return { ok: false, error: cidr ? 'missing' : 'invalid' };
 }

@@ -4,8 +4,15 @@ import { parseInline, type Block, type Inline } from '@/lib/markdown';
 // Server component: the parse and the render both happen at build time, and
 // none of this reaches the client bundle.
 
-/** Only links that go somewhere ordinary. A `javascript:` href renders as text. */
-const SAFE_HREF = /^(https?:\/\/|\/|#)/;
+/**
+ * Only links that go somewhere ordinary. A `javascript:` href renders as text.
+ * A root-relative path must not start `//` or `/\`: both are protocol-relative
+ * to a browser (it reads the backslash as a slash), so `//evil.example` would
+ * pass a bare `^\/` as a same-site link while leaving the site, and without
+ * the `target=_blank` an `http` link gets. tests/markdown.test.ts reads this
+ * pattern out of the file, since a bare Node process cannot import JSX.
+ */
+const SAFE_HREF = /^(https?:\/\/|\/(?![/\\])|#)/;
 
 function inline(nodes: Inline[]): ReactNode[] {
   return nodes.map((node, at) => {

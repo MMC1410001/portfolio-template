@@ -31,12 +31,11 @@ jobs:
 # # pushed a CSS change, and a link that broke last Tuesday stays broken however
 # # long you avoid deploying.
 # #
-# # The cost matters. Actions minutes are metered on a private repository, and
-# # once the included allowance is gone GitHub refuses to start any job at all
-# # -- the failure is a 4-second run with no runner assigned, which looks
-# # nothing like a billing problem until you read the annotation. So the
-# # cheapest run is the one that does not happen. Twenty-five network fetches on
-# # every push buy nothing a weekly run does not.
+# # The cost mattered in the end. The account exhausted its included Actions
+# # allowance in September 2026, and with the spending limit at its $0 default
+# # GitHub refuses to start any job at all -- so the cheapest run is the one that
+# # does not happen. Twenty-five network fetches on every push bought nothing a
+# # weekly run does not.
 # #
 # # ── Why there is no `npm ci` ──────────────────────────────────────────────
 # # There is nothing to install. `scripts/check-links.mjs` imports no packages,
@@ -70,9 +69,12 @@ jobs:
 #     runs-on: ubuntu-latest
 #     timeout-minutes: 10
 #     steps:
-#       - uses: actions/checkout@v4
+#       # Pinned to full commit SHAs; the trailing comment is the tag resolved.
+#       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+#         with:
+#           persist-credentials: false
 #
-#       - uses: actions/setup-node@v4
+#       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
 #         with:
 #           node-version: '22'
 #

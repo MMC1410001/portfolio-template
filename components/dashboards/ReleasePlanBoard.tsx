@@ -157,6 +157,7 @@ function PlanPage() {
             <button
               type="button"
               onClick={() => setProject('All projects')}
+              aria-pressed={project === 'All projects'}
               className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${project === 'All projects' ? 'bg-indigo-600 text-white' : 'bg-[#f3f4f6] text-[#4b5563] hover:bg-[#e9ebf2]'}`}
             >
               All projects <span className="ml-1 tabular-nums opacity-70">{total}</span>
@@ -167,6 +168,7 @@ function PlanPage() {
               <button
                 type="button"
                 onClick={() => setProject(name)}
+                aria-pressed={project === name}
                 className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${project === name ? 'bg-indigo-600 text-white' : 'bg-[#f3f4f6] text-[#4b5563] hover:bg-[#e9ebf2]'}`}
               >
                 {name} <span className="ml-1 tabular-nums opacity-70">{n}</span>

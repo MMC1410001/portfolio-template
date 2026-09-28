@@ -30,8 +30,11 @@ import {
   timingSafeEqual,
 } from '@/lib/analytics/admin-auth';
 import { verifyGoogleIdToken } from '@/lib/analytics/google-auth';
+import { readCapped } from '@/lib/read-capped';
 
 export const dynamic = 'force-dynamic';
+
+const MAX_BODY_BYTES = 16 * 1024;
 
 /**
  * Kept in step with the signed expiry, not set alongside it.
@@ -60,10 +63,16 @@ export async function POST(request: Request) {
   // No token configured, or a weak one, is indistinguishable from no route.
   if (!secret || secret.length < MIN_TOKEN_LEN) return notFound();
 
+  // Read before anything is authorised, since the body IS the credential, so
+  // it is capped: `request.json()` buffered an upload of any size first. A
+  // Google ID token is about 1.2 KB; 16 KB is room for any real one.
+  const text = await readCapped(request, MAX_BODY_BYTES);
+  if (text === null) return notFound();
+
   let token = '';
   let credential = '';
   try {
-    const body = (await request.json()) as {
+    const body = JSON.parse(text) as {
       token?: unknown;
       credential?: unknown;
     };

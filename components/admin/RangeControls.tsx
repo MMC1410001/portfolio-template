@@ -7,8 +7,8 @@
  * own its own toggle is how two panels end up disagreeing about the same week
  * with nothing on screen to explain why.
  *
- * ── Native <input type="date">, not ui/calendar.tsx ────────────────────────
- * calendar.tsx would pull react-day-picker and date-fns into the admin bundle
+ * ── Native <input type="date">, not a calendar widget ──────────────────────
+ * shadcn's calendar (since deleted) would pull react-day-picker and date-fns into the admin bundle
  * for a control used on one of six presets. A native input is 0 bytes, gives a
  * real date wheel on mobile, and is capped at today either way. The part that
  * actually matters, that the day boundary is Asia/Kolkata and not the

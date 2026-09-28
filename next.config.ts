@@ -11,9 +11,11 @@
  * API routes, a route handler can only set its own.
  *
  * Before this, `curl -I /` returned no CSP, no nosniff, no Referrer-Policy and
- * no frame-ancestors. There is no middleware.ts, and `public/_headers` is a
- * Cloudflare *Pages* convention that a Worker deploy never reads, so neither
- * was an alternative.
+ * no frame-ancestors. There is no middleware.ts. `public/_headers` IS read by
+ * Workers static assets, but only for files served from dist/client, never
+ * for the HTML the Worker renders, so it carries the cache policy for frames
+ * and photos (and restates the /_next/static rule the build would otherwise
+ * write) while the security headers stay here.
  *
  * ── Why the CSP is production-only ─────────────────────────────────────────
  * `vinext dev` serves Vite's HMR client, which opens a websocket and injects
@@ -37,7 +39,7 @@
  * ── The Google entries are load-bearing, and fail production-only ──────────
  * /admin offers Google sign-in, which pulls a script from accounts.google.com,
  * calls back to it, and renders its button in an iframe. Because this header
- * is only sent in production, omitting any of the three below leaves sign-in
+ * is only sent in production, omitting any of the four below leaves sign-in
  * working perfectly in `npm run dev` and dead on the deployed Worker, with the
  * only symptom in the browser console. They are listed per-directive rather
  * than widened into default-src so the allowance stays scoped to the one
@@ -52,7 +54,9 @@ const CSP = [
   // the /admin sign-in card.
   "script-src 'self' 'unsafe-inline' https://accounts.google.com",
   // Tailwind v4 and the hand-written token sheet both emit inline style.
-  "style-src 'self' 'unsafe-inline'",
+  // The GIS client also injects its own stylesheet from /gsi/style; without it
+  // the sign-in button renders unstyled in production only.
+  "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
   "img-src 'self' data: blob:",
   "font-src 'self'",
   // /api/chat and /api/track are same-origin; the one exception is Google
