@@ -11,7 +11,7 @@ npm run build          # prebuild (knowledge sync) + vinext build -> dist/
 npm run start          # wrangler dev --config dist/server/wrangler.json (build first)
 npm test               # units + py + chat + analytics
 npm run test:units     # every tests/*.test.ts, pure logic, no server needed
-npm run test:py        # the Python half of the answer contract (.venv if present)
+npm run test:py        # the Python half of the answer contract (.venv if present; any OS)
 npm run test:chat      # needs `npm run dev` in another terminal
 npm run test:analytics # ditto, plus ADMIN_TOKEN set
 npm run emit:migration # regenerate migrations/ and drizzle/ (0001..000N, one per schema version)

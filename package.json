@@ -17,7 +17,7 @@
     "test:chat": "node tests/chat.mjs",
     "check:model": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env.local --import ./tests/register-hooks.mjs scripts/check-model.mjs",
     "test:analytics": "node tests/analytics.mjs",
-    "test:units": "node --experimental-strip-types --no-warnings --import ./tests/register-hooks.mjs --test 'tests/*.test.ts'",
+    "test:units": "node --experimental-strip-types --no-warnings --import ./tests/register-hooks.mjs --test \"tests/*.test.ts\"",
     "test": "npm run test:units && npm run test:py && npm run test:chat && npm run test:analytics",
     "seed:demo": "node --experimental-strip-types --no-warnings --import ./tests/register-hooks.mjs scripts/seed-analytics-demo.ts",
     "preflight": "node scripts/preflight-deploy.mjs",
@@ -25,7 +25,7 @@
     "db:migrate": "wrangler d1 migrations apply ANALYTICS_DB --remote --config wrangler.jsonc",
     "db:migrate:local": "wrangler d1 migrations apply ANALYTICS_DB --local --config wrangler.jsonc",
     "check:links": "node --experimental-strip-types --no-warnings --import ./tests/register-hooks.mjs scripts/check-links.mjs",
-    "test:py": "P=python3; [ -x .venv/bin/python ] && P=.venv/bin/python; $P -m unittest discover -s tests -p 'test_*.py'"
+    "test:py": "node scripts/run-python-tests.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

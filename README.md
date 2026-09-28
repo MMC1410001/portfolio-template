@@ -292,12 +292,33 @@ FastAPI does not load a `.env` file by itself. Set Python service values in the 
 | `npm run check:links` | Opens every link in `content/portfolio.ts` as a stranger would |
 | `npm test` | Runs `test:units`, `test:py`, `test:chat` and `test:analytics` in that order (the last two need `npm run dev` in another terminal) |
 | `npm run test:units` | Runs the pure-logic checks and the route-handler tests. Needs no server |
-| `npm run test:py` | Runs the Python chatbot checks, with `.venv` if it exists |
+| `npm run test:py` | Runs the Python chatbot checks, with `.venv` if it exists (macOS, Linux or Windows) |
 | `npm run test:chat` | Runs chat checks while `npm run dev` is still running in another terminal |
 | `npm run test:analytics` | Runs analytics checks. Needs `ADMIN_TOKEN` set |
 | `npm run build` | Creates a production build and refreshes Python knowledge |
 | `npm run start` | Serves the built Cloudflare Worker locally after `npm run build` |
-| `.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` | Runs the Python chatbot checks on macOS or Linux |
+| `.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` | Runs the Python chatbot checks verbosely on macOS or Linux (`.venv\Scripts\python` on Windows) |
+
+### Working on another machine
+
+Only source is in git. Everything `.gitignore` excludes is either rebuilt from committed files or
+specific to one machine, so none of it is copied across:
+
+| Excluded | Rebuilt by |
+| --- | --- |
+| `node_modules/` | `npm ci`, exactly from `package-lock.json` |
+| `.venv/` | `python -m venv .venv`, then `pip install --require-hashes -r backend/requirements-lock.txt` |
+| `dist/`, `.next/`, `.vinext/` | `npm run build` / `npm run dev` |
+| `.wrangler/` | the dev server, on first run (local emulator state and logs; real data is in Cloudflare) |
+| `graft/` | `graft build` |
+
+The one file to carry over by hand is **`.env.local`**: it holds the secrets (`ADMIN_TOKEN`,
+`ANALYTICS_IP_SALT`, `NIM_API_KEY`) and must never be committed. Keep it in a password manager.
+Production reads its own copies from the Worker's secrets, not from this file.
+
+So a new machine is: clone, add `.env.local`, `npm ci`, `npm run dev`. The npm scripts run on
+macOS, Linux and Windows alike. The one macOS-only piece is `scripts/turntable-frames.swift`, which
+is needed only to regenerate the turntable frames.
 
 ## Deploying to Cloudflare, step by step
 
