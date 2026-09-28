@@ -588,7 +588,7 @@
         "go no go",
         "release readiness"
       ],
-      "answer": "11 operational dashboards built at Northwind, so that delivery status, quality, effort and objectives stopped living in spreadsheets and chat threads: Delivery board, Action plan, Release plan, Quality scorecard, Effort report, Quality (all clients), Defect board, Learning tracker, Release readiness, Uptime monitoring, OKR dashboard. Nine are Google Apps Script web apps over Google Sheets behind Workspace sign-in; the OKR dashboard is a page inside the Frappe and ERPNext ERP. Between them they cover pipeline counts by stage, a month of deliverables beside the delivery lifecycle and sprint ceremonies the plan assumes, estimate against actual on every task, weighted quality scores, defect intelligence that states a release position, a go / conditional-go / no-go verdict with the rule that produced it, effort logged against approved and invoiced, capability ratings, and organisation-wide OKRs. Each one is rebuilt at /dashboards on invented data.",
+      "answer": "11 operational dashboards built at Northwind, so that delivery status, quality, effort and objectives stopped living in spreadsheets and chat threads: Delivery board, Action plan, Release plan, Quality scorecard, Effort report, Quality (all clients), Defect board, Learning tracker, Release readiness, Uptime monitoring, OKR dashboard. Nine are Google Apps Script web apps over Google Sheets behind Workspace sign-in; the OKR dashboard is a page inside the Frappe and ERPNext ERP, and the uptime board is an Uptime Kuma instance on Docker. Between them they cover pipeline counts by stage, a month of deliverables beside the delivery lifecycle and sprint ceremonies the plan assumes, estimate against actual on every task, weighted quality scores, defect intelligence that states a release position, a go / conditional-go / no-go verdict with the rule that produced it, effort logged against approved and invoiced, capability ratings, organisation-wide OKRs, and uptime, response time and certificate expiry for every monitored application. Each one is rebuilt at /dashboards on invented data.",
       "href": "/dashboards"
     },
     {
@@ -1257,11 +1257,10 @@
       "href": "/#products"
     },
     {
-      "id": "halcyon-tsm-ai",
+      "id": "halcyon-field-ai",
       "patterns": [
         "field ai",
-        "halcyon tsm",
-        "tsm"
+        "halcyon field ai"
       ],
       "answer": "Field AI, part of Alex's work on Halcyon: An internal AI tool supporting the field sales team. Alex evaluated its responses and data quality and reported performance and security issues.",
       "href": "/#products"

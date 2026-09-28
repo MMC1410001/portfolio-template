@@ -27,14 +27,22 @@ export class AdminError extends Error {
   }
 }
 
+/**
+ * `signal` lets a caller abandon a request whose answer it no longer wants,
+ * a 7-day response arriving after the operator has already switched to 90.
+ * An aborted call rejects with the platform's AbortError, not an AdminError,
+ * so it can never be mistaken for a panel failure.
+ */
 export async function fetchAdmin<T>(
   action: AdminAction,
   params: Record<string, string | number | boolean | null> = {},
+  signal?: AbortSignal,
 ): Promise<T> {
   const response = await fetch('/api/admin/analytics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...params }),
+    signal,
   });
 
   if (!response.ok) {

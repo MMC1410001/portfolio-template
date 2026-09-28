@@ -106,6 +106,18 @@ jobs:
 #       - name: Unit tests
 #         run: npm run test:units
 #
+#       # The Python half of the answer contract. test_answer_contract replays
+#       # tests/chat-cases.json through faq() with no server, so a guard regex
+#       # that JavaScript accepts and Python's `re` does not fails here rather
+#       # than in a FastAPI deploy nobody is watching.
+#       - uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.12'
+#       - name: Python tests
+#         run: |
+#           pip install -r backend/requirements-lock.txt
+#           python -m unittest discover -s tests -p 'test_*.py'
+#
 #       # Fails on a placeholder database_id, a missing runtime secret, or
 #       # TRUST_PLATFORM_AUTH_HEADER being set — see scripts/preflight-deploy.mjs
 #       # for why each of those deploys "successfully" and then misbehaves.
@@ -117,6 +129,12 @@ jobs:
 #
 #       - name: Build
 #         run: npm run build
+#
+#       # prebuild regenerates backend/knowledge.json from content/*.ts. A diff
+#       # here means a content edit was committed without its sync, and anyone
+#       # running FastAPI from the repo would serve the old answers.
+#       - name: knowledge.json is committed in sync
+#         run: git diff --exit-code backend/knowledge.json
 #
 #       # Migrations before the deploy, not after: the new Worker may read a
 #       # column the old schema lacks, and every statement in migrations/ is

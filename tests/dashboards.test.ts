@@ -17,9 +17,9 @@
 // returns a promise by design and is meant to be called without awaiting;
 // the runner collects and awaits them itself.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { dashboards } from '@/content/dashboards';
+import { dashboards, numberWord } from '@/content/dashboards';
 import { MAX_TAG_LEN } from '@/lib/analytics/events';
 import { normaliseTag } from '@/lib/analytics/normalise';
 import { SECTIONS, SECTION_IDS } from '@/lib/analytics/section-catalogue';
@@ -245,4 +245,65 @@ test('demo rows are internally consistent', () => {
       r.achieved <= r.set,
       `${r.name}: achieved more OKRs than were set`,
     );
+});
+
+test('no copy hard-codes a dashboard count that disagrees with the content', () => {
+  // "Ten dashboards" sat on the homepage, the index and its metadata beside
+  // eleven cards. Counts are read from dashboards.length through numberWord()
+  // now; this catches one being typed back in, in copy or in a comment.
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+  const NUM = `(${WORDS.join('|')}|\\d+)`;
+  const value = (w: string) => (/^\d+$/.test(w) ? Number(w) : WORDS.indexOf(w.toLowerCase()));
+  const patterns = [
+    new RegExp(`\\b${NUM}\\s+(?:(?:operational|delivery)\\s+)?dashboards\\b`, 'gi'),
+    new RegExp(`\\b(?:the|all) ${NUM}\\s+(?:routes|originals|recreations|entries|enumerated slugs|boards)\\b`, 'gi'),
+  ];
+  const files = [
+    'components/portfolio/Portfolio.tsx',
+    'app/dashboards/page.tsx',
+    'app/dashboards/[slug]/page.tsx',
+    'content/dashboards.ts',
+    ...readdirSync(new URL('../components/dashboards/', import.meta.url))
+      .filter((f) => f.endsWith('.tsx'))
+      .map((f) => `components/dashboards/${f}`),
+  ];
+  const wrong: string[] = [];
+  for (const file of files) {
+    const src = read(file);
+    for (const re of patterns)
+      for (const m of src.matchAll(re))
+        if (value(m[1]) !== dashboards.length) wrong.push(`${file}: "${m[0]}"`);
+  }
+  assert.deepEqual(
+    wrong,
+    [],
+    `there are ${dashboards.length} dashboards; use numberWord(dashboards.length) instead of a literal`,
+  );
+  assert.equal(numberWord(11), 'eleven');
+  assert.equal(numberWord(11, true), 'Eleven');
+  assert.equal(numberWord(42), '42');
+});
+
+test('each recreation imports only its own demo data', () => {
+  // DashboardDetail lazy-loads one board per route. A board importing the
+  // content/dashboards-demo barrel would pull every board's rows back into
+  // its chunk, and the split would be undone without any visible symptom.
+  const offenders = readdirSync(new URL('../components/dashboards/', import.meta.url))
+    .filter((f) => f.endsWith('.tsx'))
+    .filter((f) => /from '@\/content\/dashboards-demo'/.test(read(`components/dashboards/${f}`)));
+  assert.deepEqual(offenders, [], 'import from @/content/dashboards-data/<board> instead');
+  assert.match(detail, /lazy\(\(\) => import\(/, 'DashboardDetail must lazy-load each recreation');
+});
+
+test('the sitemap and robots.txt name the host metadataBase names', () => {
+  // A sitemap listing URLs on a different host from the pages' canonical
+  // links is ignored by crawlers, and nothing else would notice.
+  const base = /metadataBase:new URL\('([^']+)'\)/.exec(read('app/layout.tsx'))?.[1];
+  const origin = /export const ORIGIN = '([^']+)'/.exec(read('app/sitemap.ts'))?.[1];
+  assert.ok(base, 'app/layout.tsx no longer sets metadataBase as a literal URL');
+  assert.equal(origin, base);
+  assert.match(read('app/robots.ts'), /from '\.\/sitemap'/);
+  // /admin answers 404 to strangers; neither file may advertise it.
+  assert.doesNotMatch(read('app/sitemap.ts'), /'\/admin/);
+  assert.doesNotMatch(read('app/robots.ts'), /'\/admin/);
 });

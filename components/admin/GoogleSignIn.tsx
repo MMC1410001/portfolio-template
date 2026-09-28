@@ -89,7 +89,7 @@ function loadScript(): Promise<void> {
 export function GoogleSignIn({ clientId }: { clientId: string }) {
   const slot = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<
-    'loading' | 'ready' | 'blocked' | 'denied' | 'rejected'
+    'loading' | 'ready' | 'blocked' | 'denied' | 'rejected' | 'unreachable'
   >('loading');
 
   useEffect(() => {
@@ -109,10 +109,17 @@ export function GoogleSignIn({ clientId }: { clientId: string }) {
           callback: (response) => {
             const credential = response.credential;
             if (!credential) return;
-            void signInWithGoogle(credential).then((outcome) => {
-              if (outcome === 'ok') location.reload();
-              else if (live) setState(outcome === 'not-allowed' ? 'denied' : 'rejected');
-            });
+            // The catch matters: fetch rejects on a network failure, and an
+            // unhandled rejection here left the button looking like it had
+            // done nothing at all.
+            void signInWithGoogle(credential)
+              .then((outcome) => {
+                if (outcome === 'ok') location.reload();
+                else if (live) setState(outcome === 'not-allowed' ? 'denied' : 'rejected');
+              })
+              .catch(() => {
+                if (live) setState('unreachable');
+              });
           },
         });
         api.renderButton(slot.current, {
@@ -154,6 +161,11 @@ export function GoogleSignIn({ clientId }: { clientId: string }) {
         <p className="text-center text-xs text-destructive">
           Google sign-in could not be verified. Check the server log for the
           reason, or use the access token below.
+        </p>
+      ) : null}
+      {state === 'unreachable' ? (
+        <p className="text-center text-xs text-destructive">
+          Could not reach the server. Check your connection and try again.
         </p>
       ) : null}
     </div>

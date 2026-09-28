@@ -49,7 +49,9 @@ export default function PrivacyPage() {
             Positions are stored as a fraction of the page, together with the
             page height they were a fraction of. Clicks that hit nothing, and
             repeated clicks in one spot, are recorded separately. They are how
-            a broken control is spotted.
+            a broken control is spotted. Such a click is named by the element
+            it landed on, and a name that looks like an email address, a long
+            number or a link is replaced before anything is stored.
           </li>
           <li>
             <strong>How far down you scrolled</strong> and the deepest point
@@ -75,7 +77,9 @@ export default function PrivacyPage() {
           <li>
             <strong>Device type, browser and operating system</strong>, worked
             out from the request your browser sends, coarsely, as &ldquo;mobile,
-            Chrome, Android&rdquo;, not a version number.
+            Chrome, Android&rdquo;, not a version number. With each event, the
+            width and height of your browser window in pixels, so a click on a
+            phone and one on a desktop can be placed on the same map.
           </li>
           <li>
             <strong>An approximate location</strong>, city, region and country,
@@ -91,17 +95,31 @@ export default function PrivacyPage() {
             not identify you.
           </li>
         </ul>
+        <p>
+          Each kind of event has a fixed list of the details it may carry.
+          Anything a request sends beyond that list is discarded on arrival
+          rather than stored.
+        </p>
       </section>
 
       <section>
         <h2>Your IP address is not stored</h2>
         <p>
           The server sees it, as every web server must, and then keeps only two
-          things: a one-way salted hash, used to rate-limit abuse and to count
-          distinct visitors, and a coarse network prefix, the first three
-          groups of an address, so <code>203.0.113.47</code> becomes{' '}
-          <code>203.0.113.0/24</code>. The address itself is never written
+          things: a one-way salted hash, used to count distinct visitors, and
+          a coarse network prefix. For an IPv4 address that is the first three
+          parts, so <code>203.0.113.47</code> becomes{' '}
+          <code>203.0.113.0/24</code>; for IPv6 it is the first three groups,
+          so <code>2001:db8:1234:5678::1</code> becomes{' '}
+          <code>2001:0db8:1234::/48</code>. The address itself is never written
           anywhere.
+        </p>
+        <p>
+          Rate limiting uses one more salted hash, of the same address for
+          IPv4 and of its <code>/64</code> network for IPv6, because one home
+          or phone connection is usually given a whole <code>/64</code>. It
+          sits beside a per-minute counter and is deleted at the next daily
+          clean-up.
         </p>
       </section>
 
@@ -113,7 +131,8 @@ export default function PrivacyPage() {
           answer and write those answers.
         </p>
         <p>
-          Before anything is stored, the text is screened. Anything containing
+          Before anything is stored, the text is screened, in your browser and
+          again on the server. Anything containing
           an email address, a long run of digits, or a link is discarded{' '}
           <em>whole</em> rather than edited. A partly-redacted question still
           reads like a real one, and nobody would notice what it had been. When

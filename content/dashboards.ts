@@ -2,16 +2,17 @@
  * The operational dashboards Alex built at Northwind, for `/dashboards`.
  *
  * ── Everything here is sanitised, and that is not a style choice ───────────
- * Nine of the ten originals are Google Apps Script web apps deployed under the
- * `northwind.example` Workspace domain, backed by Google Sheets; the tenth is a page
- * inside the Northwind ERP. Two consequences shape this file:
+ * Most of the originals are Google Apps Script web apps deployed under the
+ * `northwind.example` Workspace domain, backed by Google Sheets; the OKR dashboard
+ * is a page inside the Northwind ERP and the uptime board is an Uptime Kuma
+ * instance. Two consequences shape this file:
  *
  *  - **No URLs, ever.** An Apps Script `/macros/northwind.example/s/<id>/exec` link
  *    and a `docs.google.com/spreadsheets/d/<id>` link are internal URLs
  *    carrying a deployment id and a spreadsheet id. They are also useless to a
  *    visitor: fetched anonymously, every one of them returns a Google account
  *    chooser, not a dashboard. Publishing them would leak internal identifiers
- *    in exchange for ten dead links.
+ *    in exchange for a card full of dead links.
  *  - **No client names.** `client` is a positional label, "Enterprise client
  *    A", assigned here and nowhere else. The sector is omitted too, because
  *    naming the industry of a dashboard titled "effort utilisation and
@@ -67,12 +68,12 @@ export interface Dashboard {
 }
 
 /**
- * Verified from the source workbook: nine of the ten entries are Apps Script
- * web apps whose datastore is a Google Sheet, served through HTML Service and
- * gated by Workspace sign-in. Anything beyond that, charting library, trigger
- * schedule, is per-dashboard and belongs in `stack` only once confirmed. The
- * OKR dashboard is the exception and carries its own stack entirely; it is a
- * page inside the ERP, not a script deployment.
+ * Verified from the source workbook: every entry that spreads this is an Apps
+ * Script web app whose datastore is a Google Sheet, served through HTML Service
+ * and gated by Workspace sign-in. Anything beyond that, charting library,
+ * trigger schedule, is per-dashboard and belongs in `stack` only once
+ * confirmed. The OKR dashboard (a page inside the ERP) and the uptime board (an
+ * Uptime Kuma instance) are the exceptions and carry their own stacks entirely.
  */
 export const DASHBOARD_BASE_STACK = [
   'Google Apps Script',
@@ -243,3 +244,18 @@ export const dashboards: Dashboard[] = [
     status: 'active',
   },
 ];
+
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+
+/**
+ * A count spelled out for prose, digits past twenty.
+ *
+ * Copy that says how many dashboards there are reads the number from here,
+ * from `dashboards.length`, never from a literal. The literal went stale:
+ * the homepage, the index and its metadata all said Ten beside eleven cards.
+ * `tests/dashboards.test.ts` fails if a spelled-out count comes back.
+ */
+export function numberWord(n: number, capital = false): string {
+  const word = NUMBER_WORDS[n] ?? String(n);
+  return capital ? word[0].toUpperCase() + word.slice(1) : word;
+}

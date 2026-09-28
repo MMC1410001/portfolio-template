@@ -23,6 +23,8 @@
     "typeCheck": true
   },
   "ignorePatterns": [
+    ".claude/**",
+    ".agents/**",
     ".next/**",
     ".vinext/**",
     "out/**",

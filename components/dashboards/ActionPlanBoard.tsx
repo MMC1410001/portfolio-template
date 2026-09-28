@@ -27,7 +27,7 @@ import {
   actionPlanRows,
   type TaskRow,
   type TaskStatus,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/action-plan';
 import {
   AvatarChip,
   BarRow,
@@ -70,8 +70,8 @@ function Dates({ range }: { range: [string, string | null] }) {
     <>
       <span className="block">{range[0]}</span>
       <span className="block">
-        <span className="text-[#9ca3af]">→ </span>
-        {range[1] ?? <span className="text-[#9ca3af] italic">running</span>}
+        <span className="text-[#6b7280]">→ </span>
+        {range[1] ?? <span className="text-[#6b7280] italic">running</span>}
       </span>
     </>
   );
@@ -185,7 +185,7 @@ export function ActionPlanBoard() {
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-[#111827]">{p}</span>
-                <span className="block text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">
+                <span className="block text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">
                   {state === 'done' ? 'Completed' : state === 'now' ? 'In progress' : 'Not started'}
                 </span>
               </span>
@@ -248,8 +248,8 @@ export function ActionPlanBoard() {
           onQuery={setQuery}
           placeholder="Search by Sr. No, task, owner..."
           selects={[
-            { value: status, onChange: setStatus, options: ['All statuses', ...STATUSES.map((s) => s.status)] },
-            { value: owner, onChange: setOwner, options: ['All owners', ...owners.map(([n]) => n)] },
+            { label: 'Status', value: status, onChange: setStatus, options: ['All statuses', ...STATUSES.map((s) => s.status)] },
+            { label: 'Owner', value: owner, onChange: setOwner, options: ['All owners', ...owners.map(([n]) => n)] },
           ]}
           count={
             <>
@@ -277,7 +277,7 @@ export function ActionPlanBoard() {
                   key={r.sr}
                   className={`border-b border-[#f3f4f6] align-top ${r.status === 'Completed' ? 'bg-emerald-50/40' : ''} hover:bg-[#fafbfd]`}
                 >
-                  <td className={`px-3 py-3 text-sm font-semibold tabular-nums ${r.sr.includes('.') ? 'pl-6 text-[#9ca3af]' : 'text-indigo-600'}`}>{r.sr}</td>
+                  <td className={`px-3 py-3 text-sm font-semibold tabular-nums ${r.sr.includes('.') ? 'pl-6 text-[#6b7280]' : 'text-indigo-600'}`}>{r.sr}</td>
                   <td className="px-3 py-3 text-sm text-[#111827]">{r.task}</td>
                   <td className="px-3 py-3 text-sm tabular-nums text-[#374151]">{r.hrs}</td>
                   <td className="px-3 py-3 text-xs font-medium text-[#374151]"><Dates range={r.tentative} /></td>
@@ -293,7 +293,7 @@ export function ActionPlanBoard() {
           </table>
         </div>
         {rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[#9ca3af]">No tasks match those filters.</p>
+          <p className="py-10 text-center text-sm text-[#6b7280]">No tasks match those filters.</p>
         ) : null}
       </Panel>
 

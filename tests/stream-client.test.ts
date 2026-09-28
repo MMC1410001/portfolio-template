@@ -64,7 +64,7 @@ test('a multi-byte character straddling a chunk survives', async () => {
   // Devanagari makes this the common case, not the exotic one: the answer is
   // three bytes per character and the boundary lands mid-character often.
   const text = 'मयूर ने Northwind में';
-  const whole = frame('delta', { text }) + frame('done', { answer: text });
+  const whole = frame('delta', { text }) + frame('done', { answer: text, source: 'AI · grounded in portfolio' });
   const bytes = new TextEncoder().encode(whole);
   const cut = 20; // deliberately inside a character
   const halves = [bytes.slice(0, cut), bytes.slice(cut)];
@@ -85,9 +85,9 @@ test('a multi-byte character straddling a chunk survives', async () => {
 test('the terminal frame is returned, and says which kind it was', async () => {
   const done = await collect([frame('delta', { text: 'hi' }), frame('done', { answer: 'hi', source: 'AI' })]);
   assert.equal(done.outcome?.kind, 'done');
-  assert.deepEqual(done.outcome?.payload, { answer: 'hi', source: 'AI' });
+  assert.deepEqual(done.outcome?.payload, { answer: 'hi', source: 'AI', mode: 'faq' });
 
-  const fell = await collect([frame('delta', { text: 'part' }), frame('fallback', { answer: 'approved' })]);
+  const fell = await collect([frame('delta', { text: 'part' }), frame('fallback', { answer: 'approved', source: 'From the portfolio' })]);
   assert.equal(fell.outcome?.kind, 'fallback');
   // The deltas still fired; the caller is what replaces them.
   assert.equal(fell.text, 'part');
@@ -102,9 +102,21 @@ test('a body that ends without a terminal frame returns null', async () => {
 test('an empty delta does not count as the first token', async () => {
   // Otherwise a keep-alive would disarm the watchdog and a stream that never
   // says anything would hang until the total ceiling instead of falling back.
-  const { text, outcome } = await collect([frame('delta', { text: '' }), frame('fallback', { answer: 'x' })]);
+  const { text, outcome } = await collect([frame('delta', { text: '' }), frame('fallback', { answer: 'x', source: 'From the portfolio' })]);
   assert.equal(text, '');
   assert.equal(outcome?.kind, 'fallback');
+});
+
+test('a terminal frame with no answer text is no outcome at all', async () => {
+  // The panel used to cast this payload straight to Answer, so a frame
+  // without an answer string threw on `.slice()` inside the success path.
+  // Null sends it to the offline answer instead.
+  for (const data of [{ source: 'AI · grounded in portfolio' }, { answer: 42, source: 'x' }, { answer: 'hi' }]) {
+    const { outcome } = await collect([frame('delta', { text: 'hi' }), frame('done', data)]);
+    assert.equal(outcome, null, `payload ${JSON.stringify(data)} must not be rendered`);
+  }
+  const { outcome } = await collect([frame('fallback', { answer: 'approved', source: 'From the portfolio', ids: ['about', 7] })]);
+  assert.deepEqual(outcome?.payload, { answer: 'approved', source: 'From the portfolio', mode: 'faq', ids: ['about'] });
 });
 
 test('the pacer always drains, and never stalls', () => {

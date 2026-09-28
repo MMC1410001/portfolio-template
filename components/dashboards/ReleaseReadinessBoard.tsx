@@ -27,9 +27,10 @@ import {
   readinessRows,
   READINESS_TOTAL,
   type ReadinessRow,
-  type Severity,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/readiness';
+import type { Severity } from '@/content/dashboards-data/common';
 import { Donut, HBars, Legend, SEVERITY_COLOR, STATE_COLOR } from './charts';
+import { FilterBar, Panel } from './primitives';
 import { DashNote, RailShell, type RailItem } from './shell';
 
 type View = 'dashboard' | 'analytics' | 'risk';
@@ -101,25 +102,14 @@ function Tile({
   color: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-[#e4e8f0] bg-white">
+    <div className="overflow-hidden rounded-xl border border-[#e9ecf4] bg-white">
       <div className="p-4">
         <p className="text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">{label}</p>
         <p className="mt-1 text-3xl font-bold text-[#111827] tabular-nums">{value}</p>
-        <p className="text-xs text-[#9ca3af]">{note}</p>
+        <p className="text-xs text-[#6b7280]">{note}</p>
       </div>
       <span className="block h-1" style={{ background: color }} />
     </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl border border-[#e4e8f0] bg-white p-5">
-      <h4 className="mb-4 text-xs font-semibold tracking-[.08em] text-[#6b7280] uppercase">
-        {title}
-      </h4>
-      {children}
-    </section>
   );
 }
 
@@ -212,24 +202,24 @@ export function ReleaseReadinessBoard() {
 
   const charts = (
     <div className="grid gap-5 lg:grid-cols-3">
-      <Card title="By severity">
+      <Panel outline title="By severity">
         <div className="flex flex-col items-center gap-4">
           <Donut segments={bySeverity} size={150} />
           <Legend inline segments={bySeverity} />
         </div>
-      </Card>
-      <Card title="By priority">
+      </Panel>
+      <Panel outline title="By priority">
         <HBars data={byPriority} labelWidth="w-28" />
-      </Card>
-      <Card title="By QA status">
+      </Panel>
+      <Panel outline title="By QA status">
         <div className="flex flex-col items-center gap-4">
           <Donut segments={byQa} size={150} />
           <Legend inline segments={byQa} />
         </div>
-      </Card>
-      <Card title="By module">
+      </Panel>
+      <Panel outline title="By module">
         <HBars data={byModule} labelWidth="w-28" />
-      </Card>
+      </Panel>
     </div>
   );
 
@@ -278,57 +268,26 @@ export function ReleaseReadinessBoard() {
 
         {view === 'dashboard' ? (
           <>
-            <section className="mb-5 rounded-xl border border-[#e4e8f0] bg-white p-4">
+            <section className="mb-5 rounded-xl border border-[#e9ecf4] bg-white p-4">
               <p className="mb-3 text-xs font-semibold tracking-[.08em] text-[#6b7280] uppercase">
                 Filters
               </p>
-              <div className="flex flex-wrap items-end gap-3">
-                <label className="min-w-50 flex-1">
-                  <span className="mb-1 block text-[11px] font-semibold text-[#9ca3af]">Search</span>
-                  <input
-                    value={query}
-                    onChange={(ev) => setQuery(ev.target.value)}
-                    placeholder="Search bug ID, summary..."
-                    className="w-full rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm outline-none placeholder:text-[#9ca3af] focus:border-teal-500"
-                  />
-                </label>
-                <label>
-                  <span className="mb-1 block text-[11px] font-semibold text-[#9ca3af]">Severity</span>
-                  <select
-                    value={severity}
-                    onChange={(ev) => setSeverity(ev.target.value)}
-                    className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm outline-none focus:border-teal-500"
-                  >
-                    {['All', ...SEVERITIES].map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span className="mb-1 block text-[11px] font-semibold text-[#9ca3af]">Module</span>
-                  <select
-                    value={module}
-                    onChange={(ev) => setModule(ev.target.value)}
-                    className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm outline-none focus:border-teal-500"
-                  >
-                    {['All', ...modules].map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuery('');
-                    setSeverity('All');
-                    setModule('All');
-                    setPreset('all');
-                  }}
-                  className="rounded-lg bg-[#5b4bd0] px-4 py-2 text-sm font-medium text-white hover:bg-[#4c3fb8]"
-                >
-                  ↺ Reset
-                </button>
-              </div>
+              <FilterBar
+                labelled
+                query={query}
+                onQuery={setQuery}
+                placeholder="Search bug ID, summary..."
+                selects={[
+                  { label: 'Severity', value: severity, onChange: setSeverity, options: ['All', ...SEVERITIES] },
+                  { label: 'Module', value: module, onChange: setModule, options: ['All', ...modules] },
+                ]}
+                onReset={() => {
+                  setQuery('');
+                  setSeverity('All');
+                  setModule('All');
+                  setPreset('all');
+                }}
+              />
             </section>
             {charts}
           </>
@@ -338,7 +297,7 @@ export function ReleaseReadinessBoard() {
 
         {view === 'risk' ? (
           <div className="grid gap-5 lg:grid-cols-2">
-            <Card title="How the call is made">
+            <Panel outline title="How the call is made">
               <ol className="space-y-3 text-sm text-[#374151]">
                 <li className="flex gap-3">
                   <span className="grid size-6 shrink-0 place-items-center rounded-full bg-red-100 text-xs font-bold text-red-700">1</span>
@@ -357,11 +316,11 @@ export function ReleaseReadinessBoard() {
                   Otherwise → <strong>GO</strong>.
                 </li>
               </ol>
-              <p className="mt-4 border-t border-[#f3f4f6] pt-3 text-xs text-[#9ca3af]">
+              <p className="mt-4 border-t border-[#f3f4f6] pt-3 text-xs text-[#6b7280]">
                 Records marked invalid are excluded from every step: they were raised, triaged and rejected, and they stay in the table as evidence that triage happened.
               </p>
-            </Card>
-            <Card title="Against this log">
+            </Panel>
+            <Panel outline title="Against this log">
               <ul className="space-y-2.5 text-sm">
                 {[
                   ['Open critical', readinessRows.filter((r) => isOpen(r) && r.severity === 'Critical').length, '#dc2626'],
@@ -378,11 +337,11 @@ export function ReleaseReadinessBoard() {
                   </li>
                 ))}
               </ul>
-            </Card>
+            </Panel>
           </div>
         ) : null}
 
-        <section className="mt-5 rounded-xl border border-[#e4e8f0] bg-white p-5">
+        <section className="mt-5 rounded-xl border border-[#e9ecf4] bg-white p-5">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <h4 className="text-xs font-semibold tracking-[.08em] text-[#6b7280] uppercase">Bug records</h4>
             <span className="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-xs font-semibold text-[#4b5563] tabular-nums">
@@ -394,7 +353,7 @@ export function ReleaseReadinessBoard() {
               <thead>
                 <tr className="border-b border-[#eef1f7]">
                   {['Bug ID', 'Summary', 'Severity', 'Priority', 'Module', 'Dev status', 'QA status'].map((h) => (
-                    <th key={h} scope="col" className="px-3 py-3 text-left text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">
+                    <th key={h} scope="col" className="px-3 py-3 text-left text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">
                       {h}
                     </th>
                   ))}
@@ -427,7 +386,7 @@ export function ReleaseReadinessBoard() {
             </table>
           </div>
           {rows.length === 0 ? (
-            <p className="py-10 text-center text-sm text-[#9ca3af]">No bugs match those filters.</p>
+            <p className="py-10 text-center text-sm text-[#6b7280]">No bugs match those filters.</p>
           ) : null}
         </section>
       </RailShell>

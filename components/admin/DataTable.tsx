@@ -108,7 +108,10 @@ export function DataTable<T>({
                       type="button"
                       onClick={() => toggle(col.key)}
                       className="inline-flex items-center gap-1 hover:text-foreground"
-                      aria-label={`Sort by ${col.sortLabel ?? col.key}`}
+                      // The visible heading first, so the accessible name
+                      // contains what a sighted user reads; `key` is an
+                      // internal id ("last", "where") and only the last resort.
+                      aria-label={`Sort by ${typeof col.label === 'string' ? col.label : col.sortLabel ?? col.key}`}
                     >
                       {col.label}
                       <span aria-hidden="true" className="text-[9px]">

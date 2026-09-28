@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, ArrowUpRight, Send, Sparkles, Volume2, Square, User, X } from 'lucide-react';
 import { Sheet,SheetTrigger,SheetContent,SheetHeader,SheetTitle,SheetDescription } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
-import { answerQuestion,type Answer } from '@/content/faq';
+import { answerQuestion,GUARD_SOURCES,type Answer } from '@/content/faq';
 import { profile } from '@/content/portfolio';
 import { trackChatOpen, trackChatAsk, trackChatAnswer, trackChatClose, classifyFailure, type ChatFailure } from '@/lib/analytics/chat';
 import { pickVoice, speakable, speechFailureHint } from '@/lib/chat/speech-text';
+import { TURN_CHARS } from '@/lib/chat/turn-sig';
 import { nextKey, trimTranscript } from '@/lib/chat/session';
 import { paceChars, readChatStream } from '@/lib/chat/stream-client';
 import { linkLabel, linkSegments } from '@/lib/chat/linkify';
@@ -34,6 +35,15 @@ const MAX_QUESTION=500;
 // Where the counter appears. Far enough back to be a warning, close enough
 // that it is not decoration on a normal question.
 const COUNTER_FROM=420;
+// How long the panel waits for the response HEADERS, not for the answer. The
+// JSON path sends no headers until the whole reply is composed, so for it this
+// is the whole budget, and lib/chat/nim.ts's TOTAL_BUDGET_MS is held under it
+// (tests/chat-contracts.test.ts). The streaming path sends headers at once and
+// is then held to the 12s first-token watchdog below. Without this ceiling
+// that watchdog was the only clock, and it starts only once headers arrive, so
+// a Worker that accepted the connection and never answered left the panel
+// waiting with no deadline at all.
+const HEADER_CEILING_MS=8500;
 const RESET_NOTE='New thread. The last conversation timed out after ten minutes of quiet, so this question is answered on its own.';
 // No `onOpen` hook any more, and its absence is the point. It used to call
 // setAutoplay(false) in Portfolio.tsx, which does not pause the three-second
@@ -45,13 +55,13 @@ const RESET_NOTE='New thread. The last conversation timed out after ten minutes 
 // principle, having been through this once for scrolling and reading — only
 // a hidden tab pauses the clock.
 export default function Chat() {
- const [open,setOpen]=useState(false);const [messages,setMessages]=useState<Message[]>([{key:0,role:'assistant',text:'Hi there. I’m Alex’s portfolio guide. Ask me about his AI projects, skills, certifications, or engineering experience.',source:'Answers from the portfolio'}]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const [slow,setSlow]=useState(false);const [writingKey,setWritingKey]=useState<number|null>(null);const [notice,setNotice]=useState<string|null>(null);const inputRef=useRef<HTMLInputElement>(null);const lastReply=useRef<HTMLDivElement>(null);const box=useRef<HTMLDivElement>(null);const inflight=useRef<AbortController|null>(null);
+ const [open,setOpen]=useState(false);const [messages,setMessages]=useState<Message[]>([{key:0,role:'assistant',text:'Hi there. I’m Alex’s portfolio guide. Ask me about his AI projects, skills, certifications, or engineering experience.',source:'Answers from the portfolio'}]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const [streaming,setStreaming]=useState(false);const [slow,setSlow]=useState(false);const [writingKey,setWritingKey]=useState<number|null>(null);const [notice,setNotice]=useState<string|null>(null);const inputRef=useRef<HTMLInputElement>(null);const lastReply=useRef<HTMLDivElement>(null);const box=useRef<HTMLDivElement>(null);const inflight=useRef<AbortController|null>(null);
  // The chat is stateless on the server, so the client is what remembers.
  // Four turns is enough for a follow-up chain to resolve a pronoun without
  // shipping a whole session; `carriedRef` holds the answer ids the last
  // reply drew on, which is what keeps "why wasn't this production?" on the
  // thing it is asking about. See lib/chat/nim.ts.
- const historyRef=useRef<{role:'user'|'assistant';text:string}[]>([]);const carriedRef=useRef<string[]>([]);
+ const historyRef=useRef<{role:'user'|'assistant';text:string;sig?:string}[]>([]);const carriedRef=useRef<string[]>([]);
  // Ten minutes of silence ends the conversation. Nothing server-side ends,
  // because nothing server-side began: what ends is the context above, and
  // the visitor being told so. See hooks/use-idle.ts.
@@ -99,7 +109,12 @@ export default function Chat() {
  // back down every time a word arrives.
  const written=messages.at(-1)?.text.length??0;
  useEffect(()=>{const el=box.current;if(!el)return;if(el.scrollHeight-el.scrollTop-el.clientHeight<140)el.scrollTop=el.scrollHeight},[written]);
- async function send(text:string,promptIndex:number|null=null){const question=text.trim();if(!question||busy)return;if(question.length>MAX_QUESTION){setNotice(`That question is ${question.length-MAX_QUESTION} characters over the ${MAX_QUESTION} limit. Please shorten it and send again.`);inputRef.current?.focus();return;}
+ // `busy` ends at the first token, because from there the thinking line is
+ // replaced by the reply being written. `streaming` covers the rest, until the
+ // terminal frame: without it a second question could be sent mid-reply, two
+ // requests raced for one transcript, and the Stop button vanished while the
+ // first was still arriving.
+ async function send(text:string,promptIndex:number|null=null){const question=text.trim();if(!question||busy||streaming)return;if(question.length>MAX_QUESTION){setNotice(`That question is ${question.length-MAX_QUESTION} characters over the ${MAX_QUESTION} limit. Please shorten it and send again.`);inputRef.current?.focus();return;}
   // Read the clock before restarting it. A lapsed session drops the context
   // rather than carrying an hour-old pronoun into the prompt. `historyRef` is
   // the second half of the condition and not a formality: a panel left open
@@ -118,11 +133,24 @@ export default function Chat() {
   // Queued before the await: a question asked moments before the tab closes
   // is still recorded, and the pagehide beacon carries it.
   const {startedAt}=trackChatAsk(question,promptIndex,turn.current);
-  historyRef.current=[...historyRef.current,{role:'user' as const,text:question}].slice(-8);
-  let result:Answer;let offline=false;let failure:ChatFailure=null;let status:number|undefined;
-  // Two ways to stop: the 8.5s ceiling, and the visitor pressing stop. Both
-  // land in the same catch, and both are meant to: an abandoned question
-  // still gets the offline answer rather than leaving the panel stuck busy.
+  // The question joins the history only once it has been answered, and only
+  // when a guard did not answer it. Sent before the reply, it went out as the
+  // last "prior" turn of its own request, so every first question looked
+  // mid-conversation to /api/chat. Kept after a guard, a refused question
+  // came back as context on the next one. Trim the assistant turn: the model
+  // needs the thread of the conversation, not a verbatim transcript, and a
+  // 1200-character answer in every subsequent prompt is most of the context
+  // window spent on itself.
+  const prior=historyRef.current.slice(-4);
+  // The reply is kept to TURN_CHARS because that is exactly what the server
+  // signed; `sig` goes back with it, and a reply without one (answered
+  // locally) is dropped server-side. See lib/chat/turn-sig.ts.
+  const remember=(reply:string,guarded:boolean,sig?:string)=>{if(!guarded)historyRef.current=[...historyRef.current,{role:'user' as const,text:question},{role:'assistant' as const,text:reply.slice(0,TURN_CHARS),...(sig?{sig}:{})}].slice(-8)};
+  let result:Answer;let offline=false;let failure:ChatFailure=null;let status:number|undefined;let guarded=false;
+  // Three ways to stop: the header ceiling, the first-token watchdog, and the
+  // visitor pressing stop. All land in the same catch, and are meant to: an
+  // abandoned question still gets the offline answer rather than leaving the
+  // panel stuck busy. The reason on the signal is what labels it.
   const controller=new AbortController();inflight.current=controller;
   // Minted before the request so the streamed placeholder and the finished
   // reply are the same message rather than two.
@@ -130,7 +158,8 @@ export default function Chat() {
   // A model reply is written, not looked up, and takes seconds. Saying so
   // after four of them is the difference between a wait and a hang.
   const slowTimer=setTimeout(()=>setSlow(true),4000);
-  try{const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({message:question,history:historyRef.current.slice(-4),carried:carriedRef.current,stream:true}),signal:controller.signal});if(!response.ok){status=response.status;throw new Error('status')}
+  const headerTimer=setTimeout(()=>controller.abort('slow'),HEADER_CEILING_MS);
+  try{const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({message:question,history:prior,carried:carriedRef.current,stream:true}),signal:controller.signal});clearTimeout(headerTimer);if(!response.ok){status=response.status;throw new Error('status')}
    if(response.headers.get('content-type')?.includes('text/event-stream')&&response.body){
     // The reply is being written. Put an empty assistant turn on screen now
     // so the words have somewhere to land, and grow it as they arrive.
@@ -161,16 +190,16 @@ export default function Chat() {
     const outcome=await readChatStream(response.body,text=>{
      // The turn is created by the first token, not before it: until then
      // the thinking line is the honest thing to show.
-     clearTimeout(slowTimer);setBusy(false);setSlow(false);setWritingKey(replyKey);
+     clearTimeout(slowTimer);setBusy(false);setStreaming(true);setSlow(false);setWritingKey(replyKey);
      pending+=text;
      if(!pumping){pumping=true;requestAnimationFrame(pump)}},{
-     // 12s, where the non-streaming path had 8.5s, and the increase is the
-     // point of streaming rather than a regression of it. Measured
-     // time-to-first-token varies 3.3s to 19s, and this is a ceiling before
-     // giving up, not a typical wait: the thinking line says "still working
-     // on it" from 4s, and the moment a token lands the visitor is reading
-     // rather than waiting. Passing it costs them the curated answer they
-     // would have had at 8.5s anyway.
+     // 12s, where the headers had 8.5s, and the increase is the point of
+     // streaming rather than a regression of it. Measured time-to-first-token
+     // varies 3.3s to 19s, and this is a ceiling before giving up, not a
+     // typical wait: the thinking line says "still working on it" from 4s,
+     // and the moment a token lands the visitor is reading rather than
+     // waiting. Passing it costs them the curated answer they would have had
+     // at 8.5s anyway.
      firstTokenMs:12000,abort:()=>controller.abort('slow')});
     if(outcome){
      // Clearing these here and not only in onDelta is the whole fix for a
@@ -178,16 +207,17 @@ export default function Chat() {
      // busy and slow true, so the approved answer appeared UNDERNEATH
      // "Still working on it" with the stop button still live.
      finished=true;pending='';
-     clearTimeout(slowTimer);setBusy(false);setSlow(false);setWritingKey(null);
+     clearTimeout(slowTimer);setBusy(false);setStreaming(false);setSlow(false);setWritingKey(null);
      // 'fallback' is every check in lib/chat/nim.ts that cannot pass on a
      // partial reply: whatever was shown is replaced by the approved text.
-     const settled=outcome.payload as unknown as Answer;
+     // readChatStream has already checked the payload has text to show.
+     const settled=outcome.payload;
      setMessages(m=>m.some(entry=>entry.key===replyKey)
       ?m.map(entry=>entry.key===replyKey?{...entry,text:settled.answer,href:settled.href,source:settled.source}:entry)
       :trimTranscript([...m,{key:replyKey,role:'assistant' as const,text:settled.answer,href:settled.href,source:settled.source}]));
      inflight.current=null;touchSession();
-     historyRef.current=[...historyRef.current,{role:'assistant' as const,text:settled.answer.slice(0,320)}].slice(-8);
-     carriedRef.current=Array.isArray(settled.ids)?settled.ids.slice(0,4):[];
+     remember(settled.answer,GUARD_SOURCES.includes(settled.source),settled.sig);
+     carriedRef.current=settled.ids?settled.ids.slice(0,4):[];
      answered.current+=1;lastSource.current=settled.source;
      trackChatAnswer({source:settled.source,mode:settled.mode,offline:false,failure:null,status,startedAt,hasHref:Boolean(settled.href),answerLen:settled.answer.length,turn:turn.current});
      inputRef.current?.focus();return;
@@ -195,25 +225,27 @@ export default function Chat() {
     // No terminal frame: nothing started in time, or the connection died.
     // Drop the placeholder and take the offline path below.
     finished=true;pending='';
-    setMessages(m=>m.filter(entry=>entry.key!==replyKey));clearTimeout(slowTimer);setSlow(false);setWritingKey(null);setBusy(true);
+    setMessages(m=>m.filter(entry=>entry.key!==replyKey));clearTimeout(slowTimer);setSlow(false);setWritingKey(null);setStreaming(false);setBusy(true);
     throw new Error('stream');
    }
-   result=await response.json()}catch(error){failure=classifyFailure(error);offline=true;result=answerQuestion(question);
+   result=await response.json();guarded=GUARD_SOURCES.includes(result.source)}catch(error){clearTimeout(headerTimer);failure=classifyFailure(error);offline=true;result=answerQuestion(question);
+   // Read before the relabel below, which overwrites the source it is read from.
+   guarded=GUARD_SOURCES.includes(result.source);
    // A refused request is not an offline one, and saying "Offline" when the
    // visitor is plainly online teaches them the label means nothing. The
    // answer served is the same curated text either way; only the reason
-   // differs, and the reason is the part worth being honest about.
+   // differs, and the reason is the part worth being honest about. 'slow' is
+   // either clock giving up, the header ceiling or the first-token watchdog:
+   // the Worker was reachable and simply did not answer in time.
    if(controller.signal.reason==='user')result.source='Stopped · from the portfolio';
+   else if(controller.signal.reason==='slow'){result.source='Timed out · from the portfolio';failure='timeout'}
    else if(status===429){result.source='Rate limited · from the portfolio';setNotice('That is faster than the guide can answer. Give it about a minute — these replies still come from the portfolio.')}
    else result.source='Offline · from the portfolio'}
   // The ten minutes runs from the reply, not the question: reading a long
   // answer is not being idle.
-  clearTimeout(slowTimer);setSlow(false);setWritingKey(null);
+  clearTimeout(slowTimer);setSlow(false);setWritingKey(null);setStreaming(false);
   touchSession();
-  // Trim the assistant turn: the model needs the thread of the conversation,
-  // not a verbatim transcript, and a 1200-character answer in every
-  // subsequent prompt is most of the context window spent on itself.
-  historyRef.current=[...historyRef.current,{role:'assistant' as const,text:result.answer.slice(0,320)}].slice(-8);
+  remember(result.answer,guarded,offline?undefined:result.sig);
   carriedRef.current=Array.isArray(result.ids)?result.ids.slice(0,4):[];
   answered.current+=1;lastSource.current=result.source;
   trackChatAnswer({source:result.source,mode:result.mode,offline,failure,status,startedAt,hasHref:Boolean(result.href),answerLen:result.answer.length,turn:turn.current});
@@ -225,5 +257,11 @@ export default function Chat() {
  // non-modal dialog closes on an outside press by default, which would shut
  // the panel the instant they clicked the thing they opened it to ask about.
  // Escape and the close button remain the ways out.
- return <Sheet open={open} modal={false} disablePointerDismissal onOpenChange={value=>{setOpen(value);if(value){touchSession();openedAt.current=trackChatOpen('launcher')}else {stopSpeaking();trackChatClose({asked:asked.current,answered:answered.current,openedAt:openedAt.current,lastSource:lastSource.current})}}}><SheetTrigger data-track-tag="chat-open" data-track-cta="chat-open" className="chat-launcher"><MessageCircle size={19}/><span>Ask about Alex</span><span className="chat-dot"/></SheetTrigger><SheetContent showOverlay={false} className="chat-panel"><SheetHeader className="chat-header"><div className="assistant-symbol"><Sparkles size={23}/></div><SheetTitle>Meet the mind behind the work.</SheetTitle><SheetDescription>Portfolio guide · answers from documented work</SheetDescription></SheetHeader><div ref={box} className="chat-messages" role="log" aria-label="Conversation">{messages.map(m=>{if(m.role==='system')return <p key={m.key} className="chat-divider">{m.text}</p>;const id=`m${m.key}`;const live=speakingId===id;return <div key={m.key} ref={m.key===messages.at(-1)?.key&&m.role==='assistant'?lastReply:undefined} className={`message message-${m.role}`}>{m.role==='assistant'?<span className="message-label"><img className={`message-avatar${live?' is-speaking':''}`} src={profile.avatar} width={26} height={26} alt="" decoding="async" loading="lazy"/>ALEX’S PORTFOLIO</span>:<span className="message-label"><span className="message-avatar message-avatar-you" aria-hidden="true"><User size={14}/></span>YOU</span>}<p>{linkSegments(m.text).map((part,at)=>part.href?<a key={at} className="msg-link" href={part.href} target="_blank" rel="noreferrer">{linkLabel(part.href)}<ArrowUpRight size={11}/></a>:<span key={at}>{part.text}</span>)}{m.key===writingKey&&<span className="writing" aria-hidden="true"/>}</p>{m.href&&<a data-track-tag="chat-source-link" href={m.href} target="_blank" rel="noreferrer">View source <ArrowUpRight size={13}/></a>}{m.role==='assistant'&&<span className="message-foot">{m.source&&<small>{m.source}</small>}{canSpeak&&<button type="button" data-track-tag="chat-speak" className={`msg-speak${live?' is-speaking':''}`} onClick={()=>{touchSession();toggleVoice(id,speakable(m.text))}} aria-label={live?'Stop reading this answer':'Read this answer aloud'} title={live?'Stop':'Read aloud'}>{live?<Square size={11}/>:<Volume2 size={13}/>}<span>{live?'Stop':'Listen'}</span></button>}</span>}</div>})}{busy&&<output aria-live="off" className="thinking">{slow?'Still working on it — this one is being written rather than looked up':'Finding that in the portfolio'}<span className="dots" aria-hidden="true"><i/><i/><i/></span></output>}{notice&&<output aria-live="off" className="thinking">{notice}</output>}{expired&&messages.length>1&&<output aria-live="off" className="thinking">This conversation has been quiet for ten minutes, so it has ended. Your next question starts a fresh thread.</output>}{speechBroken&&<output aria-live="off" className="thinking">{speechFailureHint(navigator.userAgent)}</output>}</div><div className="chat-bottom">{(messages.length===1||expired)&&<div className="chat-suggestions">{prompts.map((p,i)=><button key={p} data-track-tag={`chat-suggestion-${i}`} onClick={()=>send(p,i)}>{p}<ArrowUpRight size={13}/></button>)}</div>}<form onSubmit={e=>{e.preventDefault();void send(input)}}><label htmlFor="chat-input" className="sr-only">Your question about Alex</label><Input ref={inputRef} id="chat-input" value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask about my work…" readOnly={busy} aria-busy={busy} aria-invalid={tooLong||undefined} aria-describedby={tooLong?'chat-input-error':input.length>=COUNTER_FROM?'chat-input-count':undefined}/>{busy?<button type="button" data-track-tag="chat-stop" onClick={()=>inflight.current?.abort('user')} aria-label="Stop this question" title="Stop"><X size={18}/></button>:<button data-track-tag="chat-send" type="submit" disabled={!input.trim()||tooLong} aria-label="Send question"><Send size={18}/></button>}</form>{tooLong?<p id="chat-input-error" className="chat-invalid" role="alert">{input.length-MAX_QUESTION} characters over the {MAX_QUESTION} limit. Shorten the question to send it.</p>:input.length>=COUNTER_FROM?<p id="chat-input-count" className="chat-count">{MAX_QUESTION-input.length} characters left</p>:null}<div className="chat-footnote"><span>Grounded in Alex’s published work.</span><a data-track-tag="chat-email" href={`mailto:${profile.email}`}>Email Alex <ArrowUpRight size={11}/></a></div></div></SheetContent></Sheet>
+ //
+ // `data-track-private` on the transcript: it holds the visitor's own words,
+ // and the click tracker skips text inside it.
+ // The <img> is the 26px avatar. vinext has no next/image, so the rule's
+ // advice cannot be taken; the file is already sized and loads lazily.
+ // oxlint-disable-next-line nextjs/no-img-element -- no next/image under vinext; see above
+ return <Sheet open={open} modal={false} disablePointerDismissal onOpenChange={value=>{setOpen(value);if(value){touchSession();openedAt.current=trackChatOpen('launcher')}else {stopSpeaking();trackChatClose({asked:asked.current,answered:answered.current,openedAt:openedAt.current,lastSource:lastSource.current})}}}><SheetTrigger data-track-tag="chat-open" data-track-cta="chat-open" className="chat-launcher"><MessageCircle size={19}/><span>Ask about Alex</span><span className="chat-dot"/></SheetTrigger><SheetContent showOverlay={false} className="chat-panel"><SheetHeader className="chat-header"><div className="assistant-symbol"><Sparkles size={23}/></div><SheetTitle>Meet the mind behind the work.</SheetTitle><SheetDescription>Portfolio guide · answers from documented work</SheetDescription></SheetHeader><div ref={box} className="chat-messages" role="log" aria-label="Conversation" data-track-private>{messages.map(m=>{if(m.role==='system')return <p key={m.key} className="chat-divider">{m.text}</p>;const id=`m${m.key}`;const live=speakingId===id;return <div key={m.key} ref={m.key===messages.at(-1)?.key&&m.role==='assistant'?lastReply:undefined} className={`message message-${m.role}`}>{m.role==='assistant'?<span className="message-label"><img className={`message-avatar${live?' is-speaking':''}`} src={profile.avatar} width={26} height={26} alt="" decoding="async" loading="lazy"/>ALEX’S PORTFOLIO</span>:<span className="message-label"><span className="message-avatar message-avatar-you" aria-hidden="true"><User size={14}/></span>YOU</span>}<p>{linkSegments(m.text).map((part,at)=>part.href?<a key={at} className="msg-link" href={part.href} target="_blank" rel="noreferrer">{linkLabel(part.href)}<ArrowUpRight size={11}/></a>:<span key={at}>{part.text}</span>)}{m.key===writingKey&&<span className="writing" aria-hidden="true"/>}</p>{m.href&&<a data-track-tag="chat-source-link" href={m.href} target="_blank" rel="noreferrer">View source <ArrowUpRight size={13}/></a>}{m.role==='assistant'&&<span className="message-foot">{m.source&&<small>{m.source}</small>}{canSpeak&&<button type="button" data-track-tag="chat-speak" className={`msg-speak${live?' is-speaking':''}`} onClick={()=>{touchSession();toggleVoice(id,speakable(m.text))}} aria-label={live?'Stop reading this answer':'Read this answer aloud'} title={live?'Stop':'Read aloud'}>{live?<Square size={11}/>:<Volume2 size={13}/>}<span>{live?'Stop':'Listen'}</span></button>}</span>}</div>})}{busy&&<output aria-live="off" className="thinking">{slow?'Still working on it — this one is being written rather than looked up':'Finding that in the portfolio'}<span className="dots" aria-hidden="true"><i/><i/><i/></span></output>}{notice&&<output aria-live="off" className="thinking">{notice}</output>}{expired&&messages.length>1&&<output aria-live="off" className="thinking">This conversation has been quiet for ten minutes, so it has ended. Your next question starts a fresh thread.</output>}{speechBroken&&<output aria-live="off" className="thinking">{speechFailureHint(navigator.userAgent)}</output>}</div><div className="chat-bottom">{(messages.length===1||expired)&&<div className="chat-suggestions">{prompts.map((p,i)=><button key={p} data-track-tag={`chat-suggestion-${i}`} onClick={()=>send(p,i)}>{p}<ArrowUpRight size={13}/></button>)}</div>}<form onSubmit={e=>{e.preventDefault();void send(input)}}><label htmlFor="chat-input" className="sr-only">Your question about Alex</label><Input ref={inputRef} id="chat-input" value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask about my work…" readOnly={busy} aria-busy={busy} aria-invalid={tooLong||undefined} aria-describedby={tooLong?'chat-input-error':input.length>=COUNTER_FROM?'chat-input-count':undefined}/>{busy||streaming?<button type="button" data-track-tag="chat-stop" onClick={()=>inflight.current?.abort('user')} aria-label="Stop this question" title="Stop"><X size={18}/></button>:<button data-track-tag="chat-send" type="submit" disabled={!input.trim()||tooLong} aria-label="Send question"><Send size={18}/></button>}</form>{tooLong?<p id="chat-input-error" className="chat-invalid" role="alert">{input.length-MAX_QUESTION} characters over the {MAX_QUESTION} limit. Shorten the question to send it.</p>:input.length>=COUNTER_FROM?<p id="chat-input-count" className="chat-count">{MAX_QUESTION-input.length} characters left</p>:null}<div className="chat-footnote"><span>Grounded in Alex’s published work.</span><a data-track-tag="chat-email" href={`mailto:${profile.email}`}>Email Alex <ArrowUpRight size={11}/></a></div></div></SheetContent></Sheet>
 }

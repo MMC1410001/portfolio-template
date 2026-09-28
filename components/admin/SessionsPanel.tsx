@@ -15,14 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { SessionRow } from '@/lib/analytics/types';
 import { DataTable, NumCell, TableCell } from './DataTable';
-import { duration, num } from './analytics-format';
-
-function when(ms: number): string {
-  return new Date(ms).toLocaleString('en-IN', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
-}
+import { duration, istDateTime as when, num } from './analytics-format';
 
 export function SessionsPanel({ rows }: { rows: SessionRow[] }) {
   return (

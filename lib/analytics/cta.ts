@@ -36,9 +36,12 @@ const WATCHED = '[data-track-tag], [data-track-cta]';
 
 const VISIBLE_RATIO = 0.5;
 const DWELL_MS = 1000;
+/** How long to coalesce DOM mutations before re-scanning, as in sections.ts. */
+const SCAN_DEBOUNCE_MS = 250;
 
 let observer: IntersectionObserver | null = null;
 let scanner: MutationObserver | null = null;
+let scanTimer: ReturnType<typeof setTimeout> | null = null;
 let seen = new Set<string>();
 /** Pending "has it held for a second yet" timers, keyed by element. */
 const pending = new Map<Element, ReturnType<typeof setTimeout>>();
@@ -97,6 +100,27 @@ function scan(): void {
 }
 
 /**
+ * Re-scan after mutations, debounced, and only for ones that added an element.
+ *
+ * The undebounced version ran a document-wide querySelectorAll on every
+ * mutation batch, and the turntable rewrites its degree readout's textContent
+ * on every scroll frame, which is a childList mutation adding a Text node. No
+ * tag can arrive in a Text node, so those records are skipped outright, and a
+ * burst of real ones (a chunk mounting) costs one scan rather than dozens.
+ */
+function scheduleScan(records: MutationRecord[]): void {
+  if (scanTimer !== null) return;
+  const added = records.some((r) =>
+    Array.from(r.addedNodes).some((n) => n.nodeType === 1),
+  );
+  if (!added) return;
+  scanTimer = setTimeout(() => {
+    scanTimer = null;
+    scan();
+  }, SCAN_DEBOUNCE_MS);
+}
+
+/**
  * Install the observers. Idempotent.
  *
  * The MutationObserver earns its place here even without lazy routes: the chat
@@ -115,7 +139,7 @@ export function installCtaVisibility(): void {
   scan();
 
   if (typeof MutationObserver === 'function') {
-    scanner = new MutationObserver(scan);
+    scanner = new MutationObserver(scheduleScan);
     scanner.observe(document.body, { childList: true, subtree: true });
   }
 }
@@ -134,6 +158,10 @@ export function __resetCtaVisibility(): void {
   scanner?.disconnect();
   observer = null;
   scanner = null;
+  if (scanTimer !== null) {
+    clearTimeout(scanTimer);
+    scanTimer = null;
+  }
   seen = new Set();
   for (const timer of pending.values()) clearTimeout(timer);
   pending.clear();

@@ -29,7 +29,7 @@
 
 import { getDb } from './db';
 import { chargeBudget } from './ingest';
-import { clientIp, hashIp } from './net';
+import { budgetKey, clientIp, hashIp } from './net';
 
 /**
  * Requests per address per minute.
@@ -76,8 +76,10 @@ export async function chargeChatRequest(
 
     // Half the digest. 128 bits is far past collision-resistant for a
     // per-minute counter, and there is no reason to hand the backend more of
-    // the hash than the bucketing needs.
-    const bucket = (await hashIp(ip, salt)).slice(0, 32);
+    // the hash than the bucketing needs. Keyed on the /64 for IPv6, see
+    // budgetKey(): the same value goes to the backend, so its limit gets the
+    // same fix.
+    const bucket = (await hashIp(budgetKey(ip), salt)).slice(0, 32);
     const { allowed } = await chargeBudget(
       db,
       `chat:${bucket}`,

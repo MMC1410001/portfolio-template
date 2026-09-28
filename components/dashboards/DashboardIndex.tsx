@@ -3,11 +3,11 @@
  *
  * ── A server component, on purpose ────────────────────────────────────────
  * There is no state left on this page: the tab strip it replaced needed
- * `useState` to pick which recreation to mount, and the ten routes under
+ * `useState` to pick which recreation to mount, and the routes under
  * `/dashboards/<id>` do that with URLs instead. Nothing here is interactive
  * beyond the links, so nothing here ships JavaScript, a visitor who lands on
  * the index and leaves has downloaded no recreation code at all, where the
- * tab strip had to bundle all ten to offer them.
+ * tab strip had to bundle every one of them to offer them.
  *
  * ── The cards are Tailwind, and the homepage cards are not ────────────────
  * Portfolio.tsx renders its own cards from the same `dashboards` array using
@@ -18,7 +18,7 @@
  * words.
  */
 import Link from 'next/link';
-import { dashboards } from '@/content/dashboards';
+import { dashboards, numberWord } from '@/content/dashboards';
 
 export function DashboardIndex() {
   return (
@@ -34,7 +34,7 @@ export function DashboardIndex() {
           Operational dashboards
         </h1>
         <p className="mt-3 max-w-3xl text-[#596579]">
-          Ten dashboards built at Northwind so that delivery status, quality,
+          {numberWord(dashboards.length, true)} dashboards built at Northwind so that delivery status, quality,
           effort and objectives stopped living in spreadsheets and chat
           threads. Each one is rebuilt here on invented data, the layouts, the
           calculations and the controls are the originals; the people, clients,
@@ -82,7 +82,7 @@ export function DashboardIndex() {
                   </li>
                 ))}
                 {d.stack.length > 3 ? (
-                  <li className="px-1 py-0.5 text-[11px] text-[#9ca3af]">
+                  <li className="px-1 py-0.5 text-[11px] text-[#6b7280]">
                     +{d.stack.length - 3}
                   </li>
                 ) : null}

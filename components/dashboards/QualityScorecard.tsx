@@ -22,7 +22,7 @@ import { useState } from 'react';
 import {
   scorecardProducts,
   type ScorecardProduct,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/scorecard';
 import { SEVERITY_COLOR, share } from './charts';
 import { DarkFrame, DarkHeader, DarkLivePill, DarkPill, DashNote } from './shell';
 

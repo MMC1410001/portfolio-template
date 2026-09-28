@@ -105,6 +105,15 @@ function allowlist(): Set<string> {
   );
 }
 
+/**
+ * How many addresses the allowlist holds, parsed exactly as the gate parses
+ * it. The `whoami` action reports this; counting a raw split there counted
+ * `a@x, ,b@x` as three.
+ */
+export function allowlistSize(): number {
+  return allowlist().size;
+}
+
 /** Whether an email is on the allowlist. Empty allowlist admits nobody. */
 export function isAllowedEmail(email: string): boolean {
   return allowlist().has(email.trim().toLowerCase());
@@ -199,12 +208,26 @@ function b64url(value: string): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function unb64url(value: string): string {
-  const padded = value.replace(/-/g, '+').replace(/_/g, '/');
+/**
+ * base64url -> bytes. Shared with google-auth.ts, which decodes JWT segments.
+ *
+ * Hand-rolled rather than reached for, because `atob` wants standard base64
+ * and base64url strips the padding. Feeding one to the other silently mangles
+ * any segment whose length is not a multiple of four, which is most of them.
+ */
+// The `<ArrayBuffer>` argument is not decoration: `crypto.subtle.verify` wants
+// a BufferSource, and a bare `Uint8Array` widens to `ArrayBufferLike`, which
+// includes SharedArrayBuffer and so is not assignable.
+export function b64urlToBytes(segment: string): Uint8Array<ArrayBuffer> {
+  const padded = segment.replace(/-/g, '+').replace(/_/g, '/');
   const binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
+  return out;
+}
+
+function unb64url(value: string): string {
+  return new TextDecoder().decode(b64urlToBytes(value));
 }
 
 /**

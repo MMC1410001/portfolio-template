@@ -17,7 +17,7 @@
  * panel would flip to a dark palette the original never had.
  */
 import type { ReactNode } from 'react';
-import type { Person } from '@/content/dashboards-demo';
+import type { Person } from '@/content/dashboards-data/common';
 
 /* ─────────────────────────────── chrome ────────────────────────────────── */
 
@@ -61,26 +61,43 @@ export function LivePill({ time }: { time: string }) {
   );
 }
 
+/**
+ * A white card with an eyebrow title.
+ *
+ * `outline` is the hairline-bordered variant the rail dashboards use, where a
+ * shadow would read as a second elevation beside the rail. It exists so those
+ * boards stop carrying their own near-identical `Card`: three had one, with
+ * two different border colours for the same edge. `#e9ecf4` is the one the
+ * light rail already uses in shell.tsx, so that is the one that survived.
+ */
 export function Panel({
   title,
+  sub,
   right,
   children,
+  outline = false,
   className = '',
 }: {
   title?: string;
+  /** One line under the title, the chart's own caption. */
+  sub?: string;
   right?: ReactNode;
   children: ReactNode;
+  outline?: boolean;
   className?: string;
 }) {
   return (
     <section
-      className={`rounded-2xl bg-white p-5 shadow-[0_1px_3px_rgba(16,24,40,.08)] ${className}`}
+      className={`bg-white p-5 ${outline ? 'rounded-xl border border-[#e9ecf4]' : 'rounded-2xl shadow-[0_1px_3px_rgba(16,24,40,.08)]'} ${className}`}
     >
       {title ? (
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h4 className="text-xs font-semibold tracking-[.08em] text-[#6b7280] uppercase">
-            {title}
-          </h4>
+          <div className="min-w-0">
+            <h4 className="text-xs font-semibold tracking-[.08em] text-[#6b7280] uppercase">
+              {title}
+            </h4>
+            {sub ? <p className="mt-0.5 text-xs text-[#6b7280]">{sub}</p> : null}
+          </div>
           {right}
         </div>
       ) : null}
@@ -145,7 +162,7 @@ export function StatTile({
       >
         {value}
       </p>
-      <p className="mt-1 text-xs text-[#9ca3af]">{note}</p>
+      <p className="mt-1 text-xs text-[#6b7280]">{note}</p>
     </div>
   );
 }
@@ -249,64 +266,134 @@ export function Tag({ label }: { label: string }) {
 
 /* ──────────────────────────────── filters ──────────────────────────────── */
 
+export interface FilterSelect {
+  /**
+   * What the select filters by. Required: the visible text of a select is its
+   * current value, "All", which names nothing, so without this a screen
+   * reader announces two identical unlabelled combo boxes.
+   */
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+}
+
+const FIELD =
+  'rounded-xl border border-[#e5e7eb] bg-[#f9fafb] text-sm focus:border-indigo-400';
+
+/**
+ * Search, selects, an optional reset and an optional count.
+ *
+ * `labelled` prints each control's label above it, which is how the rail
+ * dashboards lay their filter card out; otherwise the labels are carried by
+ * `aria-label` and the placeholder. Either way every control is named.
+ */
 export function FilterBar({
   query,
   onQuery,
   placeholder,
   selects,
   count,
+  onReset,
+  labelled = false,
 }: {
   query: string;
   onQuery: (v: string) => void;
   placeholder: string;
-  selects: {
-    value: string;
-    onChange: (v: string) => void;
-    options: string[];
-  }[];
-  count: ReactNode;
+  selects: FilterSelect[];
+  count?: ReactNode;
+  onReset?: () => void;
+  labelled?: boolean;
 }) {
+  const caption = (text: string) => (
+    <span
+      className={
+        labelled
+          ? 'mb-1 block text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase'
+          : 'sr-only'
+      }
+    >
+      {text}
+    </span>
+  );
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3">
-      <label className="relative min-w-55 flex-1">
-        <span className="sr-only">{placeholder}</span>
-        <svg
-          viewBox="0 0 24 24"
-          aria-hidden
-          className="absolute top-1/2 left-3 size-4 -translate-y-1/2 stroke-[#9ca3af]"
-          fill="none"
-          strokeWidth="2"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
-        <input
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder={placeholder}
-          className="w-full rounded-xl border border-[#e5e7eb] bg-[#f9fafb] py-2.5 pr-3 pl-9 text-sm text-[#111827] outline-none placeholder:text-[#9ca3af] focus:border-indigo-400"
-        />
+    <div
+      className={`mb-4 flex flex-wrap gap-3 last:mb-0 ${labelled ? 'items-end' : 'items-center'}`}
+    >
+      <label className="min-w-55 flex-1">
+        {caption(labelled ? 'Search' : placeholder)}
+        <span className="relative block">
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden
+            className="absolute top-1/2 left-3 size-4 -translate-y-1/2 stroke-[#9ca3af]"
+            fill="none"
+            strokeWidth="2"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder={placeholder}
+            className={`w-full py-2.5 pr-3 pl-9 text-[#111827] placeholder:text-[#6b7280] ${FIELD}`}
+          />
+        </span>
       </label>
-      {selects.map((s, i) => (
-        <select
-          key={i}
-          value={s.value}
-          onChange={(e) => s.onChange(e.target.value)}
-          className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2.5 text-sm text-[#374151] outline-none focus:border-indigo-400"
+      {selects.map((s) =>
+        labelled ? (
+          <label key={s.label}>
+            {caption(s.label)}
+            <select
+              value={s.value}
+              onChange={(e) => s.onChange(e.target.value)}
+              className={`block px-3 py-2.5 text-[#374151] ${FIELD}`}
+            >
+              {s.options.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <select
+            key={s.label}
+            aria-label={s.label}
+            value={s.value}
+            onChange={(e) => s.onChange(e.target.value)}
+            className={`px-3 py-2.5 text-[#374151] ${FIELD}`}
+          >
+            {s.options.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        ),
+      )}
+      {onReset ? (
+        <button
+          type="button"
+          onClick={onReset}
+          className="rounded-xl border border-[#e5e7eb] px-3 py-2.5 text-sm text-[#4b5563] hover:bg-[#f9fafb]"
         >
-          {s.options.map((o) => (
-            <option key={o}>{o}</option>
-          ))}
-        </select>
-      ))}
-      <span className="ml-auto rounded-full bg-[#f3f4f6] px-3 py-1.5 text-sm text-[#6b7280]">
-        {count}
-      </span>
+          <span aria-hidden>↺ </span>Reset
+        </button>
+      ) : null}
+      {count ? (
+        <span className="ml-auto rounded-full bg-[#f3f4f6] px-3 py-1.5 text-sm text-[#4b5563]">
+          {count}
+        </span>
+      ) : null}
     </div>
   );
 }
 
-/** Sortable column header. Arrow direction mirrors the originals. */
+/**
+ * Sortable column header. Arrow direction mirrors the originals.
+ *
+ * The arrow is decoration for sighted readers; `aria-sort` on the header is
+ * what tells a screen reader which column the table is ordered by, and it is
+ * only set on the active column, as the ARIA spec asks.
+ */
 export function Th({
   label,
   active,
@@ -323,6 +410,9 @@ export function Th({
   return (
     <th
       scope="col"
+      aria-sort={
+        onSort && active ? (dir === 'desc' ? 'descending' : 'ascending') : undefined
+      }
       className={`px-3 py-3 text-left text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase ${className}`}
     >
       {onSort ? (
@@ -332,7 +422,10 @@ export function Th({
           className="inline-flex items-center gap-1 hover:text-[#111827]"
         >
           {label}
-          <span className={active ? 'text-indigo-600' : 'text-[#c4c9d4]'}>
+          <span
+            aria-hidden
+            className={active ? 'text-indigo-600' : 'text-[#878e9b]'}
+          >
             {active && dir === 'desc' ? '▼' : '▲'}
           </span>
         </button>

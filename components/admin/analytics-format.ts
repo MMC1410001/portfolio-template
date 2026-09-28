@@ -11,8 +11,27 @@ import type {
   Breakdown,
   InternalNotice as InternalSummary,
 } from '@/lib/analytics/types';
+import { TZ_LABEL } from '@/lib/analytics/time';
 
 export const num = (n: number) => n.toLocaleString('en-IN');
+
+/**
+ * A timestamp as "28/09/26, 2:05 pm IST".
+ *
+ * The zone is pinned, not left to the runtime. `/analytics` is prerendered, so
+ * the server's zone (UTC on a Worker) and the visitor's would render two
+ * different strings for the same row, a hydration mismatch, and neither of
+ * them would be the IST the day buckets use.
+ */
+const IST_DATE_TIME = new Intl.DateTimeFormat('en-IN', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+  timeZone: 'Asia/Kolkata',
+});
+
+export function istDateTime(ms: number): string {
+  return `${IST_DATE_TIME.format(ms)} ${TZ_LABEL}`;
+}
 
 /**
  * Seconds as "2m 23s".
@@ -167,6 +186,62 @@ export function topTwoPlusOther(rows: Breakdown[]): Breakdown[] {
     second,
     { label: 'Other', sessions, share: Math.round(share * 10) / 10 },
   ];
+}
+
+/**
+ * Preferred palette slot per known entity, so a label keeps its colour when
+ * its rank changes, toggling Real visitors / All traffic reorders slices and
+ * must not repaint them. The labels are the fixed vocabulary of
+ * `lib/analytics/user-agent.ts`. The fold bucket always takes the last slot.
+ */
+const PREFERRED_SLOT: Readonly<Record<string, number>> = {
+  desktop: 0,
+  mobile: 1,
+  tablet: 2,
+  Windows: 0,
+  Android: 1,
+  iOS: 2,
+  macOS: 1,
+  Linux: 0,
+  ChromeOS: 2,
+  Other: 2,
+};
+
+/**
+ * One colour per label, stable by entity rather than by rank.
+ *
+ * A label's slot is its entry above, or a hash of its name for anything
+ * unlisted. Three hues cannot give seven operating systems a colour each, so
+ * when two labels in one chart want the same slot, one moves to the next free
+ * slot. Collisions are settled in alphabetical order, never rank order, so
+ * the same set of labels always gets the same colours however it is sorted.
+ */
+export function sliceColours(
+  labels: readonly string[],
+  palette: readonly string[],
+): string[] {
+  const size = palette.length;
+  if (size === 0) return labels.map(() => '');
+  const out: string[] = labels.map(() => '');
+  const taken = new Set<number>();
+  const order = labels
+    .map((label, i) => ({ label, i }))
+    .sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+  for (const { label, i } of order) {
+    let slot = PREFERRED_SLOT[label];
+    if (slot === undefined) {
+      let hash = 0;
+      for (const ch of label) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+      slot = hash;
+    }
+    slot %= size;
+    for (let tries = 0; tries < size && taken.has(slot); tries++) {
+      slot = (slot + 1) % size;
+    }
+    taken.add(slot);
+    out[i] = palette[slot];
+  }
+  return out;
 }
 
 /**

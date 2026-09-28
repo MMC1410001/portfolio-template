@@ -20,10 +20,13 @@ import assert from 'node:assert/strict';
 
 import {
   ADMIN_COOKIE,
+  allowlistSize,
   authorizeAdmin,
+  b64urlToBytes,
   isAllowedEmail,
   issueSession,
   MIN_TOKEN_LEN,
+  readCookie,
   readSession,
   SESSION_TTL_MS,
   verifySession,
@@ -34,11 +37,13 @@ import {
 } from '../lib/analytics/google-auth';
 import {
   LOOKS_LIKE_PII,
+  SCREENED_TEXT,
   normalisePath,
   normalisePoint,
   normaliseQuestion,
   normaliseTag,
   normaliseUtmValue,
+  screenSelector,
 } from '../lib/analytics/normalise';
 import {
   IST_OFFSET_MS,
@@ -60,17 +65,29 @@ import {
 } from '../lib/analytics/sources';
 import { classifyUserAgent, viewportClass } from '../lib/analytics/user-agent';
 import {
+  budgetKey,
   expandIpv6,
+  hashIp,
+  internalVisitorIds,
   ipPrefix,
   matchesAnyCidr,
   parseCidrList,
 } from '../lib/analytics/net';
 import {
+  isRecord,
   normaliseUtm,
+  readEvents,
   sanitiseAttribution,
   sanitiseProps,
   validateEvent,
+  type IncomingEvent,
+  type ValidatedEvent,
 } from '../lib/analytics/payload';
+import { ALLOWED_EVENTS, ALLOWED_PROPS } from '../lib/analytics/events';
+import { buildRows, chargeBudget, writeBatch } from '../lib/analytics/ingest';
+import { claimSweep, sweep, sweepIfDue } from '../lib/analytics/retention';
+import { RETENTION_DAYS, SCHEMA_STATEMENTS } from '../lib/analytics/schema';
+import { openDemoDatabase } from '../scripts/d1-sqlite';
 import {
   bandWidth,
   describeInternal,
@@ -987,4 +1004,356 @@ test('isAllowedEmail is membership, case-folded, and empty admits nobody', async
   await withEnv({ ADMIN_EMAILS: '' }, () => {
     assert.ok(!isAllowedEmail('a@x.com'));
   });
+});
+
+/* ─────────────────────────── ingest hardening ─────────────────────────── */
+
+test('every verb has a prop allowlist, and section/mode ride on all of them', () => {
+  for (const verb of ALLOWED_EVENTS) {
+    const keys = ALLOWED_PROPS[verb];
+    assert.ok(keys, `${verb} has no allowlist, so every prop it sends is dropped`);
+    assert.ok(keys.has('section') && keys.has('mode'), verb);
+  }
+});
+
+test('a forged chat_ask is screened on the server, and unknown props are dropped', () => {
+  // The browser's normaliseQuestion() is not the only possible caller: the
+  // endpoint is open, so this is what a hand-written POST gets.
+  const email = validateEvent({
+    event: 'chat_ask',
+    path: '/',
+    props: {
+      q: 'mail me at someone@example.com',
+      q_len: 30,
+      rejected: null,
+      turn: 1,
+      section: 'contact',
+      evil: 'x',
+      phone_number: '98765 43210',
+    },
+  });
+  assert.equal(email?.props?.q, null);
+  assert.equal(email?.props?.rejected, 'pii');
+  assert.equal(email?.props?.q_len, 30);
+  assert.equal(email?.section, 'contact');
+  assert.ok(!('evil' in (email?.props ?? {})));
+  assert.ok(!('phone_number' in (email?.props ?? {})));
+
+  const phone = validateEvent({
+    event: 'chat_ask',
+    path: '/',
+    props: { q: 'call 9876543210 please', rejected: null },
+  });
+  assert.equal(phone?.props?.q, null);
+  assert.equal(phone?.props?.rejected, 'pii');
+
+  const link = validateEvent({
+    event: 'chat_ask',
+    path: '/',
+    props: { q: 'see https://example.com/jd', rejected: null },
+  });
+  assert.equal(link?.props?.q, null);
+  assert.equal(link?.props?.rejected, 'url');
+
+  // Screened from the raw value: sanitiseProps' 300-character slice would
+  // otherwise cut this phone number to six digits and let it through.
+  const tail = validateEvent({
+    event: 'chat_ask',
+    path: '/',
+    props: { q: `${'é'.repeat(294)} 9876543210` },
+  });
+  assert.equal(tail?.props?.q, null);
+  assert.equal(tail?.props?.rejected, 'pii');
+
+  // Not a string: stored as null rather than as whatever was sent.
+  assert.equal(
+    validateEvent({ event: 'chat_ask', path: '/', props: { q: 42 } })?.props?.q,
+    null,
+  );
+
+  // A clean question the client already normalised passes unchanged, and the
+  // client's own `rejected` survives when the server has no objection.
+  const clean = validateEvent({
+    event: 'chat_ask',
+    path: '/',
+    props: { q: 'does he know python', rejected: 'none', prompt_index: 2 },
+  });
+  assert.equal(clean?.props?.q, 'does he know python');
+  assert.equal(clean?.props?.rejected, 'none');
+  assert.equal(clean?.props?.prompt_index, 2);
+});
+
+test('junk keys cannot crowd real ones out of the key cap', () => {
+  const props: Record<string, unknown> = {};
+  for (let i = 0; i < 40; i += 1) props[`junk${i}`] = i;
+  props.tag = 'hero-email';
+  const out = validateEvent({ event: 'click', path: '/', props });
+  assert.deepEqual(out?.props, { tag: 'hero-email' });
+});
+
+test('dead and rage click selectors lose visitor text, keep the element kind', () => {
+  assert.equal(screenSelector('div:mail me at a@b.co'), `div:${SCREENED_TEXT}`);
+  assert.equal(screenSelector('p:call 9876543210'), `p:${SCREENED_TEXT}`);
+  assert.equal(screenSelector('span:www.example.com'), `span:${SCREENED_TEXT}`);
+  assert.equal(screenSelector('a@b.co'), SCREENED_TEXT);
+  assert.equal(screenSelector('div.project-card'), 'div.project-card');
+  assert.equal(screenSelector('button:Open chat'), 'button:Open chat');
+
+  const dead = validateEvent({
+    event: 'dead_click',
+    path: '/',
+    props: { selector: 'div:reach me on a@b.co', tag: null },
+    point: { x_pct: 0.2, y_pct: 0.3, selector: 'div:reach me on a@b.co' },
+  });
+  assert.equal(dead?.props?.selector, `div:${SCREENED_TEXT}`);
+  assert.equal(dead?.point?.selector, `div:${SCREENED_TEXT}`);
+
+  const rage = validateEvent({
+    event: 'rage_click',
+    path: '/',
+    props: { selector: 'div:https://x.test', dead: true },
+    point: { x_pct: 0.2, y_pct: 0.3, selector: 'div:https://x.test' },
+  });
+  assert.equal(rage?.props?.selector, `div:${SCREENED_TEXT}`);
+  assert.equal(rage?.point?.selector, `div:${SCREENED_TEXT}`);
+
+  // A real click names a control, which is page content, and is left alone.
+  const click = validateEvent({
+    event: 'click',
+    path: '/',
+    props: { selector: 'a:owner@example.com' },
+  });
+  assert.equal(click?.props?.selector, 'a:owner@example.com');
+});
+
+test('null bodies and non-object events are refused without throwing', () => {
+  assert.equal(isRecord(null), false);
+  assert.equal(isRecord([]), false);
+  assert.equal(isRecord('x'), false);
+  assert.equal(isRecord({}), true);
+
+  const events = readEvents({
+    events: [null, 7, 'visit', [], { event: 'visit', path: '/' }],
+  });
+  assert.equal(events.length, 1);
+  assert.equal(
+    events.map(validateEvent).filter((e): e is ValidatedEvent => e !== null)
+      .length,
+    1,
+  );
+  assert.deepEqual(readEvents({ events: [null] }), []);
+  assert.equal(validateEvent(null as unknown as IncomingEvent), null);
+});
+
+test('two IPv6 addresses in one /64 share a budget key; v4 stays per-address', async () => {
+  const a = budgetKey('2001:db8:1:2:aaaa::1');
+  const b = budgetKey('2001:0db8:0001:0002:ffff:1:2:3');
+  assert.equal(a, '2001:0db8:0001:0002::/64');
+  assert.equal(a, b);
+  assert.notEqual(budgetKey('2001:db8:1:3::1'), a);
+  assert.equal(await hashIp(a, 'salt'), await hashIp(b, 'salt'));
+
+  assert.equal(budgetKey('203.0.113.47'), '203.0.113.47');
+  assert.notEqual(budgetKey('203.0.113.48'), budgetKey('203.0.113.47'));
+  // Unreadable v6 falls back to itself rather than to a shared bucket.
+  assert.equal(budgetKey('1:2:3'), '1:2:3');
+});
+
+test('internal visitors and the admin allowlist parse the same way everywhere', async () => {
+  assert.deepEqual(internalVisitorIds(' a , ,b,'), ['a', 'b']);
+  assert.deepEqual(internalVisitorIds(undefined), []);
+  await withEnv({ ADMIN_EMAILS: 'a@x.com, ,B@x.com,' }, () => {
+    assert.equal(allowlistSize(), 2);
+  });
+});
+
+test('readCookie percent-decodes, and survives a malformed escape', () => {
+  const req = (cookie: string) =>
+    new Request('https://example.test/', { headers: { cookie } });
+  assert.equal(
+    readCookie(req(`a=1; ${ADMIN_COOKIE}=123.abc%2Bdef%3D; b=2`), ADMIN_COOKIE),
+    '123.abc+def=',
+  );
+  // `=` inside the value is kept, not treated as a second separator.
+  assert.equal(readCookie(req(`${ADMIN_COOKIE}=x=y`), ADMIN_COOKIE), 'x=y');
+  assert.equal(readCookie(req(`${ADMIN_COOKIE}=%E0%A4%A`), ADMIN_COOKIE), '%E0%A4%A');
+  assert.equal(readCookie(req(`${ADMIN_COOKIE}=`), ADMIN_COOKIE), null);
+  assert.equal(readCookie(req('other=1'), ADMIN_COOKIE), null);
+});
+
+test('b64urlToBytes reads unpadded base64url', () => {
+  const bytes = b64urlToBytes('_-8');
+  assert.deepEqual(Array.from(bytes), [0xff, 0xef]);
+});
+
+/* ─────────────────────────── google key refresh ─────────────────────────── */
+
+test('an unknown kid forces one JWKS refetch, then is throttled for a minute', async () => {
+  let fetches = 0;
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    fetches += 1;
+    return new Response(JSON.stringify({ keys: [] }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+  resetJwksCache();
+  try {
+    const b64 = (v: string) =>
+      btoa(v).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const token = `${b64(JSON.stringify({ alg: 'RS256', kid: 'made-up' }))}.${b64(
+      JSON.stringify(claimsFor()),
+    )}.c2ln`;
+    const id = 'client-123.apps.googleusercontent.com';
+    const t0 = Date.now();
+
+    // First sight: the cold fetch, then the one forced refetch.
+    assert.deepEqual(await verifyGoogleIdToken(token, id, t0), {
+      ok: false,
+      reason: 'unknown-key',
+    });
+    assert.equal(fetches, 2);
+
+    // Inside the minute: answered from cache, no request to Google at all.
+    for (let i = 0; i < 5; i += 1) {
+      await verifyGoogleIdToken(token, id, t0 + 1_000 * i);
+    }
+    assert.equal(fetches, 2);
+
+    // Past it, a rotation still gets its refetch.
+    await verifyGoogleIdToken(token, id, t0 + 61_000);
+    assert.equal(fetches, 3);
+  } finally {
+    globalThis.fetch = original;
+    resetJwksCache();
+  }
+});
+
+/* ─────────────────────────── d1: budget and retention ─────────────────────────── */
+
+function freshDb() {
+  const handle = openDemoDatabase();
+  for (const sql of SCHEMA_STATEMENTS) handle.raw.exec(sql);
+  return handle;
+}
+
+test('chargeBudget counts within a minute, refuses past the limit, and rolls over', async () => {
+  const { db, close } = freshDb();
+  try {
+    const minute = 60_000 * 29_000_000;
+    assert.deepEqual(await chargeBudget(db, 'v', 100, minute + 5), { allowed: true, used: 100 });
+    assert.deepEqual(await chargeBudget(db, 'v', 20, minute + 30_000), { allowed: true, used: 120 });
+    // One past the default 120 is refused, and the count keeps climbing so a
+    // flood stays refused for the rest of the minute.
+    assert.deepEqual(await chargeBudget(db, 'v', 1, minute + 59_999), { allowed: false, used: 121 });
+    // A new minute resets rather than carrying the overage.
+    assert.deepEqual(await chargeBudget(db, 'v', 3, minute + 60_000), { allowed: true, used: 3 });
+  } finally {
+    close();
+  }
+});
+
+test('the chat: budget and the ingest budget cannot spend each other', async () => {
+  const { db, close } = freshDb();
+  try {
+    const now = 60_000 * 29_000_000;
+    for (let i = 0; i < 20; i += 1) {
+      assert.equal((await chargeBudget(db, 'chat:h', 1, now, 20)).allowed, true);
+    }
+    assert.equal((await chargeBudget(db, 'chat:h', 1, now, 20)).allowed, false);
+    // Same visitor hash, ingest side: untouched by the exhausted chat bucket.
+    assert.deepEqual(await chargeBudget(db, 'h', 1, now), { allowed: true, used: 1 });
+  } finally {
+    close();
+  }
+});
+
+const DAY = 86_400_000;
+const SID = '11111111-1111-4111-8111-111111111111';
+
+async function seedAt(
+  db: D1Database,
+  at: number,
+  events: IncomingEvent[],
+): Promise<void> {
+  const valid = events
+    .map(validateEvent)
+    .filter((e): e is ValidatedEvent => e !== null);
+  const { eventRows, pointRows } = buildRows(valid, {
+    sessionId: SID,
+    visitorId: null,
+    ua: classifyUserAgent(null),
+    ipHash: 'h',
+    ipPrefix: null,
+    isInternal: false,
+    geo: { country: null, region: null, city: null, asnOrg: null },
+    attribution: null,
+    now: at,
+  });
+  await writeBatch(db, eventRows, pointRows);
+}
+
+test('sweep expires question text at 30 days and keeps the row that carried it', async () => {
+  const { db, raw, close } = freshDb();
+  try {
+    const now = Date.UTC(2026, 8, 28);
+    const ask = (q: string): IncomingEvent => ({
+      event: 'chat_ask',
+      path: '/',
+      props: { q, q_len: q.length, rejected: null, turn: 1 },
+    });
+    const dot: IncomingEvent = {
+      event: 'click',
+      path: '/',
+      props: { tag: 'hero-email' },
+      point: { x_pct: 0.5, y_pct: 0.5 },
+    };
+    await seedAt(db, now - (RETENTION_DAYS.questionText + 1) * DAY, [ask('does he know python'), dot]);
+    await seedAt(db, now - 10 * DAY, [ask('what is taxwise'), dot]);
+    await seedAt(db, now - (RETENTION_DAYS.events + 1) * DAY, [{ event: 'visit', path: '/' }]);
+    raw.exec(`INSERT INTO ingest_budget (bucket, window_start, events) VALUES ('old', ${now - 2 * 3_600_000}, 1), ('live', ${now - 60_000}, 1)`);
+
+    const report = await sweep(db, now);
+    assert.equal(report.ran, true);
+    assert.equal(report.events, 1);
+    assert.equal(report.clickPoints, 1);
+    assert.equal(report.questionText, 1);
+    assert.equal(report.budget, 1);
+
+    const asks = raw
+      .prepare(`SELECT props FROM events WHERE event = 'chat_ask' ORDER BY created_at`)
+      .all() as { props: string }[];
+    const [old, recent] = asks.map((r) => JSON.parse(r.props) as Record<string, unknown>);
+    // The words go; the length, the reason and the turn stay.
+    assert.ok(!('q' in old));
+    assert.equal(old.q_len, 'does he know python'.length);
+    assert.equal(old.turn, 1);
+    assert.equal(recent.q, 'what is taxwise');
+
+    // Idempotent: a second sweep finds nothing left to do.
+    assert.equal((await sweep(db, now)).questionText, 0);
+  } finally {
+    close();
+  }
+});
+
+test('sweepIfDue claims a day atomically, so concurrent callers sweep once', async () => {
+  const { db, raw, close } = freshDb();
+  try {
+    const now = Date.UTC(2026, 8, 28);
+    // Both start before either claims: the old read-then-write shape let both
+    // read the same stale timestamp here, and both swept.
+    const [a, b] = await Promise.all([sweepIfDue(db, now), sweepIfDue(db, now)]);
+    assert.equal(Number(a.ran) + Number(b.ran), 1);
+
+    assert.equal((await sweepIfDue(db, now + DAY - 1)).ran, false);
+    assert.equal((await sweepIfDue(db, now + DAY)).ran, true);
+    assert.equal(await claimSweep(db, now + DAY), false);
+
+    // A value that is not a number is not a lock anyone holds.
+    raw.exec(`UPDATE analytics_meta SET value = 'junk' WHERE key = 'retention_swept_at'`);
+    assert.equal(await claimSweep(db, now + DAY), true);
+  } finally {
+    close();
+  }
 });

@@ -4,9 +4,9 @@
  * ── What "static" means here, precisely ──────────────────────────────────
  * `vinext build` does not emit prerendered HTML for any route in this project
  * (`/` and `/analytics` included) so `generateStaticParams` is not
- * producing ten files on disk, and the build's route table honestly labels
- * this one `ƒ Dynamic` because it carries a segment. What it does guarantee
- * is the property that actually matters: the slug set is enumerated from
+ * producing a file per dashboard on disk, and the build's route table
+ * honestly labels this one `ƒ Dynamic` because it carries a segment. What it
+ * does guarantee is the property that actually matters: the slug set is enumerated from
  * `content/dashboards.ts` at build time rather than trusted from the URL, and
  * the render reads a committed module: no database, no auth, no `headers()`
  * or `searchParams`. There is nothing here that can fail in front of a
@@ -16,13 +16,14 @@
  *
  * ── `dynamicParams = false` is the guard, not a default ───────────────────
  * Without it, `/dashboards/anything` renders this page and `notFound()` is
- * the only thing between a typo and a 200. With it the ten enumerated slugs
+ * the only thing between a typo and a 200. With it the enumerated slugs
  * are the only ones that resolve, and `notFound()` becomes the belt to that
  * braces, verified: `/dashboards/not-a-dashboard` is a 404.
  */
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { dashboards } from '@/content/dashboards';
+import { profile } from '@/content/portfolio';
 import { DashboardDetail } from '@/components/dashboards/DashboardDetail';
 
 export const dynamicParams = false;
@@ -53,6 +54,8 @@ export async function generateMetadata({
       description,
       url: `/dashboards/${d.id}`,
       type: 'article',
+      // Repeated from the root layout: an openGraph here replaces that one whole.
+      images: [{ url: profile.avatar, width: 720, height: 720, alt: profile.name }],
     },
   };
 }

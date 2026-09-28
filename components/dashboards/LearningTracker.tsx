@@ -18,7 +18,7 @@
  * dashboard existed to catch.
  */
 import { useState } from 'react';
-import { learners } from '@/content/dashboards-demo';
+import { learners } from '@/content/dashboards-data/learners';
 import { Ring, share, StackedBar } from './charts';
 import {
   DarkPanel,
@@ -164,7 +164,7 @@ export function LearningTracker() {
             <li className="flex items-center gap-2 text-[#c2c9db]">
               <span className="size-2.5 rounded-[3px] bg-emerald-500" />
               Completed <strong className="text-white tabular-nums">{l.assignments.done}</strong>
-              <span className="text-[#6e778f]">({share(l.assignments.done, l.assignments.total)})</span>
+              <span className="text-[#808aa4]">({share(l.assignments.done, l.assignments.total)})</span>
             </li>
             <li className="flex items-center gap-2 text-[#c2c9db]">
               <span className="size-2.5 rounded-[3px] bg-red-500" />
@@ -172,7 +172,7 @@ export function LearningTracker() {
               <strong className="text-white tabular-nums">
                 {l.assignments.total - l.assignments.done}
               </strong>
-              <span className="text-[#6e778f]">
+              <span className="text-[#808aa4]">
                 ({share(l.assignments.total - l.assignments.done, l.assignments.total)})
               </span>
             </li>
@@ -194,7 +194,7 @@ export function LearningTracker() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-[#6e778f]">
+          <p className="mt-3 text-xs text-[#808aa4]">
             Assignment completion sits at {Math.round(completion)}%; attendance is reported beside the rating rather than folded into it.
           </p>
         </DarkPanel>

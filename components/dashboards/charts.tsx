@@ -24,7 +24,7 @@
  * one change here that looks cosmetic and is not.
  *
  * ── `dark` is a prop, not a media query ───────────────────────────────────
- * Four of the ten originals are dark dashboards and six are light, on the
+ * Five of the originals are dark dashboards and the rest are light, on the
  * same page, chosen by a picker. That is a per-recreation fact rather than a
  * viewer preference, so it cannot come from `prefers-color-scheme` or from
  * this site's `.dark` class, which `Portfolio.tsx` toggles for immersive
@@ -125,7 +125,7 @@ export function Donut({
             {center.value}
           </p>
           <p
-            className={`text-[10px] font-semibold tracking-[.08em] uppercase ${dark ? 'text-[#8a93ad]' : 'text-[#9ca3af]'}`}
+            className={`text-[10px] font-semibold tracking-[.08em] uppercase ${dark ? 'text-[#8a93ad]' : 'text-[#6b7280]'}`}
           >
             {center.label}
           </p>
@@ -192,7 +192,7 @@ export function Ring({
           {caption.value}
         </p>
         <p
-          className={`text-[10px] font-semibold tracking-[.08em] uppercase ${dark ? 'text-[#8a93ad]' : 'text-[#9ca3af]'}`}
+          className={`text-[10px] font-semibold tracking-[.08em] uppercase ${dark ? 'text-[#8a93ad]' : 'text-[#6b7280]'}`}
         >
           {caption.label}
         </p>
@@ -253,7 +253,7 @@ export function Legend({
           </span>
           {sum > 0 ? (
             <span
-              className={`shrink-0 text-xs tabular-nums ${dark ? 'text-[#8a93ad]' : 'text-[#9ca3af]'}`}
+              className={`shrink-0 text-xs tabular-nums ${dark ? 'text-[#8a93ad]' : 'text-[#6b7280]'}`}
             >
               {share(s.value, sum)}
             </span>
@@ -325,7 +325,7 @@ export function Columns({
   return (
     <div className="flex gap-3">
       <ul
-        className={`flex w-12 shrink-0 flex-col-reverse justify-between py-5 text-right text-[11px] tabular-nums ${dark ? 'text-[#8a93ad]' : 'text-[#9ca3af]'}`}
+        className={`flex w-12 shrink-0 flex-col-reverse justify-between py-5 text-right text-[11px] tabular-nums ${dark ? 'text-[#8a93ad]' : 'text-[#6b7280]'}`}
       >
         {ticks.map((t) => (
           <li key={t}>{t}</li>

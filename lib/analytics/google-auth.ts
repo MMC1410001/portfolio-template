@@ -47,6 +47,8 @@
  * file in the repo where that matters most.
  */
 
+import { b64urlToBytes } from './admin-auth';
+
 /** Google's published signing keys. Rotated by Google, hence the cache TTL. */
 const JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 
@@ -86,23 +88,17 @@ interface JwtPayload {
 let cache: { keys: GoogleJwk[]; fetchedAt: number } | null = null;
 
 /**
- * base64url -> bytes.
+ * The shortest gap between two forced refetches, per isolate.
  *
- * Hand-rolled rather than reached for, because `atob` wants standard base64
- * and JWT segments are base64**url** with the padding stripped. Feeding one to
- * the other silently mangles any segment whose length is not a multiple of
- * four, which is most of them.
+ * A forced refetch is what an unknown `kid` buys, and the `kid` is in the
+ * token's header, before any signature is checked. Unthrottled, every POST to
+ * /api/admin/session carrying a made-up kid was one outbound request to
+ * Google, which is an open relay for load on someone else's endpoint and
+ * a quick way to be rate limited by it at the moment a real rotation needs a
+ * fetch. A minute still turns a rotation into at most a minute of refusals.
  */
-// The `<ArrayBuffer>` argument is not decoration: `crypto.subtle.verify` wants
-// a BufferSource, and a bare `Uint8Array` widens to `ArrayBufferLike`, which
-// includes SharedArrayBuffer and so is not assignable.
-function b64urlToBytes(segment: string): Uint8Array<ArrayBuffer> {
-  const padded = segment.replace(/-/g, '+').replace(/_/g, '/');
-  const binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
-  return out;
-}
+const FORCED_REFETCH_MIN_MS = 60_000;
+let lastForcedAt: number | null = null;
 
 function b64urlToJson<T>(segment: string): T | null {
   try {
@@ -121,7 +117,15 @@ function b64urlToJson<T>(segment: string): T | null {
  * single extra request.
  */
 async function jwks(force = false, now: number = Date.now()) {
-  if (!force && cache && now - cache.fetchedAt < JWKS_TTL_MS) return cache.keys;
+  if (cache && now - cache.fetchedAt < JWKS_TTL_MS) {
+    if (!force) return cache.keys;
+    // A throttled force is answered from the cache, which is the answer the
+    // caller already has: the kid stays unknown until the gap has passed.
+    if (lastForcedAt !== null && now - lastForcedAt < FORCED_REFETCH_MIN_MS) {
+      return cache.keys;
+    }
+    lastForcedAt = now;
+  }
   // Plain fetch, and it has to stay that way.
   //
   // This line read `fetch(JWKS_URL, { cf: { cacheTtl: 3600 } } as RequestInit)`
@@ -144,9 +148,10 @@ async function jwks(force = false, now: number = Date.now()) {
   return keys;
 }
 
-/** Exposed so a test can start from a known-empty cache. */
+/** Exposed so a test can start from a known-empty cache and throttle. */
 export function resetJwksCache(): void {
   cache = null;
+  lastForcedAt = null;
 }
 
 /**
@@ -156,14 +161,15 @@ export function resetJwksCache(): void {
  * together, a WebCrypto error reported itself as a network error and sent us
  * looking at Google's availability when the fault was in the key import.
  */
-async function findKey(kid: string): Promise<GoogleJwk | null> {
+async function findKey(kid: string, now: number): Promise<GoogleJwk | null> {
   const match = (keys: GoogleJwk[]) =>
     keys.find((k) => k.kid === kid && k.kty === 'RSA') ?? null;
-  const first = match(await jwks());
+  const first = match(await jwks(false, now));
   if (first) return first;
   // An unknown kid is the rotation case, not necessarily a forgery, refetch
-  // once, then believe the answer.
-  return match(await jwks(true));
+  // once, then believe the answer. At most once a minute: see
+  // FORCED_REFETCH_MIN_MS.
+  return match(await jwks(true, now));
 }
 
 async function verifyWithKey(jwk: GoogleJwk, token: string): Promise<boolean> {
@@ -248,7 +254,7 @@ export async function verifyGoogleIdToken(
 
   let jwk: GoogleJwk | null;
   try {
-    jwk = await findKey(header.kid);
+    jwk = await findKey(header.kid, now);
   } catch (error) {
     // Logged with the underlying message: "Google was unreachable" and
     // "Google answered 500" are the same reason code but very different days.

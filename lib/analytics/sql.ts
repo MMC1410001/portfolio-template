@@ -11,7 +11,8 @@
  * batch is unspecified behaviour, so instead this module exports fixed SQL
  * *text* that each statement prefixes. Values are **never** interpolated, 
  * only literal fragments, and every statement binds exactly ?1/?2/?3, so a
- * fragment referenced twice still binds once.
+ * fragment referenced twice still binds once. (?3 is data, bound as a JSON
+ * string, never interpolated.)
  *
  * ── Things SQLite does not have, and what replaces them ────────────────────
  * percentile_cont/disc -> a ROW_NUMBER window, see medianOf()
@@ -30,24 +31,29 @@ function quoteList(values: readonly string[]): string {
 }
 
 /**
- * ?1 = since ms, ?2 = until ms, ?3 = 1 to exclude internal sessions.
+ * ?1 = since ms, ?2 = until ms, ?3 = JSON array of session ids to leave out.
  *
  * The internal filter is a **whole-session** verdict, not per-event. Lumen
  * measured its own office leaving by three different ISPs across three
  * consecutive requests; an event-level filter leaves every internal session
  * partly counted, which produces a plausible number that is wrong.
+ *
+ * ?3 is `'[]'` when internal traffic is included, and otherwise the set
+ * `internalSessionIds()` in queries.ts computed ONCE for the request. It used
+ * to be `?3 = 1` and a CTE that re-ran the `GROUP BY session_id HAVING
+ * MAX(is_internal) = 1` scan over the whole window inside every statement,
+ * thirteen times for one overview. Bound as one parameter, so the 100-parameter
+ * cap is not in play; the ceiling is D1's 2 MB value size, roughly fifty
+ * thousand internal sessions in one window.
  */
 export const EV_CTE = `
   internal_sessions AS (
-    SELECT session_id FROM events
-     WHERE created_at >= ?1 AND created_at <= ?2
-     GROUP BY session_id HAVING MAX(is_internal) = 1
+    SELECT value AS session_id FROM json_each(?3)
   ),
   ev AS (
     SELECT * FROM events
      WHERE created_at >= ?1 AND created_at <= ?2
-       AND (?3 = 0
-            OR session_id NOT IN (SELECT session_id FROM internal_sessions))
+       AND session_id NOT IN (SELECT session_id FROM internal_sessions)
   )`;
 
 /**

@@ -57,3 +57,6 @@ __pycache__/
 # sanitised recreations, never the links themselves, and
 # tests/dashboards.test.ts fails if one ever reaches content/.
 /Dashboard collection links.xlsx
+
+# Agent worktrees (Claude Code isolation)
+.claude/worktrees/

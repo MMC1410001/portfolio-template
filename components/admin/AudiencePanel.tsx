@@ -11,9 +11,11 @@
  * categories.
  *
  * ── Colour follows the entity, not its rank ────────────────────────────────
- * Slices are indexed by their position in the folded list, which is derived
- * from a stable sort, so toggling Real visitors / All traffic cannot repaint
- * the chart mid-comparison.
+ * `sliceColours` gives each label its own slot (desktop is always the same
+ * hue, whichever device leads), so toggling Real visitors / All traffic
+ * cannot repaint the chart mid-comparison. This comment used to claim that
+ * while the code indexed the palette by rank, which repainted every slice
+ * whenever two categories swapped places.
  */
 import { Pie, PieChart } from 'recharts';
 import {
@@ -27,17 +29,25 @@ import type { Audience, Breakdown as Row } from '@/lib/analytics/types';
 import { DataTable, NumCell, TableCell } from './DataTable';
 import { Breakdown } from './Breakdown';
 import { StatTile } from './StatTile';
-import { num, pct, ratio, topTwoPlusOther } from './analytics-format';
+import {
+  num,
+  pct,
+  ratio,
+  sliceColours,
+  topTwoPlusOther,
+} from './analytics-format';
 
 const SLICES = ['var(--chart-1)', 'var(--chart-3)', 'var(--chart-5)'];
 
 function SharePie({ title, rows }: { title: string; rows: Row[] }) {
-  const folded = topTwoPlusOther(rows).map((r, i) => ({
-    ...r,
-    fill: SLICES[i],
-  }));
+  const top = topTwoPlusOther(rows);
+  const colours = sliceColours(
+    top.map((r) => r.label),
+    SLICES,
+  );
+  const folded = top.map((r, i) => ({ ...r, fill: colours[i] }));
   const config = Object.fromEntries(
-    folded.map((r, i) => [r.label, { label: r.label, color: SLICES[i] }]),
+    folded.map((r) => [r.label, { label: r.label, color: r.fill }]),
   ) satisfies ChartConfig;
 
   if (folded.length === 0) {
@@ -81,12 +91,12 @@ function SharePie({ title, rows }: { title: string; rows: Row[] }) {
         {/* Direct labels, so identity never rests on colour alone, and they
             double as the relief the light-mode contrast warning requires. */}
         <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-          {folded.map((r, i) => (
+          {folded.map((r) => (
             <li key={r.label} className="flex items-center gap-1.5">
               <span
                 aria-hidden="true"
                 className="size-2 shrink-0 rounded-full"
-                style={{ background: SLICES[i] }}
+                style={{ background: r.fill }}
               />
               <span>{r.label}</span>
               <span className="font-mono tabular-nums text-muted-foreground">

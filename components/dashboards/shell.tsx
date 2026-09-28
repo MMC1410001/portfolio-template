@@ -4,7 +4,7 @@
  * dark-canvas equivalents of the light furniture in `primitives.tsx`.
  *
  * ── Why dark is a separate set rather than a flag on the light one ────────
- * Four of the ten originals are dark dashboards. They are not the light ones
+ * Five of the originals are dark dashboards. They are not the light ones
  * with inverted tokens, the dark set uses tinted panels on a navy canvas with
  * a coloured rule down each stat, where the light set uses white cards with a
  * shadow on near-white. Threading a `dark` boolean through every light
@@ -17,11 +17,15 @@
  * is shared and only its two surface colours change.
  *
  * ── The rail is a nav, and it navigates ───────────────────────────────────
- * Five originals are multi-page: a left rail switches between sections or
+ * Several originals are multi-page: a left rail switches between sections or
  * between the projects a dashboard covers. Rendering the rail as decoration
  * beside a single fixed view would be dishonest about what the thing is, so
  * `RailShell` takes real items and a real selection, and each recreation
  * wires it to state.
+ *
+ * The items are buttons that change state, not links to pages, so the
+ * selection is `aria-pressed`. `aria-current="page"` would tell a screen
+ * reader the URL changed, and it does not.
  */
 import type { ReactNode } from 'react';
 
@@ -99,7 +103,7 @@ export function RailShell({
               <button
                 type="button"
                 onClick={() => onSelect(item.id)}
-                aria-current={item.id === active ? 'page' : undefined}
+                aria-pressed={item.id === active}
                 className={`flex w-auto items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition lg:w-full ${
                   item.id === active
                     ? dark
@@ -259,7 +263,7 @@ export function DarkStat({
           </span>
         ) : null}
       </p>
-      {note ? <p className="mt-1 text-xs text-[#6e778f]">{note}</p> : null}
+      {note ? <p className="mt-1 text-xs text-[#808aa4]">{note}</p> : null}
     </div>
   );
 }
@@ -315,7 +319,7 @@ export function DashNote({
 }) {
   return (
     <p
-      className={`mt-5 text-center text-xs ${dark ? 'text-[#6e778f]' : 'text-[#9ca3af]'}`}
+      className={`mt-5 text-center text-xs ${dark ? 'text-[#808aa4]' : 'text-[#646b79]'}`}
     >
       {children}
     </p>

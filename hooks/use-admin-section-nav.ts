@@ -43,16 +43,24 @@ export function edgeSectionId(
   return null;
 }
 
+/**
+ * Keyed on the ids' *contents*, not the array's identity. Callers pass
+ * ADMIN_SECTION_IDS, a module constant, but an inline `.map(...)` is the
+ * natural thing to write and it rebuilt the observer on every render, so the
+ * effect no longer depends on the caller getting that right.
+ */
 export function useAdminSectionNav(ids: readonly string[]): string | null {
   const [active, setActive] = useState<string | null>(ids[0] ?? null);
+  const key = ids.join('\n');
 
   useEffect(() => {
     if (typeof IntersectionObserver !== 'function') return;
+    const watched = key ? key.split('\n') : [];
 
     const observer = new IntersectionObserver(
       (entries) => {
         const edge = edgeSectionId(
-          ids,
+          watched,
           window.scrollY,
           window.innerHeight,
           document.documentElement.scrollHeight,
@@ -63,12 +71,12 @@ export function useAdminSectionNav(ids: readonly string[]): string | null {
       { rootMargin: '-15% 0px -70% 0px', threshold: 0 },
     );
 
-    for (const id of ids) {
+    for (const id of watched) {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     }
     return () => observer.disconnect();
-  }, [ids]);
+  }, [key]);
 
   return active;
 }

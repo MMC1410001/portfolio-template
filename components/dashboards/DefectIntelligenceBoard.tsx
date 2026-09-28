@@ -28,8 +28,8 @@ import {
   defectRows,
   DEFECT_TOTAL,
   type DefectRow,
-  type Severity,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/defects';
+import type { Severity } from '@/content/dashboards-data/common';
 import {
   Donut,
   HBars,
@@ -38,6 +38,7 @@ import {
   share,
   STATE_COLOR,
 } from './charts';
+import { FilterBar, Panel } from './primitives';
 import { DashNote, RailShell, type RailItem } from './shell';
 
 type View = 'dashboard' | 'analytics' | 'risk' | 'team';
@@ -99,31 +100,13 @@ function Kpi({
     <div className="rounded-xl border border-[#e9ecf4] bg-white p-4">
       <p className={`text-3xl font-bold tabular-nums ${tone}`}>{value}</p>
       <p className="mt-1 text-sm font-semibold text-[#111827]">{label}</p>
-      <p className="text-xs text-[#9ca3af]">{note}</p>
+      <p className="text-xs text-[#6b7280]">{note}</p>
       {badge ? (
         <span className="mt-2 inline-block rounded-md bg-[#f3f4f6] px-1.5 py-0.5 text-[11px] font-semibold text-[#4b5563] tabular-nums">
           {badge}
         </span>
       ) : null}
     </div>
-  );
-}
-
-function Card({
-  title,
-  sub,
-  children,
-}: {
-  title: string;
-  sub: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border border-[#e9ecf4] bg-white p-5">
-      <h4 className="text-sm font-bold text-[#111827]">{title}</h4>
-      <p className="mb-4 text-xs text-[#9ca3af]">{sub}</p>
-      {children}
-    </section>
   );
 }
 
@@ -243,35 +226,35 @@ export function DefectIntelligenceBoard() {
   const charts = (
     <>
       <div className="grid gap-5 lg:grid-cols-3">
-        <Card title="By severity" sub="Critical · High · Medium · Low">
+        <Panel outline title="By severity" sub="Critical · High · Medium · Low">
           <div className="flex flex-col items-center gap-4">
             <Donut segments={bySeverity} size={150} />
             <Legend inline segments={bySeverity} />
           </div>
-        </Card>
-        <Card title="By priority" sub="P0 · P1 · P2">
+        </Panel>
+        <Panel outline title="By priority" sub="P0 · P1 · P2">
           <HBars data={byPriority} labelWidth="w-10" />
-        </Card>
-        <Card title="Open vs closed" sub="Resolution status">
+        </Panel>
+        <Panel outline title="Open vs closed" sub="Resolution status">
           <div className="flex flex-col items-center gap-4">
             <Donut segments={byState} size={150} />
             <Legend inline segments={byState} />
           </div>
-        </Card>
+        </Panel>
       </div>
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
-        <Card title="By assignee" sub="Top contributors">
+        <Panel outline title="By assignee" sub="Top contributors">
           <HBars data={byAssignee} labelWidth="w-20" />
-        </Card>
-        <Card title="By platform" sub="All platforms">
+        </Panel>
+        <Panel outline title="By platform" sub="All platforms">
           <HBars data={byPlatform} labelWidth="w-28" />
-        </Card>
-        <Card title="Defect type" sub="Bug · Observation · Enhancement">
+        </Panel>
+        <Panel outline title="Defect type" sub="Bug · Observation · Enhancement">
           <div className="flex flex-col items-center gap-4">
             <Donut segments={byType} size={150} />
             <Legend inline segments={byType} />
           </div>
-        </Card>
+        </Panel>
       </div>
     </>
   );
@@ -335,7 +318,7 @@ export function DefectIntelligenceBoard() {
                     ? 'Team'
                     : 'Dashboard'}
             </h3>
-            <p className="text-sm text-[#9ca3af]">
+            <p className="text-sm text-[#6b7280]">
               Defect log /{' '}
               {preset === 'open'
                 ? 'Status: open'
@@ -363,58 +346,27 @@ export function DefectIntelligenceBoard() {
         {view === 'dashboard' ? (
           <>
             <section className="mb-5 rounded-xl border border-[#e9ecf4] bg-white p-4">
-              <div className="flex flex-wrap items-end gap-3">
-                <label className="min-w-50 flex-1">
-                  <span className="mb-1 block text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">Search</span>
-                  <input
-                    value={query}
-                    onChange={(ev) => setQuery(ev.target.value)}
-                    placeholder="Search ID, title, module..."
-                    className="w-full rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm outline-none placeholder:text-[#9ca3af] focus:border-indigo-400"
-                  />
-                </label>
-                <label>
-                  <span className="mb-1 block text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">Platform</span>
-                  <select
-                    value={platform}
-                    onChange={(ev) => setPlatform(ev.target.value)}
-                    className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm outline-none focus:border-indigo-400"
-                  >
-                    {['All platforms', ...platforms.map(([n]) => n)].map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span className="mb-1 block text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">Severity</span>
-                  <select
-                    value={severity}
-                    onChange={(ev) => setSeverity(ev.target.value)}
-                    className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-sm outline-none focus:border-indigo-400"
-                  >
-                    {['All severities', ...SEVERITIES].map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuery('');
-                    setPlatform('All platforms');
-                    setSeverity('All severities');
-                    setPreset('all');
-                  }}
-                  className="rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm text-[#6b7280] hover:bg-[#f9fafb]"
-                >
-                  ↺ Reset
-                </button>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <FilterBar
+                labelled
+                query={query}
+                onQuery={setQuery}
+                placeholder="Search ID, title, module..."
+                selects={[
+                  { label: 'Platform', value: platform, onChange: setPlatform, options: ['All platforms', ...platforms.map(([n]) => n)] },
+                  { label: 'Severity', value: severity, onChange: setSeverity, options: ['All severities', ...SEVERITIES] },
+                ]}
+                onReset={() => {
+                  setQuery('');
+                  setPlatform('All platforms');
+                  setSeverity('All severities');
+                  setPreset('all');
+                }}
+              />
+              <div className="flex flex-wrap gap-2">
                 {[...bySeverity, ...byPriority, ...byType].map((s) => (
                   <span key={s.label} className="rounded-lg border border-[#e9ecf4] px-3 py-1.5 text-center">
                     <span className="block text-base font-bold tabular-nums" style={{ color: s.color }}>{s.value}</span>
-                    <span className="block text-[10px] font-semibold tracking-[.06em] text-[#9ca3af] uppercase">{s.label}</span>
+                    <span className="block text-[10px] font-semibold tracking-[.06em] text-[#6b7280] uppercase">{s.label}</span>
                   </span>
                 ))}
               </div>
@@ -428,21 +380,21 @@ export function DefectIntelligenceBoard() {
         {view === 'risk' ? riskStrip : null}
         {view === 'team' ? (
           <div className="grid gap-5 lg:grid-cols-3">
-            <Card title="By assignee" sub="Bug count per person">
+            <Panel outline title="By assignee" sub="Bug count per person">
               <HBars data={byAssignee} labelWidth="w-20" />
-            </Card>
-            <Card title="By severity" sub="Severity distribution">
+            </Panel>
+            <Panel outline title="By severity" sub="Severity distribution">
               <div className="flex flex-col items-center gap-4">
                 <Donut segments={bySeverity} size={150} />
                 <Legend inline segments={bySeverity} />
               </div>
-            </Card>
-            <Card title="By status" sub="Open vs closed">
+            </Panel>
+            <Panel outline title="By status" sub="Open vs closed">
               <div className="flex flex-col items-center gap-4">
                 <Donut segments={byState} size={150} />
                 <Legend inline segments={byState} />
               </div>
-            </Card>
+            </Panel>
           </div>
         ) : null}
 
@@ -458,7 +410,7 @@ export function DefectIntelligenceBoard() {
               <thead>
                 <tr className="border-b border-[#eef1f7]">
                   {['Bug ID', 'Platform', 'Module', 'Severity', 'Priority', 'Title', 'Assignee', 'Status', 'Type'].map((h) => (
-                    <th key={h} scope="col" className="px-3 py-3 text-left text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">
+                    <th key={h} scope="col" className="px-3 py-3 text-left text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">
                       {h}
                     </th>
                   ))}
@@ -482,7 +434,7 @@ export function DefectIntelligenceBoard() {
             </table>
           </div>
           {rows.length === 0 ? (
-            <p className="py-10 text-center text-sm text-[#9ca3af]">No defects match those filters.</p>
+            <p className="py-10 text-center text-sm text-[#6b7280]">No defects match those filters.</p>
           ) : null}
         </section>
       </RailShell>

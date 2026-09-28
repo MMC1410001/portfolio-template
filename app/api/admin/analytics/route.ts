@@ -12,10 +12,14 @@
  */
 
 import { after } from 'next/server';
-import { authorizeAdmin, notFound } from '@/lib/analytics/admin-auth';
+import {
+  allowlistSize,
+  authorizeAdmin,
+  notFound,
+} from '@/lib/analytics/admin-auth';
 import { getDbHandle, ensureSchema } from '@/lib/analytics/db';
 import { readWindow } from '@/lib/analytics/time';
-import { parseCidrList } from '@/lib/analytics/net';
+import { internalVisitorIds, parseCidrList } from '@/lib/analytics/net';
 import { sweepIfDue, sweep } from '@/lib/analytics/retention';
 import {
   audience,
@@ -77,8 +81,7 @@ export async function POST(request: Request) {
           (typeof cf?.country === 'string' ? cf.country : null) ??
           request.headers.get('cf-ipcountry'),
         env: {
-          adminEmails: (process.env.ADMIN_EMAILS ?? '').split(',').filter(Boolean)
-            .length,
+          adminEmails: allowlistSize(),
           hasToken: Boolean(process.env.ADMIN_TOKEN),
           hasIpSalt: Boolean(process.env.ANALYTICS_IP_SALT),
           internalCidrs: parseCidrList(process.env.ANALYTICS_INTERNAL_CIDRS)
@@ -106,9 +109,7 @@ export async function POST(request: Request) {
     // Defaults to excluding internal traffic, matching the panel's default.
     excludeInternal: body.excludeInternal !== false,
     cidrsActive: parseCidrList(process.env.ANALYTICS_INTERNAL_CIDRS).length,
-    visitorsActive: (process.env.ANALYTICS_INTERNAL_VISITORS ?? '')
-      .split(',')
-      .filter((v) => v.trim())
+    visitorsActive: internalVisitorIds(process.env.ANALYTICS_INTERNAL_VISITORS)
       .length,
   };
 

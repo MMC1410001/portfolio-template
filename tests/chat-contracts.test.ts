@@ -24,22 +24,28 @@ test('the model budget stays inside the browser timeout', () => {
   const nim = read('lib/chat/nim.ts');
   const chat = read('components/portfolio/Chat.tsx');
   const budget = Number(/const TOTAL_BUDGET_MS = (\d+)/.exec(nim)?.[1]);
-  // Since the reply streams, the browser's deadline is on the FIRST token
-  // rather than on the whole answer: once words are on screen there is
-  // nothing to gain by cutting them off. The non-streaming path still has
-  // to finish inside that same deadline, because it produces nothing until
-  // it produces everything.
-  const clientTimeout = Number(/firstTokenMs:(\d+)/.exec(chat)?.[1]);
+  // Two browser clocks. The HEADER ceiling is what the non-streaming path
+  // has to beat, because it sends no headers until it has the whole answer.
+  // This used to be compared against the 12s first-token watchdog instead,
+  // which only starts once headers have arrived and so never bounded the
+  // JSON path at all.
+  const headerCeiling = Number(/const HEADER_CEILING_MS=(\d+)/.exec(chat)?.[1]);
+  const firstToken = Number(/firstTokenMs:(\d+)/.exec(chat)?.[1]);
   assert.ok(budget > 0, 'TOTAL_BUDGET_MS not found in lib/chat/nim.ts');
-  assert.ok(clientTimeout > 0, 'firstTokenMs was not found in Chat.tsx');
+  assert.ok(headerCeiling > 0, 'HEADER_CEILING_MS was not found in Chat.tsx');
+  assert.ok(firstToken > 0, 'firstTokenMs was not found in Chat.tsx');
+  assert.match(chat, /setTimeout\(\(\)=>controller\.abort\('slow'\),HEADER_CEILING_MS\)/, 'the header ceiling must actually abort');
   assert.ok(
-    budget + 500 <= clientTimeout,
-    `the Worker may spend ${budget}ms while the browser gives up at ${clientTimeout}ms`,
+    budget + 500 <= headerCeiling,
+    `the Worker may spend ${budget}ms while the browser gives up waiting for headers at ${headerCeiling}ms`,
   );
-  // And the streaming ceiling must be the looser one, or streaming buys
-  // nothing: the whole point is that a 10.9s answer is readable from 1s.
+  // Streaming is what the first-token watchdog is for, and it has to be
+  // the looser clock or streaming buys nothing.
+  assert.ok(firstToken > headerCeiling, 'the first-token watchdog must outlast the header ceiling');
+  // And the stream's own ceiling looser still: the whole point is that a
+  // 10.9s answer is readable from 1s.
   const streamTotal = Number(/export const STREAM_TOTAL_MS = (\d+)/.exec(nim)?.[1]);
-  assert.ok(streamTotal > clientTimeout, 'the stream ceiling must outlast the first-token deadline');
+  assert.ok(streamTotal > firstToken, 'the stream ceiling must outlast the first-token deadline');
   // And the retry must draw from that budget rather than from the per-call
   // ceiling, which is the specific line that was wrong.
   assert.match(nim, /TOTAL_BUDGET_MS - \(Date\.now\(\) - started\)/);
@@ -98,6 +104,20 @@ test('the chat log has exactly one live region', () => {
   const outputs = chat.match(/<output/g) ?? [];
   const silenced = chat.match(/<output aria-live="off"/g) ?? [];
   assert.equal(silenced.length, outputs.length, 'every <output> inside the log must be aria-live="off"');
+});
+
+test('a question cannot be sent while a reply is still streaming', () => {
+  // `busy` clears at the first token. Guarding send() on it alone let a
+  // second question race the first for one transcript, and took the Stop
+  // button away while the first reply was still arriving.
+  const chat = read('components/portfolio/Chat.tsx');
+  assert.match(chat, /if\(!question\|\|busy\|\|streaming\)return;/);
+  assert.match(chat, /\{busy\|\|streaming\?<button type="button" data-track-tag="chat-stop"/);
+});
+
+test('the transcript is marked private to the click tracker', () => {
+  const chat = read('components/portfolio/Chat.tsx');
+  assert.match(chat, /className="chat-messages"[^>]*data-track-private/);
 });
 
 test('the input keeps focus while a question is in flight', () => {

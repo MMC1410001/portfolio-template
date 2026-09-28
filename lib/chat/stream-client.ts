@@ -67,7 +67,35 @@ export function parseFrames(buffer: string): { frames: ChatFrame[]; rest: string
 export interface StreamOutcome {
   /** 'done' is the model's reply; 'fallback' is approved text replacing it. */
   kind: 'done' | 'fallback';
-  payload: Record<string, unknown>;
+  payload: ChatPayload;
+}
+
+/**
+ * The terminal frame's payload, checked rather than cast.
+ *
+ * Structurally the `Answer` of content/faq.ts, redeclared because this file
+ * imports nothing. The panel used to take the frame's JSON `as unknown as
+ * Answer`, so a frame without an `answer` string reached `.slice()` and
+ * threw inside the success path, leaving the panel stuck busy.
+ */
+export interface ChatPayload {
+  answer: string;
+  source: string;
+  mode: 'faq' | 'ai';
+  href?: string;
+  ids?: string[];
+  /** The server's signature over the reply, sent back with it as history. lib/chat/turn-sig.ts. */
+  sig?: string;
+}
+
+/** A payload the panel can render, or null, which sends it to the offline answer. */
+export function toPayload(data: Record<string, unknown>): ChatPayload | null {
+  if (typeof data.answer !== 'string' || typeof data.source !== 'string') return null;
+  const payload: ChatPayload = { answer: data.answer, source: data.source, mode: data.mode === 'ai' ? 'ai' : 'faq' };
+  if (typeof data.href === 'string') payload.href = data.href;
+  if (Array.isArray(data.ids)) payload.ids = data.ids.filter((id): id is string => typeof id === 'string');
+  if (typeof data.sig === 'string') payload.sig = data.sig;
+  return payload;
 }
 
 /**
@@ -75,7 +103,8 @@ export interface StreamOutcome {
  *
  * Returns the terminal frame, or null. Null means the caller should fall
  * back, and covers every failure the same way: no first token in time, a
- * body that ends without a terminal frame, a network drop mid-answer.
+ * body that ends without a terminal frame, a terminal frame with no answer
+ * text in it, a network drop mid-answer.
  */
 export async function readChatStream(
   body: ReadableStream<Uint8Array>,
@@ -111,7 +140,10 @@ export async function readChatStream(
           clearTimeout(watchdog);
           onDelta(frame.data.text);
         } else if (frame.event === 'done' || frame.event === 'fallback') {
-          outcome = { kind: frame.event, payload: frame.data };
+          // The last terminal frame decides, and one that cannot be rendered
+          // decides "offline" rather than being skipped for an earlier one.
+          const payload = toPayload(frame.data);
+          outcome = payload ? { kind: frame.event, payload } : null;
         }
       }
     }

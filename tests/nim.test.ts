@@ -20,7 +20,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { answers } from '@/content/faq';
-import { composeAnswer, nimConfigured } from '@/lib/chat/nim';
+import { composeAnswer, nimConfigured, streamAnswer, type StreamEvent } from '@/lib/chat/nim';
 
 const real = globalThis.fetch;
 
@@ -159,6 +159,54 @@ test('a malformed NIM_MODEL is refused rather than sent', async () => {
   assert.equal(await withKey({ ...KEY, NIM_MODEL: 'not a model' }, () => composeAnswer('is he available?')), null);
   assert.equal(calls.length, 0);
   globalThis.fetch = real;
+});
+
+/** An OpenAI-style SSE body, one delta frame per piece. */
+function stubStream(pieces: string[]): void {
+  const encoder = new TextEncoder();
+  const text = pieces.map((p) => `data: ${JSON.stringify({ choices: [{ delta: { content: p } }] })}\n\n`).join('') + 'data: [DONE]\n\n';
+  globalThis.fetch = (async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(text));
+      controller.close();
+    },
+  }))) as typeof fetch;
+}
+
+async function drain(question: string): Promise<StreamEvent[]> {
+  const events: StreamEvent[] = [];
+  await withKey(KEY, async () => {
+    for await (const event of streamAnswer(question)) events.push(event);
+  });
+  return events;
+}
+
+test('a streamed reply that runs over the limit fails rather than being cut', async () => {
+  // attemptCompose rejects an over-long reply; streaming used to truncate
+  // it at the limit and serve a sentence that stopped halfway, labelled as
+  // grounded. It now fails, and the route replaces it with the curated text.
+  stubStream(Array.from({ length: 30 }, () => 'He is on a sixty day notice with buyout available. '));
+  const events = await drain('is he available?');
+  globalThis.fetch = real;
+  assert.equal(events.at(-1)?.type, 'fail');
+  assert.ok(!events.some((e) => e.type === 'done'), 'an over-long reply is never served');
+});
+
+test('a streamed reply inside the limit is released and completed', async () => {
+  stubStream(['He is on a 60-day notice ', 'with buyout available, and can join soon after an offer.']);
+  const events = await drain('is he available?');
+  globalThis.fetch = real;
+  const done = events.at(-1);
+  assert.equal(done?.type, 'done');
+  const shown = events.filter((e) => e.type === 'delta').map((e) => (e.type === 'delta' ? e.text : '')).join('');
+  assert.equal(shown, done?.type === 'done' ? done.answer : '', 'what was released is the answer served');
+});
+
+test('a streamed invented link fails', async () => {
+  stubStream(['He is on a 60-day notice with buyout available. See ', 'https://not-his-site.example/cv for details.']);
+  const events = await drain('where is his cv?');
+  globalThis.fetch = real;
+  assert.equal(events.at(-1)?.type, 'fail');
 });
 
 test('fenced JSON still parses', async () => {

@@ -67,7 +67,13 @@ export function useStored(
   return [value, set];
 }
 
-/** Same, for a value stored as `'1'` / absent. */
+/**
+ * Same, for a boolean stored as the string `'true'` / `'false'`.
+ *
+ * Absent means the fallback, and anything other than `'false'` reads as true.
+ * Not the `'1'` / absent convention of `pfInternal` in scope.ts, which is why
+ * that key is read with plain useStored() rather than this.
+ */
 export function useStoredFlag(
   key: string,
   fallback: boolean,

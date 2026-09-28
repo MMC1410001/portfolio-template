@@ -38,7 +38,7 @@ import type {
   Overview,
   SessionRow,
 } from '@/lib/analytics/types';
-import { ADMIN_SECTIONS, adminSection } from './admin-sections';
+import { ADMIN_SECTION_IDS, adminSection } from './admin-sections';
 import { AdminNav } from './AdminNav';
 import { AdminSection, PanelError } from './AdminSection';
 import { AnalyticsPanel } from './AnalyticsPanel';
@@ -73,6 +73,9 @@ export function AdminShell({ who }: { who: string }) {
   // subscription rather than in an effect; see hooks/use-stored.ts.
   const [excludeInternal, persistInternal] = useStoredFlag(INTERNAL_KEY, true);
   const [nonce, setNonce] = useState(0);
+  // The heatmap's own Refresh re-reads the heatmap and nothing else: it used
+  // to bump `nonce` and refetch all six panels to redraw one.
+  const [heatNonce, setHeatNonce] = useState(0);
   // Pinned, not sampled per render: a window that drifts while you read it
   // makes two numbers on the same screen describe different periods.
   // Advanced only by Refresh, which is an event handler.
@@ -106,17 +109,28 @@ export function AdminShell({ who }: { who: string }) {
     [window_.since, window_.until, excludeInternal],
   );
 
+  /**
+   * One panel's fetch, abandoned when `signal` aborts.
+   *
+   * Every effect below aborts on cleanup, so a slow response for a range the
+   * operator has already left can neither overwrite the newer one nor flash
+   * an error: after an abort this sets nothing at all, whether the request
+   * settled late or rejected with AbortError.
+   */
   const load = useCallback(
     async function load<T>(
       action: Parameters<typeof fetchAdmin>[0],
       set: (s: Slot<T>) => void,
+      signal: AbortSignal,
       extra: Record<string, string | number | boolean | null> = {},
     ) {
       set({ data: null, error: null, loading: true });
       try {
-        const data = await fetchAdmin<T>(action, { ...params, ...extra });
+        const data = await fetchAdmin<T>(action, { ...params, ...extra }, signal);
+        if (signal.aborted) return;
         set({ data, error: null, loading: false });
       } catch (error) {
+        if (signal.aborted) return;
         set({
           data: null,
           error:
@@ -131,18 +145,22 @@ export function AdminShell({ who }: { who: string }) {
   );
 
   useEffect(() => {
-    void load<Overview>('analytics', setOverview);
-    void load<Audience>('audience', setAudience);
-    void load<Campaigns>('campaigns', setCampaigns);
-    void load<ChatStats>('chat', setChat);
-    void load<SessionRow[]>('sessions', setSessions, { limit: 60 });
+    const abort = new AbortController();
+    void load<Overview>('analytics', setOverview, abort.signal);
+    void load<Audience>('audience', setAudience, abort.signal);
+    void load<Campaigns>('campaigns', setCampaigns, abort.signal);
+    void load<ChatStats>('chat', setChat, abort.signal);
+    void load<SessionRow[]>('sessions', setSessions, abort.signal, { limit: 60 });
+    return () => abort.abort();
   }, [load, nonce]);
 
   useEffect(() => {
-    void load<ClickMap>('click-map', setHeat, { kind, device, mode });
-  }, [load, nonce, kind, device, mode]);
+    const abort = new AbortController();
+    void load<ClickMap>('click-map', setHeat, abort.signal, { kind, device, mode });
+    return () => abort.abort();
+  }, [load, nonce, heatNonce, kind, device, mode]);
 
-  const active = useAdminSectionNav(ADMIN_SECTIONS.map((s) => s.id));
+  const active = useAdminSectionNav(ADMIN_SECTION_IDS);
   const anyLoading =
     overview.loading || audience.loading || campaigns.loading || chat.loading;
 
@@ -224,7 +242,7 @@ export function AdminShell({ who }: { who: string }) {
               onDevice={setDevice}
               onKind={setKind}
               onMode={setMode}
-              onRefresh={() => setNonce((n) => n + 1)}
+              onRefresh={() => setHeatNonce((n) => n + 1)}
             />
           </AdminSection>
 

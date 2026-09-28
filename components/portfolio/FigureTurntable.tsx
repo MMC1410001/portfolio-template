@@ -61,7 +61,7 @@
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { trackTag } from '@/lib/analytics/tag';
+import { trackSyntheticTag } from '@/lib/analytics/tag';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -162,8 +162,10 @@ export default function FigureTurntable({reduced,preview,children}:{reduced:bool
     node.style.transform=`translate3d(${((p-0.5)*depth*52).toFixed(1)}px,${((p-0.5)*depth*-36).toFixed(1)}px,0)`;
    }
    // One tag, once: "did anyone actually scroll far enough to see the turn?"
-   // is the only question this feature needs answered.
-   if(p>0.9&&!seen.current){seen.current=true;trackTag('scene-rotation',{frames:images.length})}
+   // is the only question this feature needs answered. Always its own row: this
+   // runs from scroll, so there is no click for trackTag() to enrich, only an
+   // unrelated earlier one it would have relabelled.
+   if(p>0.9&&!seen.current){seen.current=true;trackSyntheticTag('scene-rotation',{frames:images.length})}
   };
   // Decode before the first paint, or the canvas shows one frame arriving at a
   // time as the network delivers them.

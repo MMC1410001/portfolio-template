@@ -65,6 +65,7 @@ import type {
   SessionRow,
 } from '../lib/analytics/types';
 import { SECTIONS } from '../lib/analytics/section-catalogue';
+import { GUARD_SOURCES } from '../content/faq';
 
 /* ─────────────────────────── knobs ─────────────────────────── */
 
@@ -452,15 +453,12 @@ const CHAT_SOURCES = [
 /** What the query counts as the coverage gap. Exact string, deliberately. */
 const GAP_SOURCE = 'Not documented';
 
-/** Guard sources: a question deflected before it reaches the answer set. */
-const GUARD_SOURCES = ['Safety boundary', 'Portfolio guide', 'Out of scope'] as const;
-
 /** Questions that trip a guard rather than reaching the answer set. */
 const GUARDED_QUESTIONS = [
   'what is his password',
   'give me his client list',
   'share the internal api keys',
-  'what is the weather in mumbai',
+  'what is the weather in austin',
   'write me a poem',
   'is he married',
   'what caste is he',

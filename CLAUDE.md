@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. `AGENTS.md` is generated from it: regenerate that after editing this (the command is in its header).
 
 ## Commands
 
@@ -9,8 +9,9 @@ npm run dev            # vinext dev server on http://localhost:3000
 npm run typecheck      # tsc --noEmit, the real gate
 npm run build          # prebuild (knowledge sync) + vinext build -> dist/
 npm run start          # wrangler dev --config dist/server/wrangler.json (build first)
-npm test               # units + chat + analytics
-npm run test:units     # pure-logic checks, no server needed
+npm test               # units + py + chat + analytics
+npm run test:units     # every tests/*.test.ts, pure logic, no server needed
+npm run test:py        # the Python half of the answer contract (.venv if present)
 npm run test:chat      # needs `npm run dev` in another terminal
 npm run test:analytics # ditto, plus ADMIN_TOKEN set
 npm run emit:migration # regenerate migrations/ and drizzle/ from schema.ts
@@ -25,7 +26,7 @@ npm run lint           # oxlint. See the warning below
 Python (optional FastAPI service):
 
 ```sh
-python3 -m venv .venv && source .venv/bin/activate && pip install -r backend/requirements.txt
+python3 -m venv .venv && source .venv/bin/activate && pip install -r backend/requirements-lock.txt
 uvicorn backend.main:app --reload --port 8000
 .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v
 .venv/bin/python -m unittest tests.test_backend.PortfolioGuideTests.test_auth   # single test
@@ -46,9 +47,11 @@ without a full build.
 
 ### `npm run lint` does not pass, and never did
 
-`oxlint` reports a dozen pre-existing errors in `components/ui/*` (generated shadcn output) and
-`hooks/use-mobile.ts`: `react-compiler`, `jsx-a11y/prefer-tag-over-role`,
-`restrict-template-expressions`. A clean lint is not a gate you can hold new work to. **Lint the
+`oxlint` reports about fifteen pre-existing errors, all in `components/ui/*` (generated shadcn
+output): `jsx-a11y/prefer-tag-over-role`, `restrict-template-expressions` and friends. Everything
+first-party (`app`, `lib`, `hooks`, `components/{portfolio,admin,dashboards,showcase}`, `scripts`,
+`tests`) lints clean, and should stay that way. A whole-repo clean lint is still not a gate you can
+hold new work to. **Lint the
 paths you touched:**
 
 ```sh
@@ -149,6 +152,9 @@ rows still render with a name. Alongside it:
 | `/admin` | the dashboard (dynamic) |
 | `/privacy` | the disclosure, with a working opt-out |
 | `/analytics` | public showcase of the dashboard, on synthetic data (static) |
+| `/analytics/design-notes` | `ANALYTICS.md`, rendered (static) |
+| `/dashboards`, `/dashboards/[slug]` | recreations of delivery dashboards, one lazy chunk per board (static, `dynamicParams=false`) |
+| `/robots.txt`, `/sitemap.xml` | `app/robots.ts`, `app/sitemap.ts`; `/admin` is deliberately in neither |
 
 `/` must stay **statically rendered**. Several choices in the analytics code exist only to protect
 that, notably reading the heatmap preview flag from `window.location` rather than via
@@ -170,12 +176,12 @@ Two side effects matter when touching it:
 - `prefers-reduced-motion` skips the transition and disables autoplay.
 
 `ImmersiveSystem.tsx` → `FigureTurntable.tsx` are `lazy()`-loaded, so neither the rig nor the
-772KB of frames it pulls touches the initial bundle. **The immersive view is a scroll-driven photo
+240KB of frames it pulls touches the initial bundle. **The immersive view is a scroll-driven photo
 turntable, not a 3D scene**, three.js, `@react-three/fiber` and `SystemScene.tsx` are gone, and
 with them the quality select, the pause button and the WebGL2 probe: a sequence that only moves
 when the visitor scrolls has no running animation to pause and no GPU to fall back from.
 
-- `public/turntable/f-00..21.avif` are 22 stills of one seated pose around a full circle, cut out
+- `public/turntable/f-00..59.avif` are 60 stills of one seated pose around a full circle, cut out
   and normalised by `scripts/turntable-frames.swift` (macOS-only: Vision for the matte and the
   person measurement, ImageIO for AVIF; source sheet in `assets/`). **Never hand-edit them**, 
   re-run the script, whose header carries the exact invocation and the reasoning. Frame
@@ -213,8 +219,10 @@ boundary rather than the generic deflection.
 
 ### Chat answers degrade in four tiers
 
-1. **Browser**, `Chat.tsx` calls `/api/chat`, and on *any* failure (non-OK, 8.5s timeout) runs
-   `answerQuestion()` locally and labels the source `'Offline · from the portfolio'`. The chatbot
+1. **Browser**, `Chat.tsx` calls `/api/chat`, and on *any* failure runs `answerQuestion()` locally.
+   Two deadlines: `HEADER_CEILING_MS` (8.5s) until the response headers arrive, then a 12s
+   first-token watchdog on a stream. The source says why: `'Timed out · …'`, `'Stopped · …'`,
+   `'Rate limited · …'`, otherwise `'Offline · from the portfolio'`. The chatbot
    works with the Worker down. It also means some questions never reach the server.
 2. **Worker**, `app/api/chat/route.ts` computes `answerQuestion()` first, then only consults the
    Python service when a documented answer already matched (`source === 'From the portfolio'`).
@@ -222,15 +230,17 @@ boundary rather than the generic deflection.
 3. **NVIDIA NIM, from the Worker itself** (`lib/chat/nim.ts`). Set `NIM_API_KEY` and the Worker
    composes a reply, with no second deployment. Two classes of question reach it: **the ones no
    pattern matched** (`Answer.unmatched`), and **a matched question asked during a conversation**
-   (`enrichable && history.length > 0`). The second is why it composes at all: a first question is
+   (`enrichable && history.length > 0`, where `history` is *prior* turns only; the client used to
+   include the current question, which made every first question eligible). The second is why it composes at all: a first question is
    a topic lookup and the curated answer is the best reply, but "Lumen, was he QA or developer?"
    as a fourth question, answered with the entire Lumen entry, is a topic being matched rather
    than a question being answered. The union of both was tried and `npm run test:chat` failed
    inside one run, the model preferred the company answer over the experience answer for "What did
    he do at Northwind?", and both are approved prose, so nothing was false and the reply was simply
    worse. The patterns in `content/faq.ts` are tuned against `tests/chat-cases.json`; a model
-   overruling a match it did not need to make can only regress. Defaults to `openai/gpt-oss-20b`
-   (~1s); most other models on `integrate.api.nvidia.com` 404 per-account or cold start past the
+   overruling a match it did not need to make can only regress. Defaults to
+   `nvidia/nemotron-3-super-120b-a12b` with thinking off (~1-3s; `gpt-oss-20b`, the previous
+   default, had drifted to 7s+ and timed out 7 questions in 8); most other models on `integrate.api.nvidia.com` 404 per-account or cold start past the
    6s timeout, so confirm a `NIM_MODEL` override against your own key.
 4. **FastAPI + Gemini**, `backend/main.py`. Optional and currently unhosted. Gemini receives the
    approved answer set as data and may only return an `answer_id`; the served prose is always
@@ -257,10 +267,32 @@ much it actually protects:
 
 **Two clocks, and only one of them matters.** `TIMEOUT_MS` is what one call may take;
 `TOTAL_BUDGET_MS` (7.5s) is what `composeAnswer` may take including its retry, and it exists
-because `Chat.tsx` aborts at **8.5s**. The retry used to be budgeted against `TIMEOUT_MS`, so a
+because `Chat.tsx` aborts at **8.5s** if no headers have arrived (`HEADER_CEILING_MS`). The retry used to be budgeted against `TIMEOUT_MS`, so a
 first attempt failing at 5.9s started a second with a fresh 6.5s: measured at 9.7s, 9.9s and 12.3s,
 every one of them after the browser had already served the offline answer.
 `tests/chat-contracts.test.ts` reads both numbers out of the source and fails if they cross.
+
+**History is screened too, not only the question.** `lib/chat/gate.ts` runs `answerQuestion()` on
+every prior user turn and drops any that a guard refused, with the reply after it, before the
+history reaches the model; `Chat.tsx` also never records a guarded turn. Without that, "What is the
+server password?" followed by "and?" carried the refused question to NVIDIA as context.
+
+**Assistant turns are verified by signature, not by guard.** The guards judge questions, and the
+site's own refusals contain "password" and "salary", so they cannot screen a reply. Instead every
+reply `/api/chat` returns carries `sig`, an HMAC of its first `TURN_CHARS` (320) characters, which
+is exactly what `Chat.tsx` keeps and sends back; `verifyHistory` in `lib/chat/turn-sig.ts` drops any
+assistant turn without a valid one, *before* `screenHistory` runs. Without it a hand-built body
+could put a sentence in the bot's mouth for the model to repeat as "AI · grounded in portfolio".
+The key is derived from `ANALYTICS_IP_SALT` (no new secret; with it unset every assistant turn is
+dropped). Replies the panel answered locally carry no signature and are dropped the same way, which
+costs a follow-up that one reply's context, never its user turn. Any new `Response.json` carrying an
+answer must go through `signed()`; `tests/turn-sig.test.ts` fails if one does not.
+
+**The guards are English.** A question in another language that matched no pattern is therefore
+*not* model-eligible (`modelEligible` in `gate.ts`: `detectLanguage` must return null and the
+question must contain no non-ASCII letters, which also catches Spanish that the stopword list
+misses). It gets the curated not-documented reply. A non-English question that *did* match still
+goes to the model to be answered in its own language.
 
 **The tier is latency-bound, and that is not fixed.** Measured over eight unmatched questions, the
 NVIDIA endpoint answered in 5.4s to 16.3s. Check your own telemetry before assuming the model
@@ -300,7 +332,8 @@ leaves it unset.
 The Python side still refuses to trust `X-Forwarded-For`, but keying on `request.client.host`
 alone was worse than conservative, behind the Worker that is a Cloudflare egress address, so every
 visitor shared one bucket and fifteen questions from one person locked the AI path for everyone.
-The Worker now forwards `X-Client-Bucket`, the salted hash it already computed, and `main.py`
+The Worker now forwards `X-Client-Bucket`, the salted budget hash it already computed (keyed on the
+/64 for IPv6, see `budgetKey` in `lib/analytics/net.ts`), and `main.py`
 honours it **only when `CHAT_BACKEND_TOKEN` is set**, matching the token is what proves the
 request came from the Worker, so a direct caller cannot choose its own bucket.
 
@@ -316,9 +349,11 @@ what keeps the two implementations of the same logic in step.
 - **oxlint, not ESLint; oxfmt, not Prettier.** `typescript/no-explicit-any` and
   `typescript/no-deprecated` are errors, `typeAware` is on, and `correctness` is escalated to error.
 - shadcn is configured with `style: "base-nova"`: the primitives are backed by **`@base-ui/react`,
-  not Radix**. 60 components are vendored in `components/ui/`; `chart.tsx`, `table.tsx`,
-  `sidebar.tsx`, `tabs.tsx` and most others are currently unused. `recharts@3.8.0` is installed and
-  unused.
+  not Radix**. 55 components are vendored in `components/ui/`. The admin dashboard uses
+  `chart.tsx` (over `recharts@3.8.0`), `table.tsx`, `sidebar.tsx` and `calendar.tsx`
+  (`RangeControls`); many others are unused. Unused parts whose packages were dead weight (command,
+  carousel, input-otp, resizable, message-scroller) were deleted with their dependencies: check
+  imports before assuming a vendored file is spare.
 - **Tailwind v4, CSS-first.** There is no `tailwind.config.*`. Tokens live in `app/globals.css`:
   `@theme inline` maps `--color-*` / `--font-*`, then `:root` and `.dark` define the palettes.
   Beyond the tokens, the portfolio's styling is hand-written BEM-ish CSS (`.portfolio`,
@@ -329,7 +364,8 @@ what keeps the two implementations of the same logic in step.
   Sites runtime config, not the repo (`dist/server/wrangler.json` ships `"vars": {}`). FastAPI does
   **not** load `.env` itself, export those or set them in the host's secret store.
 - **External links rot silently.** `npm run check:links` imports `content/portfolio.ts` and fetches
-  every URL anonymously. It is a deploy gate. It is host-aware on purpose: a naive "non-200 is
+  every URL anonymously. It runs weekly in `.github/workflows/links.yml`, not on deploy (link rot is a
+  property of time, not of a push); run it by hand before a content release. It is host-aware on purpose: a naive "non-200 is
   broken" rule produced 9 false positives out of 25, because Sample Academy and `ude.my` sit behind a
   Cloudflare challenge (a *fake* certificate id returns the same 403 as a real one), Coursera is
   client-rendered (a fake code also returns 200), and LinkedIn answers 999 inconsistently. Those
@@ -353,8 +389,17 @@ Two rules that are easy to break by accident:
 - **`lib/analytics/events.ts` is imported by both the browser and the ingest route.** Adding a verb
   is deliberately a one-file change; splitting it is how a verb gets dropped silently and looks
   exactly like broken code.
+- **Every event verb has a prop-key allowlist (`PROPS_BY_VERB` in `events.ts`), and the server drops
+  any key not on it.** Adding a prop in the browser without adding it there loses it silently. The
+  server also re-runs `normaliseQuestion` on `chat_ask` `q` and screens dead/rage-click selectors:
+  `/api/track` is open, so a rule enforced only in the browser is not a rule.
 - **If you add a field to the event log, update `app/privacy/page.tsx` in the same commit.** That
   page states what is collected and for how long. It is an obligation, not a nicety.
+- **`ANALYTICS.md` is public.** `/analytics/design-notes` renders it verbatim (imported `?raw` at
+  build time through the small parser in `lib/markdown.ts`), because the repo is private and the
+  showcase's link to it on GitHub was a 404. Whatever goes into that file is published on the next
+  deploy. `tests/markdown.test.ts` parses the real file, so a construct the parser cannot handle
+  fails the unit tests rather than the page.
 - **`/analytics` is public and must never touch the database.** It renders the same panels as
   `/admin` against `content/analytics-demo.json`. If it ever gains a `fetchAdmin` call it becomes a
   public page probing a gated API on every load. Change a query payload shape and re-run

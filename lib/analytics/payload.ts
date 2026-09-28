@@ -9,9 +9,14 @@
  * indistinguishable from real data once written.
  */
 
-import { ALLOWED_EVENTS, POINT_KIND } from './events';
+import { ALLOWED_EVENTS, ALLOWED_PROPS, POINT_KIND } from './events';
 import { SECTION_IDS, MODES, sectionIdFromPath } from './section-catalogue';
-import { MAX_CLICK_ID_LEN, normaliseUtmValue } from './normalise';
+import {
+  MAX_CLICK_ID_LEN,
+  normaliseQuestion,
+  normaliseUtmValue,
+  screenSelector,
+} from './normalise';
 
 /** One request can never write more than this, however many it claims. */
 export const MAX_BATCH = 50;
@@ -49,6 +54,11 @@ export interface TrackBody {
   events?: unknown;
 }
 
+/** A plain object: not null, not an array. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /** Keeps a forged header or a very long URL from bloating a row. */
 export function clamp(value: unknown, max: number): string | null {
   if (typeof value !== 'string' || !value) return null;
@@ -74,16 +84,20 @@ export function clampPct(value: unknown): number | null {
  *
  * Nested objects and arrays are dropped whole rather than truncated: nesting
  * is how a byte cap gets defeated, and nothing reading this column needs it.
+ *
+ * `allowed` is the verb's key list from events.ts. It filters BEFORE the key
+ * cap, so twenty junk keys at the front of an object cannot push the real
+ * ones out.
  */
 export function sanitiseProps(
   value: unknown,
+  allowed?: ReadonlySet<string>,
 ): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 
-  const entries = Object.entries(value as Record<string, unknown>).slice(
-    0,
-    MAX_PROPS_KEYS,
-  );
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => !allowed || allowed.has(key))
+    .slice(0, MAX_PROPS_KEYS);
   const out: Record<string, unknown> = {};
 
   for (const [key, raw] of entries) {
@@ -175,7 +189,12 @@ export function sanitiseAttribution(
  */
 export function readEvents(body: TrackBody): IncomingEvent[] {
   if (Array.isArray(body.events)) {
-    return body.events.slice(0, MAX_BATCH) as IncomingEvent[];
+    // Non-objects go here rather than in validateEvent: `raw.event` on a
+    // `null` entry throws, and a throw lands in the route's catch as an
+    // "ingest failed" log line for what is only junk.
+    return body.events
+      .slice(0, MAX_BATCH)
+      .filter(isRecord) as IncomingEvent[];
   }
   return [
     {
@@ -216,10 +235,15 @@ export interface ValidatedEvent {
  * cannot label a dead click as a real one.
  */
 export function validateEvent(raw: IncomingEvent): ValidatedEvent | null {
+  if (!isRecord(raw)) return null;
   const event = typeof raw.event === 'string' ? raw.event : '';
   if (!ALLOWED_EVENTS.has(event)) return null;
 
-  const props = sanitiseProps(raw.props);
+  const props = screenProps(
+    event,
+    raw.props,
+    sanitiseProps(raw.props, ALLOWED_PROPS[event]),
+  );
   const path = clamp(raw.path, 512) ?? '/';
 
   // A page_view carries its section in the path (`/#work`); everything else
@@ -258,11 +282,72 @@ export function validateEvent(raw: IncomingEvent): ValidatedEvent | null {
             2_000_000,
           ),
           selector: clamp(
-            (raw.point as { selector?: unknown }).selector,
+            screenPointSelector(
+              event,
+              (raw.point as { selector?: unknown }).selector,
+            ),
             200,
           ),
           kind: POINT_KIND[event],
         }
       : null,
   };
+}
+
+/** The verbs whose element name can carry visitor text. See screenSelector. */
+const SCREENED_SELECTOR_VERBS: ReadonlySet<string> = new Set([
+  'dead_click',
+  'rage_click',
+]);
+
+/** Screened before the 200-character clamp, for screenProps' reason. */
+function screenPointSelector(event: string, selector: unknown): unknown {
+  return typeof selector === 'string' && SCREENED_SELECTOR_VERBS.has(event)
+    ? screenSelector(selector)
+    : selector;
+}
+
+/**
+ * The browser's privacy screens, run again on the server.
+ *
+ * `normaliseQuestion()` used to run only in chat.ts, so the rule on /privacy
+ * ("an email address, a long run of digits or a link is discarded whole") held
+ * for the site's own client and for nobody else: the endpoint is open, and a
+ * hand-written POST could store any 300 characters as `q`. It is the same
+ * function, so the two ends cannot drift, and it is idempotent on text the
+ * client already normalised.
+ *
+ * Screened from the RAW value, before sanitiseProps' 300-character slice: a
+ * slice can cut a phone number to six digits, which the digit-run rule then
+ * no longer sees. `rejected` is overwritten only when the server refuses, so
+ * the client's own reason survives when it had one.
+ */
+function screenProps(
+  event: string,
+  rawProps: unknown,
+  props: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!props) return props;
+  const source = rawProps as Record<string, unknown>;
+
+  if (event === 'chat_ask' && 'q' in props) {
+    const raw = source.q;
+    if (typeof raw !== 'string') {
+      props.q = null;
+    } else {
+      const { q, rejected } = normaliseQuestion(raw);
+      props.q = q;
+      if (rejected) props.rejected = rejected;
+    }
+  }
+
+  if (
+    SCREENED_SELECTOR_VERBS.has(event) &&
+    typeof props.selector === 'string' &&
+    typeof source.selector === 'string'
+  ) {
+    props.selector = screenSelector(source.selector).slice(0, 300);
+  }
+
+  return props;
 }

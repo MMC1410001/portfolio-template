@@ -69,12 +69,47 @@ const INTERACTIVE =
   ' details, [data-track-tag]';
 
 /**
- * A human-readable, reasonably stable identifier for an element.
+ * Regions whose text belongs to the visitor, not to the page.
+ *
+ * The chat transcript is the one that exists today: a question is typed by the
+ * visitor, and an email address or a phone number in it would otherwise reach
+ * `props.selector` through textContent and sit in the event log for 180 days,
+ * outside the 30-day question-text policy and past normaliseQuestion()'s PII
+ * refusal entirely. Anything inside one is named by its markup, never its text.
+ */
+const PRIVATE_REGION = '[data-track-private]';
+
+function isPrivate(el: Element): boolean {
+  return typeof el.closest === 'function' && el.closest(PRIVATE_REGION) !== null;
+}
+
+/**
+ * Tag, then id or first class, and nothing a visitor could have typed.
+ *
+ * For elements that are not controls. A dead click lands on whatever div was
+ * under the pointer, and the nearest div with text is very often a chat
+ * bubble, so this reads none of textContent, aria-label or title: only
+ * author-written markup is safe to name.
+ */
+export function describeStructure(el: Element): string {
+  const tagName = el.tagName.toLowerCase();
+  if (el.id) return `${tagName}#${el.id}`.slice(0, 60);
+  // getAttribute, not className: on an SVG node className is an object.
+  const first = (el.getAttribute('class') ?? '').trim().split(/\s+/)[0];
+  return first ? `${tagName}.${first}`.slice(0, 60) : tagName;
+}
+
+/**
+ * A human-readable, reasonably stable identifier for a control.
  *
  * Deliberately not a CSS path: Tailwind class lists are long, unstable and
  * meaningless in a table, and an nth-child path breaks the moment anything is
  * inserted above it. Tag plus accessible name survives both and is legible in
  * the dashboard without a lookup.
+ *
+ * Inside a PRIVATE_REGION the textContent step is skipped, for the name and for
+ * `text`: a link in a chat answer is still named by its attributes, never by
+ * words the visitor may have supplied.
  */
 export function describeElement(el: Element): {
   selector: string;
@@ -82,22 +117,23 @@ export function describeElement(el: Element): {
   tag: string | null;
 } {
   const tagName = el.tagName.toLowerCase();
+  const own = isPrivate(el) ? null : el.textContent;
   const explicit = normaliseTag(el.getAttribute('data-track-tag'));
   if (explicit) {
-    return { selector: explicit, text: normaliseText(el.textContent), tag: explicit };
+    return { selector: explicit, text: normaliseText(own), tag: explicit };
   }
 
   const name =
     normaliseText(el.getAttribute('aria-label')) ??
     normaliseText(el.getAttribute('alt')) ??
     normaliseText(el.getAttribute('title')) ??
-    normaliseText(el.textContent, 40) ??
+    normaliseText(own, 40) ??
     normaliseText(el.getAttribute('name')) ??
     (el.id ? `#${el.id}` : null);
 
   return {
     selector: name ? `${tagName}:${name}` : tagName,
-    text: normaliseText(el.textContent),
+    text: normaliseText(own),
     tag: null,
   };
 }
@@ -192,12 +228,19 @@ export function installClickTracking(): void {
       const section = currentSection();
       const mode = currentMode();
       const el = target.closest(INTERACTIVE);
+      // What a click on nothing interactive is filed under: the nearest thing
+      // that can be named, so the row says *what* was clicked and not only
+      // where. By structure only, see describeStructure(). This used to be
+      // describeElement(near), the first 40 characters of the nearest div,
+      // and a chat bubble is a div.
+      const near = el ? null : target.closest('[id], [class], section, article, div');
+      const structural = near ? describeStructure(near) : target.tagName.toLowerCase();
 
       // Queued BEFORE the click row below, never after. See the queue-order
       // rule in the header.
       if (rageThisView < RAGE_MAX_PER_VIEW && isRageBurst(event)) {
         rageThisView += 1;
-        const rageSelector = el ? describeElement(el).selector : null;
+        const rageSelector = el ? describeElement(el).selector : structural;
         queueEvent('rage_click', {
           props: { selector: rageSelector, dead: !el, section, mode },
           point: pointFor(event, rageSelector),
@@ -215,14 +258,9 @@ export function installClickTracking(): void {
          */
         if (deadThisView < DEAD_MAX_PER_VIEW && Math.random() < DEAD_SAMPLE_RATE) {
           deadThisView += 1;
-          // The nearest thing that can be named, so the row says *what* was
-          // clicked and not only where. Not a control, by definition.
-          const near = target.closest('[id], [class], section, article, div');
           queueEvent('dead_click', {
             props: {
-              selector: near
-                ? describeElement(near).selector
-                : target.tagName.toLowerCase(),
+              selector: structural,
               tag: null,
               section,
               mode,

@@ -23,6 +23,7 @@ import { getDb, ensureSchema } from '@/lib/analytics/db';
 import {
   MAX_BODY_BYTES,
   UUID_RE,
+  isRecord,
   readEvents,
   sanitiseAttribution,
   validateEvent,
@@ -30,9 +31,12 @@ import {
   type ValidatedEvent,
 } from '@/lib/analytics/payload';
 import { classifyUserAgent } from '@/lib/analytics/user-agent';
+import { readCapped } from '@/lib/read-capped';
 import {
+  budgetKey,
   clientIp,
   hashIp,
+  internalVisitorIds,
   ipPrefix,
   matchesAnyCidr,
   parseCidrList,
@@ -47,6 +51,10 @@ function ok(written: number): Response {
     { ok: true, written },
     { headers: { 'Cache-Control': 'private, no-store' } },
   );
+}
+
+function tooLarge(): Response {
+  return Response.json({ error: 'Payload too large.' }, { status: 413 });
 }
 
 function refused(reason: string): Response {
@@ -70,23 +78,28 @@ export async function POST(request: Request) {
     }
 
     if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
-      return Response.json({ error: 'Payload too large.' }, { status: 413 });
+      return tooLarge();
     }
-    // The header is advisory, so the read is checked too, the same two-stage
-    // guard app/api/chat/route.ts already uses.
-    const text = await request.text();
-    if (text.length > MAX_BODY_BYTES) {
-      return Response.json({ error: 'Payload too large.' }, { status: 413 });
-    }
+    // The header is advisory, so the read is capped too, and capped as it
+    // streams: `request.text()` buffered the whole body before its length
+    // could be checked, so a chunked upload with no content-length got to
+    // allocate as much as it liked first.
+    const text = await readCapped(request, MAX_BODY_BYTES);
+    if (text === null) return tooLarge();
 
-    let body: TrackBody;
+    let parsed: unknown;
     try {
       // Never request.json(): sendBeacon posts text/plain, and json() is
       // content-type sensitive in some runtimes and gives no byte cap.
-      body = JSON.parse(text) as TrackBody;
+      parsed = JSON.parse(text);
     } catch {
       return refused('bad_json');
     }
+    // `null`, a number or an array all parse, and `body.session_id` on the
+    // first of them throws into the catch below as an "ingest failed" log
+    // line for what is only junk.
+    if (!isRecord(parsed)) return refused('bad_json');
+    const body = parsed as TrackBody;
 
     const sessionId =
       typeof body.session_id === 'string' && UUID_RE.test(body.session_id)
@@ -128,17 +141,20 @@ export async function POST(request: Request) {
     await ensureSchema(db);
 
     // Charged per event, before any work, exactly as the source system does.
-    const budget = await chargeBudget(db, ipHash, events.length, Date.now());
+    // Keyed on the /64 for IPv6 (see budgetKey), so it is its own hash rather
+    // than ipHash, which stays per-address for distinct-visitor counts. For
+    // IPv4 the two are the same value.
+    const bucket = await hashIp(budgetKey(ip), salt);
+    const budget = await chargeBudget(db, bucket, events.length, Date.now());
     if (!budget.allowed) return refused('rate_limited');
 
     cidrs ??= parseCidrList(process.env.ANALYTICS_INTERNAL_CIDRS);
     const attribution = sanitiseAttribution(body.attribution);
     const visitorId = attribution?.visitor_id ?? null;
 
-    const internalVisitors = (process.env.ANALYTICS_INTERNAL_VISITORS ?? '')
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
+    const internalVisitors = internalVisitorIds(
+      process.env.ANALYTICS_INTERNAL_VISITORS,
+    );
 
     const isInternal =
       matchesAnyCidr(ip, cidrs) ||

@@ -74,8 +74,14 @@ def faq(question: str) -> dict:
     # answered by inviting the asker to put it to Alex directly.
     if re.search(DATA['guard']['personal'], q, re.I):
         return result('That is personal information, and not something this portfolio covers. I can answer questions about Alex’s work, skills, experience, education and availability.', 'Out of scope')
+    # This refusal and the not-documented fallback at the end are the same
+    # text answerQuestion() in content/faq.ts returns, contact details
+    # included. They used to be a shorter paraphrase, so the two tiers gave a
+    # visitor different words for the same answer; tests/test_backend.py reads
+    # the TypeScript source and fails if they drift again.
+    contact = f"{DATA['profile']['email']} or {DATA['profile']['phone']}"
     if re.search(DATA['guard']['unknown'], q, re.I):
-        return result('That detail is not in the portfolio. Please ask Alex directly on LinkedIn or by email.', 'Not documented', DATA['profile']['linkedin'])
+        return result(f'That detail is not in the portfolio. Please ask Alex directly at {contact}.', 'Not documented', DATA['profile']['linkedin'])
     if re.search(DATA['guard']['offTopic'], q, re.I):
         return result('I answer questions about Alex’s work. Ask about his projects, skills, certifications, or experience.')
     if re.fullmatch(r'(hi|hello|hey|thanks|thank you)[!. ]*', q, re.I):
@@ -83,7 +89,7 @@ def faq(question: str) -> dict:
     for entry in DATA['answers']:
         if any(re.search(r'\b' + re.escape(word) + r'\b', q, re.I) for word in entry['patterns']):
             return result(entry['answer'], 'From the portfolio', entry.get('href'))
-    return result('I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, or experience. You can also contact him directly.', 'Not documented', DATA['profile']['linkedin'])
+    return result(f'I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, availability or experience. You can also reach him directly at {contact}.', 'Not documented', DATA['profile']['linkedin'])
 
 @app.get('/health')
 def health():

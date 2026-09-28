@@ -41,7 +41,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { ADMIN_SECTIONS, adminSection } from '@/components/admin/admin-sections';
+import { ADMIN_SECTION_IDS, adminSection } from '@/components/admin/admin-sections';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { AdminSection } from '@/components/admin/AdminSection';
 import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
@@ -132,7 +132,7 @@ export function ShowcaseShell() {
     [rangeId, device, kind, mode],
   );
 
-  const active = useAdminSectionNav(ADMIN_SECTIONS.map((s) => s.id));
+  const active = useAdminSectionNav(ADMIN_SECTION_IDS);
   const anchor = prettyAnchor(demo.anchor);
 
   return (
@@ -360,21 +360,20 @@ function HowItWorks() {
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
+          nativeButton={false}
           variant="outline"
           size="sm"
           className="text-xs"
           render={
-            <a
-              href="https://github.com/example-dev/portfolio/blob/main/ANALYTICS.md"
-              target="_blank"
-              rel="noreferrer noopener"
-              data-track-tag="showcase-design-notes"
-            >
+            // The repo is private, so a GitHub link was a 404 for every
+            // visitor. The page renders ANALYTICS.md itself.
+            <Link href="/analytics/design-notes" data-track-tag="showcase-design-notes">
               Read the design notes
-            </a>
+            </Link>
           }
         />
         <Button
+          nativeButton={false}
           variant="ghost"
           size="sm"
           className="text-xs"
@@ -385,6 +384,7 @@ function HowItWorks() {
           }
         />
         <Button
+          nativeButton={false}
           variant="ghost"
           size="sm"
           className="text-xs"

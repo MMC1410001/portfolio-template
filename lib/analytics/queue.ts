@@ -13,7 +13,8 @@
  * when the page goes away. The body is a `text/plain` Blob: that content type
  * is CORS-safelisted so it needs no preflight, which matters because a beacon
  * fired during pagehide has no time for a round trip. `/api/track` reads it
- * with `request.text()` + `JSON.parse`, exactly as `/api/chat` already does.
+ * as byte-capped text (`lib/read-capped.ts`) + `JSON.parse`, exactly as
+ * `/api/chat` does, never `request.json()`, which is content-type sensitive.
  */
 
 import type { AnalyticsEvent, QueuedEvent } from './events';
@@ -28,7 +29,23 @@ const MAX_QUEUED = 200;
 
 const SESSION_START_KEY = 'pfSessionStart';
 
+/**
+ * How recently the tail must have been queued for enrichLastEvent() to name it.
+ *
+ * A gesture and the click that caused it are one dispatch apart, the capture
+ * listener and the React handler run in the same task, so a few milliseconds.
+ * Without a bound, a trackTag() from a scroll handler relabelled whatever click
+ * happened to be last in the queue, seconds or minutes earlier.
+ */
+const ENRICH_WINDOW_MS = 50;
+
 let queue: QueuedEvent[] = [];
+/**
+ * When the tail was queued. Module memory rather than a field on the event,
+ * because every field on QueuedEvent is sent to the server. Stays valid across
+ * a partial drain: flushEvents() takes from the front, never the tail.
+ */
+let tailQueuedAt = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let hooksInstalled = false;
 /** See QueuedEvent.seq. Never reset outside the test seam. */
@@ -110,6 +127,7 @@ export function queueEvent(
       // caller and this deliberately is not.
       seq: seqCounter++,
     });
+    tailQueuedAt = Date.now();
 
     // Drop the oldest rather than the newest: recent behaviour is what anyone
     // reading the dashboard is actually looking at.
@@ -134,6 +152,10 @@ export function queueEvent(
  * Guarded on the event type so a stray call cannot rewrite an unrelated row.
  * This guard is also the reason for the queue-order rule documented in
  * clicks.ts: `rage_click` must be queued before the `click` row, never after.
+ *
+ * And guarded on time: only a tail queued within ENRICH_WINDOW_MS counts as the
+ * same gesture. An older click is somebody else's row, and the caller writes
+ * its own instead.
  */
 export function enrichLastEvent(
   event: AnalyticsEvent,
@@ -141,6 +163,7 @@ export function enrichLastEvent(
 ): boolean {
   const last = queue[queue.length - 1];
   if (!last || last.event !== event) return false;
+  if (Date.now() - tailQueuedAt > ENRICH_WINDOW_MS) return false;
   last.props = { ...last.props, ...props };
   return true;
 }
@@ -153,6 +176,13 @@ export async function flushEvents(beacon = false): Promise<void> {
   if (timer !== null) {
     clearTimeout(timer);
     timer = null;
+  }
+  // Checked at send time as well as at queue time. Opting out on /privacy with
+  // events already queued must not send them: the visitor asked before they
+  // left the browser, and that is the moment that counts.
+  if (disabled()) {
+    queue = [];
+    return;
   }
   if (queue.length === 0) return;
 
@@ -278,6 +308,7 @@ export function endAnalyticsSession(): void {
 /** Test seam. Not for application code. */
 export function __resetQueue(): void {
   queue = [];
+  tailQueuedAt = 0;
   if (timer !== null) {
     clearTimeout(timer);
     timer = null;

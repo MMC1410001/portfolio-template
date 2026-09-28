@@ -82,7 +82,7 @@ That is enough to use the full website and its factual chat guide. After the fol
 ## How to use the site
 
 1. Read the résumé view first.
-2. Press **Experience mode**, or wait ten seconds without interacting, to reveal the interactive view.
+2. Press **Experience mode**, or stay on the page for three seconds (a hidden tab pauses the clock), to reveal the interactive view.
 3. Move through the 3D system with the buttons, scrolling, and supported mouse or touch actions.
 4. Open the chat button to ask about Alex's projects, skills, certifications, course notes, and experience.
 
@@ -116,8 +116,8 @@ The chat route returns an immediate approved answer by default. It keeps the por
 | --- | --- | --- |
 | Frontend | React, TypeScript, Vinext, Vite | Renders the portfolio and its routes |
 | Styling | Tailwind CSS and custom CSS | Provides responsive layouts, transitions, and accessibility support |
-| Interactive view | Three.js and React Three Fiber | Renders the 3D system experience only when needed |
-| Chat | API route and approved FAQ content | Gives fast, source-backed answers with no external model required |
+| Interactive view | GSAP ScrollTrigger over 60 AVIF frames | A scroll-driven photo turntable, lazy-loaded only when the view opens |
+| Chat | API route and approved FAQ content, optional NVIDIA NIM | Curated answers first; with `NIM_API_KEY` set, the Worker composes follow-ups from a shortlist of approved answers only |
 | Optional AI matching | Python, FastAPI, Gemini | Matches questions to approved answers without generating new portfolio claims |
 | Hosting | Sites and Cloudflare Worker build | Packages the frontend and API route for the configured site |
 
@@ -166,7 +166,7 @@ Python service to host. It needs one secret, and the key is free.
    you do not need an NVIDIA Enterprise or NGC subscription.
 2. Verify your email if prompted, then sign back in.
 3. Open any model page, for example
-   **https://build.nvidia.com/openai/gpt-oss-20b**. That is the model this
+   **https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b**. That is the model this
    project uses by default.
 4. On the right of the model page click **Get API Key** (some layouts show
    **Build with this NIM** first, then **Get API Key**).
@@ -224,8 +224,8 @@ build.nvidia.com, delete the old one there, update `.env.local`, and re-run
 `wrangler secret put NIM_API_KEY --name portfolio-template`. A key in a chat log, a
 screenshot or a commit is a key someone else has.
 
-`NIM_MODEL` is optional and defaults to `openai/gpt-oss-20b`, which answers in
-about a second. Confirm any replacement against your own key first: most
+`NIM_MODEL` is optional and defaults to `nvidia/nemotron-3-super-120b-a12b`, which
+answers in one to three seconds with its thinking turned off. Confirm any replacement against your own key first: most
 models on `integrate.api.nvidia.com` are either not enabled for a given
 account (an instant 404) or cold start past the 6s timeout.
 
@@ -252,7 +252,7 @@ Use a current Python 3 installation. Python 3.10 or newer is recommended.
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r backend/requirements.txt
+pip install -r backend/requirements-lock.txt
 uvicorn backend.main:app --reload --port 8000
 ```
 

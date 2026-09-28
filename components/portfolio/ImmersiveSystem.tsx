@@ -29,7 +29,8 @@ export default function ImmersiveSystem({reduced,preview}:{reduced:boolean;previ
  return <div className={`immersive-system ${failed?'system-flat':''}`}>
   {failed?fallback:<SceneBoundary onError={scope=>{setFailed(true);queueEvent('error',{props:{scope}})}} fallback={fallback}>
    <FigureTurntable reduced={reduced} preview={preview}>
-    <div className="system-nodes" aria-label="Explore the connected stack">{layers.map((l,i)=><button key={l.name} data-track-tag={`scene-node-${i}`} data-parallax={i===0?'1':i===1?'-0.7':'0.5'} className={`node node-${i} ${selected===i?'selected':''}`} onClick={()=>setSelected(i)} aria-pressed={selected===i}><span className="node-signal"/>{l.name}<ArrowUpRight size={13}/></button>)}</div>
+    {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a <fieldset> would name the group too, but brings its own box model into an absolutely positioned parallax layer; role=group is the same semantics without it */}
+    <div className="system-nodes" role="group" aria-label="Explore the connected stack">{layers.map((l,i)=><button key={l.name} data-track-tag={`scene-node-${i}`} data-parallax={i===0?'1':i===1?'-0.7':'0.5'} className={`node node-${i} ${selected===i?'selected':''}`} onClick={()=>setSelected(i)} aria-pressed={selected===i}><span className="node-signal"/>{l.name}<ArrowUpRight size={13}/></button>)}</div>
     <div className="node-detail" data-parallax="-0.35" aria-live="polite"><strong>{layers[selected].tools}</strong><p>{layers[selected].detail}</p><a data-track-tag={`scene-explore-${layers[selected].anchor}`} href={`#${layers[selected].anchor}`}>Explore the work <ArrowUpRight size={13}/></a></div>
    </FigureTurntable>
   </SceneBoundary>}

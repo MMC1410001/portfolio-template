@@ -29,7 +29,7 @@ import {
   type Department,
   type PortfolioRow,
   type ProjectStatus,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/portfolio';
 import {
   AvatarChip,
   BarRow,
@@ -192,8 +192,8 @@ export function PortfolioBoard() {
           onQuery={setQuery}
           placeholder="Search project, owner, resource..."
           selects={[
-            { value: status, onChange: setStatus, options: ['All statuses', ...STAGES.map((s) => s.status)] },
-            { value: dept, onChange: setDept, options: ['All departments', ...DEPARTMENTS] },
+            { label: 'Status', value: status, onChange: setStatus, options: ['All statuses', ...STAGES.map((s) => s.status)] },
+            { label: 'Department', value: dept, onChange: setDept, options: ['All departments', ...DEPARTMENTS] },
           ]}
           count={
             <>
@@ -225,12 +225,12 @@ export function PortfolioBoard() {
                     {r.start ? (
                       <>
                         <span className="font-semibold text-[#111827]">{r.start}</span>
-                        <span className="text-[#9ca3af]"> → </span>
+                        <span className="text-[#6b7280]"> → </span>
                         <span className="font-semibold text-[#111827]">{r.end}</span>
-                        <span className="mt-1 block text-xs text-[#9ca3af]">{r.days} days</span>
+                        <span className="mt-1 block text-xs text-[#6b7280]">{r.days} days</span>
                       </>
                     ) : (
-                      <span className="text-[#9ca3af] italic">To be decided</span>
+                      <span className="text-[#6b7280] italic">To be decided</span>
                     )}
                   </td>
                   <td className="px-3 py-4"><StatusPill label={r.status.toUpperCase()} tone={TONE[r.status]} /></td>
@@ -238,7 +238,7 @@ export function PortfolioBoard() {
                   <td className="px-3 py-4">
                     {([['Dev', r.dev], ['QA', r.qa], ['Business', r.business]] as const).map(([label, people]) => (
                       <div key={label} className="mb-2 last:mb-0">
-                        <p className="text-[10px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">{label}</p>
+                        <p className="text-[10px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">{label}</p>
                         {people.length ? (
                           <div className="mt-1 flex flex-wrap gap-1.5">
                             {people.map((p) => <AvatarChip key={p.name} person={p} />)}
@@ -256,11 +256,11 @@ export function PortfolioBoard() {
           </table>
         </div>
         {rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[#9ca3af]">No projects match those filters.</p>
+          <p className="py-10 text-center text-sm text-[#6b7280]">No projects match those filters.</p>
         ) : null}
       </Panel>
 
-      <p className="mt-5 text-center text-xs text-[#9ca3af]">
+      <p className="mt-5 text-center text-xs text-[#646b79]">
         Recreation on synthetic data · {total} projects · the original auto-refreshes every 30s
       </p>
     </DashFrame>

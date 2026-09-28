@@ -27,7 +27,10 @@ import { signIn } from '@/lib/admin-client';
 export function AdminSignIn({ clientId }: { clientId: string }) {
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // 'network' is its own message because it is its own fix: the token may be
+  // right and the Worker down, and "that did not work" would send the
+  // operator hunting for a typo.
+  const [failed, setFailed] = useState<'rejected' | 'network' | null>(null);
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -54,11 +57,17 @@ export function AdminSignIn({ clientId }: { clientId: string }) {
               event.preventDefault();
               if (!token.trim() || busy) return;
               setBusy(true);
-              setFailed(false);
-              const ok = await signIn(token.trim());
-              setBusy(false);
-              if (ok) location.reload();
-              else setFailed(true);
+              setFailed(null);
+              // finally, or a rejected fetch (offline, Worker down) leaves the
+              // button on "Checking…" and disabled for good.
+              try {
+                if (await signIn(token.trim())) location.reload();
+                else setFailed('rejected');
+              } catch {
+                setFailed('network');
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             <label htmlFor="admin-token" className="text-xs">
@@ -72,9 +81,14 @@ export function AdminSignIn({ clientId }: { clientId: string }) {
               autoComplete="current-password"
               placeholder="ADMIN_TOKEN"
             />
-            {failed ? (
+            {failed === 'rejected' ? (
               <p className="text-xs text-destructive">
                 That did not work.
+              </p>
+            ) : null}
+            {failed === 'network' ? (
+              <p className="text-xs text-destructive">
+                Could not reach the server. Check your connection and try again.
               </p>
             ) : null}
             <Button type="submit" disabled={busy || !token.trim()}>

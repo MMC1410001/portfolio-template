@@ -22,7 +22,7 @@ import { useState } from 'react';
 import {
   qualityEngagements,
   type QualityEngagement,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/quality';
 import { Donut, Legend, Ring, SEVERITY_COLOR, share, StackedBar } from './charts';
 import {
   DarkPanel,
@@ -140,19 +140,19 @@ export function PortfolioQualityBoard() {
                 <dl className="mt-4 space-y-1.5 rounded-xl bg-[#1a2030] p-3 text-sm">
                   <div className="flex justify-between gap-3">
                     <dt className="text-[#8a93ad]">
-                      Test pass % <span className="text-[#6e778f]">× {WEIGHTS.testPass}</span>
+                      Test pass % <span className="text-[#808aa4]">× {WEIGHTS.testPass}</span>
                     </dt>
                     <dd className="font-semibold text-white tabular-nums">{e.weights.testPass}%</dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-[#8a93ad]">
-                      Performance <span className="text-[#6e778f]">× {WEIGHTS.performance}</span>
+                      Performance <span className="text-[#808aa4]">× {WEIGHTS.performance}</span>
                     </dt>
                     <dd className="font-semibold text-white tabular-nums">{e.weights.performance}%</dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-[#8a93ad]">
-                      Accessibility <span className="text-[#6e778f]">× {WEIGHTS.accessibility}</span>
+                      Accessibility <span className="text-[#808aa4]">× {WEIGHTS.accessibility}</span>
                     </dt>
                     <dd className="font-semibold text-white tabular-nums">{e.weights.accessibility}%</dd>
                   </div>
@@ -208,7 +208,7 @@ export function PortfolioQualityBoard() {
                   {s.label}
                 </p>
                 <p className="mt-0.5 text-2xl font-bold text-white tabular-nums">{s.value}</p>
-                <p className="text-xs text-[#6e778f]">{share(s.value, defectTotal)} share</p>
+                <p className="text-xs text-[#808aa4]">{share(s.value, defectTotal)} share</p>
               </li>
             ))}
           </ul>

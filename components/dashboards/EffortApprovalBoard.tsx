@@ -31,7 +31,7 @@ import {
   effortPo,
   effortProjects,
   effortResources,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/effort';
 import { APPROVAL_COLOR, Columns, Donut, Legend, share, StackedBar } from './charts';
 import {
   DarkPanel,
@@ -114,7 +114,7 @@ export function EffortApprovalBoard() {
         brand={
           <>
             <p className="text-sm font-bold text-white">Client effort report</p>
-            <p className="text-[11px] font-semibold tracking-[.1em] text-[#6e778f] uppercase">
+            <p className="text-[11px] font-semibold tracking-[.1em] text-[#808aa4] uppercase">
               Effort utilisation
             </p>
           </>
@@ -304,7 +304,7 @@ export function EffortApprovalBoard() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-xs text-[#6e778f]">
+            <p className="mt-3 text-xs text-[#808aa4]">
               Cell shading scales with hours logged · darker blue = higher load
             </p>
           </DarkPanel>

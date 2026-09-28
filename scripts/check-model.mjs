@@ -9,7 +9,7 @@
  *
  * It calls composeAnswer directly rather than going through the Worker, so it
  * measures the model and not the deployment, and it spends real tokens — a
- * dozen calls, which at gpt-oss-20b prices is not worth the cost of a script
+ * dozen calls, which is not worth the cost of a script
  * that avoids them.
  *
  *   npm run check:model

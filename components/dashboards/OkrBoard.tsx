@@ -2,7 +2,7 @@
 /**
  * Recreation of the organisation OKR dashboard.
  *
- * ── The only one of the ten that is not an Apps Script app ────────────────
+ * ── Not an Apps Script app, unlike most of the others ─────────────────────
  * This is a page inside the ERP rather than a script deployment reading a
  * sheet, and that is the whole reason it exists in this form. OKRs were
  * already a record in the ERP with an owner, a manager and an approval
@@ -31,8 +31,9 @@ import {
   OKR_TOTALS,
   type OkrApproval,
   type OkrRow,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/okr';
 import { Donut, Legend, Ring } from './charts';
+import { FilterBar, Panel } from './primitives';
 import { DashNote } from './shell';
 
 const APPROVALS: OkrApproval[] = [
@@ -103,14 +104,12 @@ function Bar({ value }: { value: number }) {
   );
 }
 
-function Card({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+/** Panel's outline variant, never clipped: the tables inside scroll sideways. */
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className={`min-w-0 overflow-hidden rounded-2xl border border-[#e4e8f0] bg-white p-4 sm:p-5 ${className}`}>
-      <h4 className="mb-4 text-xs font-semibold tracking-[.08em] text-[#6b7280] uppercase">
-        {title}
-      </h4>
+    <Panel outline title={title} className="min-w-0 overflow-hidden">
       {children}
-    </section>
+    </Panel>
   );
 }
 
@@ -162,10 +161,10 @@ export function OkrBoard() {
           <p className="mt-1 text-sm text-[#6b7280]">OKR period: {okrPeriod}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-lg border border-[#e4e8f0] bg-white px-3 py-2 text-sm font-medium">
+          <span className="rounded-lg border border-[#e9ecf4] bg-white px-3 py-2 text-sm font-medium">
             {okrPeriod}
           </span>
-          <span className="inline-flex items-center gap-2 rounded-lg border border-[#e4e8f0] bg-white px-3 py-2 text-sm text-[#374151]">
+          <span className="inline-flex items-center gap-2 rounded-lg border border-[#e9ecf4] bg-white px-3 py-2 text-sm text-[#374151]">
             <span className="size-2 rounded-full bg-emerald-500" />
             Live · 10:09:07
           </span>
@@ -183,6 +182,7 @@ export function OkrBoard() {
             key={id}
             type="button"
             onClick={() => setTab(id)}
+            aria-pressed={tab === id}
             className={`rounded-full px-5 py-2 text-sm font-semibold transition ${tab === id ? 'bg-indigo-600 text-white' : 'text-[#6b7280] hover:text-[#111827]'}`}
           >
             {label}
@@ -204,7 +204,7 @@ export function OkrBoard() {
               <div key={String(label)} className={`rounded-xl border-t-4 bg-white p-4 shadow-[0_1px_3px_rgba(16,24,40,.06)] ${edge}`}>
                 <p className="text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">{label}</p>
                 <p className="mt-1 text-2xl font-bold text-[#111827] tabular-nums">{value}</p>
-                <p className="mt-0.5 text-xs text-[#9ca3af]">{note}</p>
+                <p className="mt-0.5 text-xs text-[#6b7280]">{note}</p>
               </div>
             ))}
           </div>
@@ -272,7 +272,7 @@ export function OkrBoard() {
                     <span className="w-20 shrink-0 text-right sm:w-28">
                       <span className="block text-sm font-bold text-[#111827] tabular-nums">{r.progress}%</span>
                       <Bar value={r.progress} />
-                      <span className="mt-1 block text-[10px] font-semibold tracking-[.06em] text-[#9ca3af] uppercase">
+                      <span className="mt-1 block text-[10px] font-semibold tracking-[.06em] text-[#6b7280] uppercase">
                         {r.achieved}/{r.set} achieved
                       </span>
                     </span>
@@ -284,7 +284,7 @@ export function OkrBoard() {
             <Card title="⚠ Needs attention, lowest performers">
               <ul className="space-y-3">
                 {bottomFive.map((r, i) => (
-                  <li key={r.empId} className="flex items-center gap-3 rounded-xl border border-[#e4e8f0] p-3">
+                  <li key={r.empId} className="flex items-center gap-3 rounded-xl border border-[#e9ecf4] p-3">
                     <span className="w-6 shrink-0 text-center text-xs font-bold text-red-600">#{i + 1}</span>
                     <Initials name={r.name} i={i + 3} />
                     <span className="min-w-0 flex-1">
@@ -294,7 +294,7 @@ export function OkrBoard() {
                     <span className="w-20 shrink-0 text-right sm:w-28">
                       <span className="block text-sm font-bold text-red-600 tabular-nums">{r.progress}%</span>
                       <Bar value={r.progress} />
-                      <span className="mt-1 block text-[10px] font-semibold tracking-[.06em] text-[#9ca3af] uppercase">
+                      <span className="mt-1 block text-[10px] font-semibold tracking-[.06em] text-[#6b7280] uppercase">
                         {r.achieved}/{r.set} achieved
                       </span>
                     </span>
@@ -305,41 +305,26 @@ export function OkrBoard() {
           </div>
 
           <Card title="Employee OKRs">
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search employee, ID or manager..."
-                className="min-w-55 flex-1 rounded-lg border border-[#e4e8f0] bg-[#f9fafb] px-3 py-2 text-sm outline-none placeholder:text-[#9ca3af] focus:border-indigo-400"
-              />
-              <select
-                value={dept}
-                onChange={(e) => setDept(e.target.value)}
-                className="rounded-lg border border-[#e4e8f0] bg-[#f9fafb] px-3 py-2 text-sm outline-none focus:border-indigo-400"
-              >
-                {['All departments', ...deptNames].map((o) => (
-                  <option key={o}>{o}</option>
-                ))}
-              </select>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="rounded-lg border border-[#e4e8f0] bg-[#f9fafb] px-3 py-2 text-sm outline-none focus:border-indigo-400"
-              >
-                {['All statuses', ...APPROVALS].map((o) => (
-                  <option key={o}>{o}</option>
-                ))}
-              </select>
-              <span className="ml-auto text-sm text-[#6b7280]">
-                Showing <strong className="text-[#111827]">{rows.length}</strong> of {okrRows.length}
-              </span>
-            </div>
+            <FilterBar
+              query={query}
+              onQuery={setQuery}
+              placeholder="Search employee, ID or manager..."
+              selects={[
+                { label: 'Department', value: dept, onChange: setDept, options: ['All departments', ...deptNames] },
+                { label: 'Approval status', value: status, onChange: setStatus, options: ['All statuses', ...APPROVALS] },
+              ]}
+              count={
+                <>
+                  Showing <strong className="font-semibold text-[#111827]">{rows.length}</strong> of {okrRows.length}
+                </>
+              }
+            />
             <div className="-mx-2 overflow-x-auto">
               <table className="w-full min-w-200 border-collapse">
                 <thead>
                   <tr className="border-b border-[#eef1f7]">
                     {['Employee', 'Department', 'Manager', 'Set', 'Achieved', 'Progress', 'Progress status', 'Status'].map((h) => (
-                      <th key={h} scope="col" className="px-3 py-3 text-left text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">
+                      <th key={h} scope="col" className="px-3 py-3 text-left text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">
                         {h}
                       </th>
                     ))}
@@ -353,7 +338,7 @@ export function OkrBoard() {
                           <Initials name={r.name} i={i} />
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold text-[#111827]">{r.name}</span>
-                            <span className="block text-xs text-[#9ca3af]">{r.empId}</span>
+                            <span className="block text-xs text-[#6b7280]">{r.empId}</span>
                           </span>
                         </span>
                       </td>
@@ -386,7 +371,7 @@ export function OkrBoard() {
               </table>
             </div>
             {rows.length === 0 ? (
-              <p className="py-10 text-center text-sm text-[#9ca3af]">No employees match those filters.</p>
+              <p className="py-10 text-center text-sm text-[#6b7280]">No employees match those filters.</p>
             ) : null}
           </Card>
         </>
@@ -467,7 +452,7 @@ export function OkrBoard() {
                     <thead>
                       <tr className="border-b border-[#eef1f7]">
                         {['Employee', 'Reporting manager', 'Set', 'Achieved', 'Progress', 'Status'].map((h) => (
-                          <th key={h} scope="col" className="px-3 py-2.5 text-left text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">
+                          <th key={h} scope="col" className="px-3 py-2.5 text-left text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">
                             {h}
                           </th>
                         ))}
@@ -483,7 +468,7 @@ export function OkrBoard() {
                                 <Initials name={m.name} i={i} />
                                 <span className="min-w-0">
                                   <span className="block text-sm font-semibold text-[#111827]">{m.name}</span>
-                                  <span className="block text-xs text-[#9ca3af]">{m.empId}</span>
+                                  <span className="block text-xs text-[#6b7280]">{m.empId}</span>
                                 </span>
                               </span>
                             </td>

@@ -22,6 +22,15 @@ import { normaliseTag } from './normalise';
 import { currentSection } from './sections';
 import { currentMode } from './mode';
 
+function payloadFor(name: string, props: Record<string, unknown>) {
+  return {
+    tag: name,
+    section: currentSection(),
+    mode: currentMode(),
+    ...props,
+  };
+}
+
 export function trackTag(
   tag: string,
   props: Record<string, unknown> = {},
@@ -29,15 +38,28 @@ export function trackTag(
   const name = normaliseTag(tag);
   if (!name) return;
 
-  const payload = {
-    tag: name,
-    section: currentSection(),
-    mode: currentMode(),
-    ...props,
-  };
-
+  const payload = payloadFor(name, props);
   if (enrichLastEvent('click', payload)) return;
   queueEvent('click', {
     props: { selector: name, synthetic: true, ...payload },
+  });
+}
+
+/**
+ * A synthetic row, always, never an enrichment.
+ *
+ * For a gesture that is known NOT to be a click: the turntable reports from
+ * its scroll handler, and trackTag() there would try to name whatever click
+ * happened to sit at the tail of the queue. The time window in
+ * enrichLastEvent() makes that unlikely; this makes it impossible.
+ */
+export function trackSyntheticTag(
+  tag: string,
+  props: Record<string, unknown> = {},
+): void {
+  const name = normaliseTag(tag);
+  if (!name) return;
+  queueEvent('click', {
+    props: { selector: name, synthetic: true, ...payloadFor(name, props) },
   });
 }

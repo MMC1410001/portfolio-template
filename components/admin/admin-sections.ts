@@ -56,6 +56,15 @@ export const ADMIN_SECTIONS: readonly AdminNavSection[] = [
   },
 ];
 
+/**
+ * The ids, computed once at module load.
+ *
+ * The scroll-spy's effect depends on the array it is given, and both shells
+ * used to pass `ADMIN_SECTIONS.map(...)` inline: a new array every render, so
+ * the IntersectionObserver was torn down and rebuilt on every render.
+ */
+export const ADMIN_SECTION_IDS: readonly string[] = ADMIN_SECTIONS.map((s) => s.id);
+
 const BY_ID = new Map(ADMIN_SECTIONS.map((s) => [s.id, s]));
 
 /**

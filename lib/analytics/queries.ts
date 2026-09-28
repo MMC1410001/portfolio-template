@@ -23,6 +23,7 @@ import {
 import { RETENTION_DAYS } from './schema';
 import { resolveSource } from './sources';
 import { TZ_LABEL, type Window } from './time';
+import { GUARD_SOURCES } from '@/content/faq';
 import type {
   Audience,
   Breakdown,
@@ -80,29 +81,53 @@ function toBreakdown(list: Row[], total: number): Breakdown[] {
   }));
 }
 
-/** ?1/?2/?3, the window and the internal-filter switch. */
-function bind(o: QueryOptions): [number, number, number] {
-  return [o.window.since, o.window.until, o.excludeInternal ? 1 : 0];
-}
-
-async function internalNotice(
+/**
+ * The sessions in the window with any internal row, computed once per request.
+ *
+ * Every statement used to derive this itself, inside EV_CTE, which re-scanned
+ * the window once per statement. Now it is read here and handed to each one
+ * as `?3`. The verdict is the same whole-session one: MAX(is_internal) = 1
+ * over the same window bounds the CTE used.
+ *
+ * Read before the batch rather than inside it, so it is not part of the
+ * batch's snapshot. The cost is a row written between the two reads being
+ * judged by a set a few milliseconds old, on an admin panel that is already a
+ * snapshot of a moving log.
+ */
+async function internalSessionIds(
   db: D1Database,
   o: QueryOptions,
-): Promise<InternalNotice> {
-  const [since, until] = bind(o);
-  const row = await db
+): Promise<string[]> {
+  const result = await db
     .prepare(
-      `SELECT COUNT(*) AS n FROM (
-         SELECT session_id FROM events
-          WHERE created_at >= ?1 AND created_at <= ?2
-          GROUP BY session_id HAVING MAX(is_internal) = 1)`,
+      `SELECT session_id FROM events
+        WHERE created_at >= ?1 AND created_at <= ?2
+        GROUP BY session_id HAVING MAX(is_internal) = 1`,
     )
-    .bind(since, until)
-    .first<{ n: number }>();
+    .bind(o.window.since, o.window.until)
+    .all<{ session_id: string }>();
+  return (result.results ?? []).map((r) => r.session_id);
+}
 
+/** ?1/?2/?3, the window and the internal sessions to leave out. See EV_CTE. */
+function bindsFor(
+  o: QueryOptions,
+  internal: readonly string[],
+): [number, number, string] {
+  return [
+    o.window.since,
+    o.window.until,
+    o.excludeInternal ? JSON.stringify(internal) : '[]',
+  ];
+}
+
+function internalNotice(
+  o: QueryOptions,
+  internal: readonly string[],
+): InternalNotice {
   return {
     excluded: o.excludeInternal,
-    sessionsMatched: num(row?.n),
+    sessionsMatched: internal.length,
     cidrsActive: o.cidrsActive ?? 0,
     visitorsActive: o.visitorsActive ?? 0,
   };
@@ -114,7 +139,8 @@ export async function overview(
   db: D1Database,
   o: QueryOptions,
 ): Promise<Overview> {
-  const p = bind(o);
+  const internal = await internalSessionIds(db, o);
+  const p = bindsFor(o, internal);
   const q = (sql: string) => db.prepare(sql).bind(...p);
 
   const results = await db.batch<Row>([
@@ -294,7 +320,7 @@ export async function overview(
 
   return {
     meta: meta(o),
-    internal: await internalNotice(db, o),
+    internal: internalNotice(o, internal),
     funnel: {
       sessions: num(f.sessions),
       engaged: num(f.engaged),
@@ -380,7 +406,8 @@ export async function audience(
   db: D1Database,
   o: QueryOptions,
 ): Promise<Audience> {
-  const p = bind(o);
+  const internal = await internalSessionIds(db, o);
+  const p = bindsFor(o, internal);
   const q = (sql: string) => db.prepare(sql).bind(...p);
 
   const results = await db.batch<Row>([
@@ -417,7 +444,7 @@ export async function audience(
          FROM sess GROUP BY 1 ORDER BY sessions DESC`),
 
     // 4, cities. Region carried alongside because two states share city
-    //     names and "Thane" alone means little.
+    //     names and "Springfield" alone means little.
     q(`${WITH_SESS}
        SELECT city, region, country, COUNT(*) AS sessions
          FROM sess WHERE city IS NOT NULL
@@ -444,7 +471,7 @@ export async function audience(
 
   return {
     meta: meta(o),
-    internal: await internalNotice(db, o),
+    internal: internalNotice(o, internal),
     visitors: {
       new: num(v.new_v),
       returning: num(v.returning_v),
@@ -484,7 +511,8 @@ export async function campaigns(
   db: D1Database,
   o: QueryOptions,
 ): Promise<Campaigns> {
-  const p = bind(o);
+  const internal = await internalSessionIds(db, o);
+  const p = bindsFor(o, internal);
   const q = (sql: string) => db.prepare(sql).bind(...p);
 
   const results = await db.batch<Row>([
@@ -514,7 +542,7 @@ export async function campaigns(
   const t = one(results, 1);
   return {
     meta: meta(o),
-    internal: await internalNotice(db, o),
+    internal: internalNotice(o, internal),
     campaigns: rows(results, 0).map((r) => ({
       source: str(r.source),
       medium: str(r.medium),
@@ -541,13 +569,12 @@ const SEED_SOURCE = 'Answers from the portfolio';
  * the personal-information boundary; it arrived with guard.personal and has to
  * be named here for the same reason the other two are.
  */
-const GUARD_SOURCES = ['Safety boundary', 'Portfolio guide', 'Out of scope'];
-
 export async function chatStats(
   db: D1Database,
   o: QueryOptions,
 ): Promise<ChatStats> {
-  const p = bind(o);
+  const internal = await internalSessionIds(db, o);
+  const p = bindsFor(o, internal);
   const q = (sql: string) => db.prepare(sql).bind(...p);
 
   const results = await db.batch<Row>([
@@ -667,7 +694,7 @@ export async function chatStats(
 
   return {
     meta: meta(o),
-    internal: await internalNotice(db, o),
+    internal: internalNotice(o, internal),
     asked: num(head.asked),
     answered: num(head.answered),
     opened: num(head.opened),
@@ -713,7 +740,11 @@ export async function clickMap(
     mode: string | null;
   },
 ): Promise<ClickMap> {
-  const [since, until, excl] = bind(o);
+  // Nothing to report here, so the set is read only when it is used.
+  const [since, until, excl] = bindsFor(
+    o,
+    o.excludeInternal ? await internalSessionIds(db, o) : [],
+  );
 
   const row = await db
     .prepare(
@@ -724,8 +755,7 @@ export async function clickMap(
             AND kind = ?4
             AND (?5 IS NULL OR device = ?5)
             AND (?6 IS NULL OR mode = ?6)
-            AND (?3 = 0
-                 OR session_id NOT IN (SELECT session_id FROM internal_sessions))
+            AND session_id NOT IN (SELECT session_id FROM internal_sessions)
        ),
        -- percentile_disc(0.5): a REAL observed height, not an average of two
        -- heights no visitor had. 0 when nothing carries one -> fraction mode.
@@ -764,8 +794,7 @@ export async function clickMap(
             AND kind = ?4
             AND (?5 IS NULL OR device = ?5)
             AND (?6 IS NULL OR mode = ?6)
-            AND (?3 = 0
-                 OR session_id NOT IN (SELECT session_id FROM internal_sessions))
+            AND session_id NOT IN (SELECT session_id FROM internal_sessions)
        ),
        ranked AS (SELECT doc_h, ROW_NUMBER() OVER (ORDER BY doc_h) rn,
                          COUNT(*) OVER () n
@@ -812,7 +841,11 @@ export async function listSessions(
   db: D1Database,
   o: QueryOptions & { limit: number },
 ): Promise<SessionRow[]> {
-  const [since, until, excl] = bind(o);
+  // Nothing to report here, so the set is read only when it is used.
+  const [since, until, excl] = bindsFor(
+    o,
+    o.excludeInternal ? await internalSessionIds(db, o) : [],
+  );
   const result = await db
     .prepare(
       `${WITH_EV}, ${SESS_CTE}

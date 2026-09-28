@@ -130,6 +130,30 @@ export function normaliseQuestion(raw: string): {
   return { q: value, rejected: null };
 }
 
+/** What replaces the name part of a selector that failed the screen. */
+export const SCREENED_TEXT = '[screened]';
+
+/**
+ * An element name from a click row, with anything personal taken out.
+ *
+ * A dead click names the nearest element by its text (`div:<first 40
+ * characters>`), and the nearest element can be a chat bubble holding what the
+ * visitor typed. The same screen as a question applies, and for the same
+ * reason it replaces rather than scrubs: the element kind before the colon is
+ * page structure and survives, the text after it goes whole.
+ *
+ * Run on the server as well as fixed on the client, because the endpoint is
+ * open and the browser is not the only possible caller.
+ */
+export function screenSelector(raw: string): string {
+  if (!LOOKS_LIKE_PII.test(raw) && !LOOKS_LIKE_URL.test(raw)) return raw;
+  const colon = raw.indexOf(':');
+  const kind = colon > 0 ? raw.slice(0, colon) : '';
+  return /^[a-z][a-z0-9-]{0,31}$/.test(kind)
+    ? `${kind}:${SCREENED_TEXT}`
+    : SCREENED_TEXT;
+}
+
 /**
  * Normalise a click to 0-1 of the page box it was given.
  *

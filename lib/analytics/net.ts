@@ -81,6 +81,41 @@ export async function hashIp(ip: string, salt: string): Promise<string> {
     .join('');
 }
 
+/**
+ * What a rate-limit bucket is keyed on: the /64 for IPv6, the address for v4.
+ *
+ * Budget keys only. The visitor hash stays on the full address.
+ *
+ * A /64 is the smallest network IPv6 hands out, and one household, phone or
+ * cloud VM routinely holds the whole of it, 2^64 addresses, with privacy
+ * extensions rotating through them on their own. Keyed on the full address,
+ * the 120-events-a-minute budget was a per-request formality for anyone who
+ * cared to rotate the low bits. IPv4 has no equivalent, and widening it to a
+ * /24 would put a whole office or carrier NAT on one allowance.
+ *
+ * An address `expandIpv6` cannot read falls back to itself: the limit is then
+ * no weaker than it was, which beats refusing the event.
+ */
+export function budgetKey(ip: string): string {
+  if (!ip.includes(':')) return ip;
+  const groups = expandIpv6(ip);
+  return groups ? `${groups.slice(0, 4).join(':')}::/64` : ip;
+}
+
+/**
+ * `ANALYTICS_INTERNAL_VISITORS`, as a list of visitor ids.
+ *
+ * One parser for the two routes that read it: ingest classifies with it and
+ * the dashboard reports how many are active, and the count on the panel is
+ * only honest if it is a count of the list ingest actually matches against.
+ */
+export function internalVisitorIds(raw: string | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
 /** Coarse network prefix: /24 for v4, /48 for v6. Null for anything odd. */
 export function ipPrefix(ip: string): string | null {
   if (ip.includes(':')) {

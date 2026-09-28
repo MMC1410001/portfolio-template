@@ -31,10 +31,10 @@ import {
   releaseMonth,
   releaseRows,
   RELEASE_TOTAL,
-  type Priority,
   type ReleaseRow,
   type ReleaseStage,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/release-plan';
+import type { Priority } from '@/content/dashboards-data/common';
 import { AvatarChip, FilterBar, Panel, StatTile, Th } from './primitives';
 import { DashNote, RailShell, type RailItem } from './shell';
 
@@ -182,8 +182,8 @@ function PlanPage() {
           onQuery={setQuery}
           placeholder="Search features, owners..."
           selects={[
-            { value: stage, onChange: setStage, options: ['All stages', ...STAGES] },
-            { value: priority, onChange: setPriority, options: ['All priorities', 'P0', 'P1', 'P2'] },
+            { label: 'Stage', value: stage, onChange: setStage, options: ['All stages', ...STAGES] },
+            { label: 'Priority', value: priority, onChange: setPriority, options: ['All priorities', 'P0', 'P1', 'P2'] },
           ]}
           count={
             <>
@@ -208,7 +208,7 @@ function PlanPage() {
             <tbody>
               {rows.map((r: ReleaseRow) => (
                 <tr key={r.n} className="border-b border-[#f3f4f6] hover:bg-[#fafbfd]">
-                  <td className="px-3 py-3.5 text-sm tabular-nums text-[#9ca3af]">{r.n}</td>
+                  <td className="px-3 py-3.5 text-sm tabular-nums text-[#6b7280]">{r.n}</td>
                   <td className="px-3 py-3.5 text-sm font-semibold text-[#111827]">{r.feature}</td>
                   <td className="px-3 py-3.5">
                     <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${PRIORITY_COLOR[r.priority]}`}>{r.priority}</span>
@@ -221,7 +221,7 @@ function PlanPage() {
                     </span>
                   </td>
                   <td className="px-3 py-3.5"><AvatarChip person={r.pm} /></td>
-                  <td className="px-3 py-3.5 text-sm text-[#9ca3af]">{r.em.name}</td>
+                  <td className="px-3 py-3.5 text-sm text-[#6b7280]">{r.em.name}</td>
                   <td className="px-3 py-3.5 text-sm font-semibold text-[#111827]">{r.goLive}</td>
                 </tr>
               ))}
@@ -229,7 +229,7 @@ function PlanPage() {
           </table>
         </div>
         {rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[#9ca3af]">No deliverables match those filters.</p>
+          <p className="py-10 text-center text-sm text-[#6b7280]">No deliverables match those filters.</p>
         ) : null}
       </Panel>
     </>
@@ -271,7 +271,7 @@ function HierarchyPage() {
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {deliveryHierarchy.map((l) => (
             <li key={l.artifact} className="rounded-xl border border-[#e5e7eb] p-4">
-              <p className="text-[11px] font-semibold tracking-[.08em] text-[#9ca3af] uppercase">Level {l.level}</p>
+              <p className="text-[11px] font-semibold tracking-[.08em] text-[#6b7280] uppercase">Level {l.level}</p>
               <p className="mt-1 text-sm font-semibold text-[#111827]">{l.artifact}</p>
             </li>
           ))}

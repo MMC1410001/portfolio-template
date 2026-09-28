@@ -47,8 +47,8 @@ silently and looked exactly like broken code.
 | `page_view` | on **leaving** a section | `from`, `to`, `terminal`, `doc_h` |
 | `session_end` | pagehide / visibilitychange | `exit_section`, `resume_ms`, `immersive_ms`, `mode_changes`, `max_scroll_px` |
 | `click` | capture-phase, delegated | `tag`, `selector`, `section`, `mode` |
-| `dead_click` | click hit nothing interactive | `selector`, plus a coordinate |
-| `rage_click` | 3+ clicks in 40px inside 700ms | `dead`, plus a coordinate |
+| `dead_click` | click hit nothing interactive | `selector` (structure only: tag, `#id` or first class, never text), plus a coordinate |
+| `rage_click` | 3+ clicks in 40px inside 700ms | `dead`, `selector` (structural for non-controls), plus a coordinate |
 | `scroll_depth` | 25/50/75/100%, once each | `depth`, `doc_h`, `section` |
 | `cta_view` | tagged control 50% visible for 1s | `tag` |
 | `mode_change` | résumé ↔ Experience | `from`, `to`, `trigger`, `dwell_ms`, `reduced` |
@@ -116,7 +116,23 @@ that has no click name of its own.
 There is no GTM here, so the name lives in the DOM and the capture-phase
 listener reads it on the first pass: no dataLayer, no second writer, no
 `enrichLastEvent` for ordinary clicks. `trackTag()` survives for gestures that
-are not DOM clicks (a `Select` changing value, a pause toggle).
+are not DOM clicks (a `Select` changing value, a pause toggle), and only
+enriches a click queued within the last 50ms: past that, the click it would
+name belongs to some earlier gesture. Anything driven by scroll or a timer
+uses `trackSyntheticTag()`, which always writes its own `synthetic: true` row.
+The turntable's `scene-rotation` used to relabel whichever node the visitor
+had clicked up to ten seconds earlier.
+
+**`data-track-private` marks text that must never become a click name.** The
+chat transcript carries it. `describeElement()` never reads `textContent`
+inside it, and dead and rage clicks on non-controls are named by structure
+alone everywhere: a triple-click to select one's own question used to store
+its first 40 characters, email address included, as the selector.
+
+**Every verb's props are allowlisted.** `PROPS_BY_VERB` in `events.ts`, which
+`satisfies Record<AnalyticsEvent, …>`, so a new verb without an entry is a type
+error. The server drops any other key before the 20-key cap. A prop added in
+the browser and not there is lost without a sound.
 
 **The queue-order rule still applies.** `enrichLastEvent()` names the tail of
 the queue and refuses anything that is not a `click`, so `clicks.ts` queues
@@ -189,6 +205,12 @@ anything containing a URL, anything over 120 characters, anything under 3.
 Refused text is dropped **whole**, never edited, a partly-redacted question
 still reads like a real one and nobody would notice what it had been.
 
+It runs **twice**: in the browser, and again in `validateEvent` on the raw
+`q` before the 300-character clamp (a clamp can cut a phone number below seven
+digits). `/api/track` is unauthenticated, so the browser pass protects honest
+clients only. Dead and rage click selectors get the same PII/URL screen on the
+server, and a match becomes `div:[screened]`.
+
 **Rejecting the text never rejects the event.** The row still carries
 `q_len`, the answer source and the rejection reason, so volume, guard-hit rate
 and the offline-fallback rate survive intact, and `count(rejected='pii')`
@@ -206,12 +228,12 @@ religion, marital status, disability, gender, which gets a boundary rather
 than the `Not documented` text, because that text invites the asker to contact
 Alex directly and no recruiter should be nudged toward those questions).
 
-The list is duplicated by necessity: `GUARD_SOURCES` in
-`lib/analytics/queries.ts` matches them in SQL, and `scripts/seed-analytics-demo.ts`
-carries its own copy so `/analytics` shows the same buckets. A source missing
-from either is counted as a real answer, which understates the guard-hit rate
-and leaves an unexplained slice in the source distribution. Adding a guard tier
-to `content/faq.ts` means editing both.
+The list lives once, as `GUARD_SOURCES` in `content/faq.ts`, next to the
+answers that produce them. `lib/analytics/queries.ts` matches it in SQL,
+`scripts/seed-analytics-demo.ts` draws from it so `/analytics` shows the same
+buckets, and `Chat.tsx` uses it to keep a guarded turn out of the conversation
+history. A source missing from it is counted as a real answer, which
+understates the guard-hit rate. Adding a guard tier means adding it there.
 
 `Chat.tsx` seeds the conversation with `source: 'Answers from the portfolio'`,
 which is *not* one of `content/faq.ts`'s real sources. The panel excludes it
@@ -442,8 +464,11 @@ There is nowhere to attach one: vinext's worker entry exports only `fetch`,
 and the generated `wrangler.json` has empty `triggers`. So the sweep is
 opportunistic, on every admin read (behind `after()`, so it never delays the
 dashboard), on roughly 1 ingest in 500, and via the `retention-sweep` action.
-It claims the slot by writing its timestamp *before* deleting anything, so two
-concurrent requests cannot both sweep.
+It claims the slot *before* deleting anything, with one conditional
+`UPDATE … WHERE CAST(value AS INTEGER) <= ? RETURNING` (after an
+`INSERT OR IGNORE` for the first run), and sweeps only if a row came back. The
+earlier read-then-write let two isolates both read the old stamp and both
+sweep.
 
 Because all three are pull-based, none of them fires in a quiet month. At ~20
 sessions a day the ingest trigger has roughly an 11% chance of firing on any
@@ -474,7 +499,11 @@ putting `ADMIN_TOKEN` in a third-party service.
 ## Rate limiting, and what it does not do
 
 A D1 counter, charged **per event before any work**, 120 per address per
-minute. An in-memory `Map` is not a limiter on Workers: isolates are created
+minute. "Address" is the IPv4 address, or the **/64** for IPv6 (`budgetKey` in
+`net.ts`): one home connection holds 2^64 addresses, so a full-address key was
+a formality. The visitor hash stays per-address; only the budget is widened.
+The body cap is counted in bytes on the stream, and the read stops at the cap
+rather than buffering the whole upload first. An in-memory `Map` is not a limiter on Workers: isolates are created
 and destroyed per burst, and two requests from one address routinely land in
 different ones.
 

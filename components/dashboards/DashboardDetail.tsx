@@ -20,36 +20,38 @@
  * component, which is the same constraint that keeps
  * `lib/analytics/normalise.ts` off the DOM.
  *
- * ── Only the selected recreation is mounted ──────────────────────────────
- * That was true of the tab strip and it is still true here, now for free:
- * the route renders one dashboard, so the other nine never reach the DOM.
+ * ── Only the selected recreation is mounted, or downloaded ───────────────
+ * Each entry below is its own `lazy()` chunk, and each recreation imports only
+ * its own rows from content/dashboards-data/. This file used to import every
+ * board statically, which made this one client chunk carry all of them and
+ * every row of demo data (about 165KB) to show one. The server still renders
+ * the selected board into the first response: React streams the fallback,
+ * then the board in a hidden block that an inline script swaps in before any
+ * bundle has loaded (verified against the built Worker). A crawler that runs
+ * no JavaScript at all sees the fallback with the board markup beside it. On a
+ * client-side move between dashboards the fallback shows while that one
+ * board's chunk arrives.
+ *
+ * A server component picking the board would look simpler and would not
+ * split: @vitejs/plugin-rsc groups client references by the server chunk that
+ * imports them, so all of them would still land in one client chunk.
  */
+import { lazy, Suspense, type ComponentType } from 'react';
 import Link from 'next/link';
 import { dashboards, type Dashboard } from '@/content/dashboards';
-import { ActionPlanBoard } from './ActionPlanBoard';
-import { DefectIntelligenceBoard } from './DefectIntelligenceBoard';
-import { EffortApprovalBoard } from './EffortApprovalBoard';
-import { LearningTracker } from './LearningTracker';
-import { OkrBoard } from './OkrBoard';
-import { PortfolioBoard } from './PortfolioBoard';
-import { PortfolioQualityBoard } from './PortfolioQualityBoard';
-import { QualityScorecard } from './QualityScorecard';
-import { ReleasePlanBoard } from './ReleasePlanBoard';
-import { ReleaseReadinessBoard } from './ReleaseReadinessBoard';
-import { UptimeBoard } from './UptimeBoard';
 
-const RECREATIONS: Record<string, () => React.ReactElement> = {
-  'automation-portfolio': PortfolioBoard,
-  'payroll-action-plan': ActionPlanBoard,
-  'release-plan': ReleasePlanBoard,
-  'quality-scorecard': QualityScorecard,
-  'effort-approval': EffortApprovalBoard,
-  'portfolio-quality': PortfolioQualityBoard,
-  'defect-intelligence': DefectIntelligenceBoard,
-  'learning-tracker': LearningTracker,
-  'release-readiness': ReleaseReadinessBoard,
-  'okr-dashboard': OkrBoard,
-  'uptime-monitoring': UptimeBoard,
+const RECREATIONS: Record<string, ComponentType> = {
+  'automation-portfolio': lazy(() => import('./PortfolioBoard').then((m) => ({ default: m.PortfolioBoard }))),
+  'payroll-action-plan': lazy(() => import('./ActionPlanBoard').then((m) => ({ default: m.ActionPlanBoard }))),
+  'release-plan': lazy(() => import('./ReleasePlanBoard').then((m) => ({ default: m.ReleasePlanBoard }))),
+  'quality-scorecard': lazy(() => import('./QualityScorecard').then((m) => ({ default: m.QualityScorecard }))),
+  'effort-approval': lazy(() => import('./EffortApprovalBoard').then((m) => ({ default: m.EffortApprovalBoard }))),
+  'portfolio-quality': lazy(() => import('./PortfolioQualityBoard').then((m) => ({ default: m.PortfolioQualityBoard }))),
+  'defect-intelligence': lazy(() => import('./DefectIntelligenceBoard').then((m) => ({ default: m.DefectIntelligenceBoard }))),
+  'learning-tracker': lazy(() => import('./LearningTracker').then((m) => ({ default: m.LearningTracker }))),
+  'release-readiness': lazy(() => import('./ReleaseReadinessBoard').then((m) => ({ default: m.ReleaseReadinessBoard }))),
+  'okr-dashboard': lazy(() => import('./OkrBoard').then((m) => ({ default: m.OkrBoard }))),
+  'uptime-monitoring': lazy(() => import('./UptimeBoard').then((m) => ({ default: m.UptimeBoard }))),
 };
 
 export function DashboardDetail({ dashboard }: { dashboard: Dashboard }) {
@@ -126,7 +128,15 @@ export function DashboardDetail({ dashboard }: { dashboard: Dashboard }) {
       </section>
 
       {Recreation ? (
-        <Recreation />
+        <Suspense
+          fallback={
+            <output className="grid min-h-[60vh] place-items-center rounded-2xl bg-[#eef1f7] text-sm text-[#596579]">
+              Loading the recreation…
+            </output>
+          }
+        >
+          <Recreation />
+        </Suspense>
       ) : (
         <p className="rounded-xl border border-dashed border-[#dce2ec] p-10 text-center text-[#596579]">
           Recreation in progress.

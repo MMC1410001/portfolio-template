@@ -29,7 +29,7 @@ import {
   uptimeMonitors,
   uptimeTrace,
   type UptimeMonitor,
-} from '@/content/dashboards-demo';
+} from '@/content/dashboards-data/uptime';
 import { DarkFrame, DarkHeader, DarkLivePill, DarkPanel, DarkStat, DashNote } from './shell';
 
 const UP = '#5cdd8b';
@@ -223,7 +223,7 @@ export function UptimeBoard() {
         </div>
       </DarkPanel>
 
-      <DashNote>
+      <DashNote dark>
         Recreated from the original with the identifying parts removed rather than masked: no hostnames, positional
         labels for the applications, and an event log that is representative rather than transcribed. A monitoring
         board is a list of somebody else&rsquo;s systems next to their downtime, and that is theirs to publish, not

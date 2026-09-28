@@ -54,6 +54,60 @@ export const ALLOWED_EVENTS: ReadonlySet<string> = new Set<AnalyticsEvent>([
 ]);
 
 /**
+ * The `props` keys each verb may carry. Anything else is dropped at ingest.
+ *
+ * Here, beside the verb list, so adding a verb stays a one-file change: the
+ * `satisfies` below makes a verb with no entry a type error rather than a verb
+ * whose every prop is silently discarded. The same trap applies to a new prop
+ * on an existing verb, which is why each list was taken from the call sites
+ * that queue it (clicks.ts, sections.ts, scroll.ts, cta.ts, mode.ts, chat.ts,
+ * tag.ts, queue.ts's session_end hooks, session.ts's visit, and the two
+ * `queueEvent` calls in ImmersiveSystem.tsx). A key added there and not here
+ * reaches the server and is thrown away, with no error at either end.
+ *
+ * `section` and `mode` are allowed on every verb: validateEvent reads both
+ * into their own columns, allowlisted against the catalogue.
+ *
+ * `click` is the loose one. trackTag() spreads its caller's props onto the row
+ * (FigureTurntable's `frames` today), so a new trackTag caller with a new key
+ * needs that key listed here.
+ */
+const COMMON_PROPS = ['section', 'mode'] as const;
+
+const PROPS_BY_VERB = {
+  visit: ['reduced_motion'],
+  page_view: ['from', 'to', 'doc_h', 'terminal'],
+  session_end: [
+    'exit_section', 'resume_ms', 'immersive_ms', 'mode_changes',
+    'max_scroll_px', 'doc_h',
+  ],
+  click: ['selector', 'text', 'tag', 'sampled', 'synthetic', 'frames'],
+  dead_click: ['selector', 'tag'],
+  rage_click: ['selector', 'dead'],
+  scroll_depth: ['depth', 'doc_h'],
+  cta_view: ['tag'],
+  // `reduced_motion` from use-mode-tracking.ts, `reduced` from the
+  // ImmersiveSystem mount row. Two spellings of one fact, both in the log.
+  mode_change: ['from', 'to', 'trigger', 'dwell_ms', 'reduced_motion', 'reduced'],
+  chat_open: ['trigger'],
+  chat_ask: ['q', 'q_len', 'rejected', 'prompt_index', 'turn'],
+  chat_answer: [
+    'source', 'answer_mode', 'offline', 'failure', 'status', 'latency_ms',
+    'has_href', 'answer_len', 'turn',
+  ],
+  chat_close: ['asked', 'answered', 'dwell_ms', 'last_source'],
+  error: ['scope'],
+} as const satisfies Record<AnalyticsEvent, readonly string[]>;
+
+export const ALLOWED_PROPS: Readonly<Record<string, ReadonlySet<string>>> =
+  Object.fromEntries(
+    Object.entries(PROPS_BY_VERB).map(([verb, keys]) => [
+      verb,
+      new Set<string>([...COMMON_PROPS, ...keys]),
+    ]),
+  );
+
+/**
  * Which verbs carry a coordinate, and what kind of point it is.
  *
  * Derived from the *validated* verb server-side, exactly as Lumen does it,

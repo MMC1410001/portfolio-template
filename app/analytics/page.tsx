@@ -22,6 +22,7 @@
 import type { Metadata } from 'next';
 import { ShowcaseShell } from '@/components/showcase/ShowcaseShell';
 import { AdminTheme } from '@/components/admin/ThemeToggle';
+import { profile } from '@/content/portfolio';
 
 export const metadata: Metadata = {
   title: 'Analytics dashboard, on sample data',
@@ -37,6 +38,8 @@ export const metadata: Metadata = {
       'chatbot coverage gaps. Shown on synthetic data.',
     url: '/analytics',
     type: 'website',
+    // A page-level openGraph replaces the layout's whole, share image included.
+    images: [{ url: profile.avatar, width: 720, height: 720, alt: profile.name }],
   },
 };
 
