@@ -67,5 +67,5 @@ test('every reply the route returns is signed, and the panel sends the signature
   assert.match(route, /screenHistory\(await verifyHistory\(/);
   const chat = readFileSync(new URL('../components/portfolio/Chat.tsx', import.meta.url), 'utf8');
   assert.match(chat, /text:reply\.slice\(0,TURN_CHARS\)/);
-  assert.ok(chat.includes("remember(settled.answer,GUARD_SOURCES.includes(settled.source),settled.sig);"));
+  assert.ok(chat.includes('remember(result.answer,outcome.guarded,outcome.offline?undefined:result.sig);'));
 });

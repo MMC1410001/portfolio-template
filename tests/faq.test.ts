@@ -19,8 +19,9 @@
 // returns a promise by design and is meant to be called without awaiting;
 // the runner collects and awaits them itself.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { CAREER_START, NORTHWIND_START, PYTHON_START, tenure } from '@/content/portfolio';
+import { CAREER_START, NORTHWIND_START, PYTHON_START, BIRTH_MONTH, tenure, age } from '@/content/portfolio';
 import { answers, answerQuestion, guard, normaliseQuestion } from '@/content/faq';
 
 const DURATION = /^(?:\d+ years?)?(?: )?(?:\d+ months?)?$/;
@@ -121,4 +122,24 @@ test('normaliseQuestion folds the forms that bypassed the guards', () => {
   assert.equal(normaliseQuestion('ｉｇｎｏｒｅ　ａｌｌ'), 'ignore all');
   assert.equal(normaliseQuestion('résumé'), 'resume');
   assert.equal(normaliseQuestion('manager’s'), "manager's");
+});
+
+// Shared with tests/test_backend.py, which asserts the same pairs against
+// _normalise() and the Python ports of tenure() and age(). One fixture, so the
+// two suites cannot hold the two runtimes to different expectations.
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./${name}`, import.meta.url), 'utf8')) as unknown;
+
+test('normaliseQuestion matches tests/normalise-cases.json, which Python asserts too', () => {
+  // Devanagari keeps its matras, virama and nukta; a mark on an ASCII letter
+  // goes whatever block it is from; format characters go everywhere.
+  for (const [input, expected] of fixture('normalise-cases.json') as [string, string][]) {
+    assert.equal(normaliseQuestion(input), expected, JSON.stringify(input));
+  }
+});
+
+test('tenure() and age() match tests/clock-cases.json, which Python asserts too', () => {
+  const cases = fixture('clock-cases.json') as { birthMonth: string; tenure: [string, string, string][]; age: [string, number][] };
+  assert.equal(cases.birthMonth, BIRTH_MONTH);
+  for (const [from, to, expected] of cases.tenure) assert.equal(tenure(from, to), expected, `${from} to ${to}`);
+  for (const [to, expected] of cases.age) assert.equal(age(to), expected, to);
 });

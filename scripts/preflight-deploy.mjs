@@ -66,7 +66,15 @@ if (!/"binding"\s*:\s*"ANALYTICS_DB"/.test(wrangler)) {
  * failure here is reported as a warning rather than a block: it usually means
  * "not logged in yet", and refusing to deploy over an unrelated auth problem
  * would be its own annoyance.
+ *
+ * Except in CI. There nobody is at the keyboard to "verify by hand", the
+ * warning scrolls past in a log, and an unreadable list means the deploy
+ * token cannot see the Worker it is about to replace. So with CI set, it
+ * blocks.
  */
+function secretListUnreadable(ci) {
+  return ci ? problems : warnings;
+}
 let remoteSecrets = null;
 try {
   const raw = execFileSync(
@@ -78,10 +86,14 @@ try {
     (JSON.parse(raw) ?? []).map((entry) => entry.name ?? ''),
   );
 } catch {
-  warnings.push(
+  secretListUnreadable(process.env.CI).push(
     'Could not read the Worker\'s secret list (not logged in, or the Worker ' +
-      'does not exist yet). Skipping the secret check, verify by hand that ' +
-      'ANALYTICS_IP_SALT and ADMIN_TOKEN are set.',
+      'does not exist yet). ' +
+      (process.env.CI
+        ? 'In CI this blocks: give the deploy token permission to read the ' +
+          'Worker\'s secrets, so ANALYTICS_IP_SALT and ADMIN_TOKEN can be checked.'
+        : 'Skipping the secret check, verify by hand that ANALYTICS_IP_SALT ' +
+          'and ADMIN_TOKEN are set.'),
   );
 }
 
@@ -99,6 +111,28 @@ if (remoteSecrets) {
       );
     }
   }
+}
+
+/* ── 2b. The model tier needs the database it is metered by ─────────────── */
+
+/**
+ * NIM_API_KEY turns on a paid API, and the only thing bounding its bill is
+ * the CHAT_MODEL_DAILY_LIMIT counter, a row in D1. That cap fails closed
+ * (lib/analytics/chat-quota.ts, chargeModelCall): with no database every
+ * model call is refused and the curated answer served. So a key with no
+ * binding deploys "fine" and the model tier is silently dead, which is this
+ * file's whole category of problem. Checked against the vars in
+ * wrangler.jsonc and the remote secrets, whichever could be read.
+ */
+const hasDbBinding = /"binding"\s*:\s*"ANALYTICS_DB"/.test(wrangler);
+const hasNimKey = /"NIM_API_KEY"\s*:/.test(wrangler) || Boolean(remoteSecrets?.has('NIM_API_KEY'));
+if (hasNimKey && !hasDbBinding) {
+  problems.push(
+    'NIM_API_KEY is set but wrangler.jsonc has no ANALYTICS_DB binding. The ' +
+      'model tier is metered by a D1 counter and refuses every call without ' +
+      'one, so the key would do nothing. Add the binding, or remove the key ' +
+      'with:  wrangler secret delete NIM_API_KEY',
+  );
 }
 
 /* ── 3. The header-trust flag must not be set for a Cloudflare origin ────── */

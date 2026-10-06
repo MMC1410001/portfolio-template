@@ -22,6 +22,7 @@ import { isUntrackedPath, trackingSuppressed } from './scope';
 import { normaliseTag } from './normalise';
 import { currentSection } from './sections';
 import { currentMode } from './mode';
+import { debouncedScan } from './dom';
 
 /**
  * What this watches.
@@ -41,7 +42,6 @@ const SCAN_DEBOUNCE_MS = 250;
 
 let observer: IntersectionObserver | null = null;
 let scanner: MutationObserver | null = null;
-let scanTimer: ReturnType<typeof setTimeout> | null = null;
 let seen = new Set<string>();
 /** Pending "has it held for a second yet" timers, keyed by element. */
 const pending = new Map<Element, ReturnType<typeof setTimeout>>();
@@ -103,22 +103,10 @@ function scan(): void {
  * Re-scan after mutations, debounced, and only for ones that added an element.
  *
  * The undebounced version ran a document-wide querySelectorAll on every
- * mutation batch, and the turntable rewrites its degree readout's textContent
- * on every scroll frame, which is a childList mutation adding a Text node. No
- * tag can arrive in a Text node, so those records are skipped outright, and a
- * burst of real ones (a chunk mounting) costs one scan rather than dozens.
+ * mutation batch, once per scroll frame while the turntable turned. See
+ * debouncedScan() in dom.ts for the filter.
  */
-function scheduleScan(records: MutationRecord[]): void {
-  if (scanTimer !== null) return;
-  const added = records.some((r) =>
-    Array.from(r.addedNodes).some((n) => n.nodeType === 1),
-  );
-  if (!added) return;
-  scanTimer = setTimeout(() => {
-    scanTimer = null;
-    scan();
-  }, SCAN_DEBOUNCE_MS);
-}
+const scans = debouncedScan(SCAN_DEBOUNCE_MS, scan);
 
 /**
  * Install the observers. Idempotent.
@@ -145,7 +133,7 @@ export function installCtaVisibility(): void {
   scan();
 
   if (typeof MutationObserver === 'function') {
-    scanner = new MutationObserver(scheduleScan);
+    scanner = new MutationObserver(scans.schedule);
     scanner.observe(document.body, { childList: true, subtree: true });
   }
 }
@@ -172,10 +160,7 @@ export function uninstallCtaVisibility(): void {
   scanner?.disconnect();
   observer = null;
   scanner = null;
-  if (scanTimer !== null) {
-    clearTimeout(scanTimer);
-    scanTimer = null;
-  }
+  scans.cancel();
   for (const timer of pending.values()) clearTimeout(timer);
   pending.clear();
 }

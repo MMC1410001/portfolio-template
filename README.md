@@ -335,7 +335,8 @@ FastAPI does not load a `.env` file by itself. Set Python service values in the 
 | `npm run dev` | Starts the local development website |
 | `npm run typecheck` | Checks TypeScript types |
 | `npm run check:links` | Opens every link in `content/portfolio.ts` as a stranger would |
-| `npm test` | Runs `test:units`, `test:py`, `test:chat` and `test:analytics` in that order (the last two need `npm run dev` in another terminal) |
+| `npm test` | Runs `test:units` and `test:py`, what CI runs; no server needed |
+| `npm run test:e2e` | Runs `test:chat` and `test:analytics` (need `npm run dev` in another terminal) |
 | `npm run test:units` | Runs the pure-logic checks and the route-handler tests. Needs no server |
 | `npm run test:py` | Runs the Python chatbot checks, with `.venv` if it exists (macOS, Linux or Windows) |
 | `npm run test:chat` | Runs chat checks while `npm run dev` is still running in another terminal |
@@ -347,7 +348,7 @@ FastAPI does not load a `.env` file by itself. Set Python service values in the 
 | `npm run seed:demo` | Regenerates the synthetic data behind `/analytics` |
 | `npm run emit:migration` | Regenerates `migrations/` from the schema |
 | `npm run preflight` | Checks a deploy would not come up half-broken |
-| `npm run deploy` | Preflight, build, and `wrangler deploy` |
+| `npm run deploy` | Typecheck, unit and Python tests, preflight, build, D1 migrations, and `wrangler deploy` |
 | `npm run db:migrate` | Applies `migrations/` to the remote D1 (`db:migrate:local` for the local one) |
 | `.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` | Runs the Python chatbot checks verbosely on macOS or Linux (`.venv\Scripts\python` on Windows) |
 
@@ -663,7 +664,7 @@ The optional FastAPI service is separate from the Worker. If you enable it, depl
 ## Before you publish
 
 1. Check every new public link in a private browser window.
-2. Run `npm run typecheck`, `npm test` (with `npm run dev` running in another terminal), and `npm run build`.
+2. Run `npm run typecheck`, `npm test`, `npm run test:e2e` (with `npm run dev` running in another terminal), and `npm run build`.
 3. Verify that photos, résumé files, and course notes are intended for public sharing.
 4. Search for secrets before committing. Do not commit `.env.local`, `.dev.vars`, or personal access tokens. Keep real values out of `.env.example`.
 5. Confirm that every client description is a safe high-level summary.

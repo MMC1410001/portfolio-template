@@ -165,9 +165,6 @@ export function describeInternal(
   };
 }
 
-/** `'/#work'` handled by sectionLabel; this is for a bare unknown path. */
-export const shortPath = (path: string) => path.replace(/^\/#?/, '') || 'page';
-
 /**
  * Keep the two largest categories, fold the rest into one "Other".
  *

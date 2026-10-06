@@ -28,13 +28,28 @@
  * call. It has no session and no token, so such a call would 404 forever, 
  * and, worse, it would mean a public page probing the gated API on every load.
  *
- * ── Why the data is a static import ────────────────────────────────────────
+ * ── Why the data is committed JSON ─────────────────────────────────────────
  * The page is statically rendered. There is no endpoint behind it, which is
  * also why every control's options are precomputed in the JSON rather than
  * derived on demand: the range presets and all 18 heatmap combinations exist
  * as baked payloads. See scripts/seed-analytics-demo.ts.
+ *
+ * ── Why the data and every panel are their own chunks ──────────────────────
+ * This file used to import all seven panels and the 272KB JSON statically,
+ * which put the lot in one client chunk: about 352KB gzip of script before
+ * the page could hydrate. The JSON is now a dynamic `import()`, read with
+ * `use()`, and each panel a `lazy()` chunk, as DashboardDetail does with its
+ * boards. Neither costs the static HTML anything: the server awaits both, so
+ * the prerendered page is complete, and hydration keeps that markup on screen
+ * while the chunks arrive in parallel instead of in one long download. It is
+ * still a file in the bundle, not a request to anything with data behind it.
+ *
+ * A chunk that never arrives (offline, or a hashed name a redeploy removed)
+ * rejects, which `<Suspense>` does not catch, so each sits under a
+ * SceneBoundary: one failed panel says so in its own slot, and a failed
+ * dataset leaves the navigation and a reload link rather than a blank page.
  */
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, use, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   SidebarInset,
@@ -44,16 +59,9 @@ import {
 import { SHOWCASE_SECTIONS, SHOWCASE_SECTION_IDS, adminSection } from '@/components/admin/admin-sections';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { AdminSection } from '@/components/admin/AdminSection';
-import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
-import { AudiencePanel } from '@/components/admin/AudiencePanel';
-import { CampaignsPanel } from '@/components/admin/CampaignsPanel';
-import { ChatPanel } from '@/components/admin/ChatPanel';
-import { ClicksPanel } from '@/components/admin/ClicksPanel';
-import {
-  ClickHeatmap,
-  type Device,
-} from '@/components/admin/ClickHeatmap';
-import { SessionsPanel } from '@/components/admin/SessionsPanel';
+import type { Device } from '@/components/admin/ClickHeatmap';
+import SceneBoundary from '@/components/portfolio/SceneBoundary';
+import { queueEvent } from '@/lib/analytics/queue';
 import { ThemeToggle } from '@/components/admin/ThemeToggle';
 import { useAdminSectionNav } from '@/hooks/use-admin-section-nav';
 import { Badge } from '@/components/ui/badge';
@@ -70,7 +78,22 @@ import type {
   Overview,
   SessionRow,
 } from '@/lib/analytics/types';
-import demo from '@/content/analytics-demo.json';
+
+const AnalyticsPanel = lazy(() => import('@/components/admin/AnalyticsPanel').then((m) => ({ default: m.AnalyticsPanel })));
+const ClicksPanel = lazy(() => import('@/components/admin/ClicksPanel').then((m) => ({ default: m.ClicksPanel })));
+const ClickHeatmap = lazy(() => import('@/components/admin/ClickHeatmap').then((m) => ({ default: m.ClickHeatmap })));
+const AudiencePanel = lazy(() => import('@/components/admin/AudiencePanel').then((m) => ({ default: m.AudiencePanel })));
+const ChatPanel = lazy(() => import('@/components/admin/ChatPanel').then((m) => ({ default: m.ChatPanel })));
+const CampaignsPanel = lazy(() => import('@/components/admin/CampaignsPanel').then((m) => ({ default: m.CampaignsPanel })));
+const SessionsPanel = lazy(() => import('@/components/admin/SessionsPanel').then((m) => ({ default: m.SessionsPanel })));
+
+/**
+ * Requested when this module is evaluated, not when it first renders, so the
+ * dataset downloads alongside the panel chunks rather than after them. One
+ * promise for the life of the page, which is what `use()` needs.
+ */
+const DEMO = import('@/content/analytics-demo.json').then((m) => m.default);
+type Demo = Awaited<typeof DEMO>;
 
 /** One range's worth of precomputed payloads. */
 interface RangeBundle {
@@ -89,17 +112,22 @@ interface RangeBundle {
  * running the real query functions, whose return types *are* these interfaces.
  * If a payload shape changes, the generator changes with it.
  */
-const RANGES = demo.ranges as unknown as Record<string, RangeBundle>;
-const HEAT = demo.heat as unknown as Record<string, ClickMap>;
+function payloads(demo: Demo) {
+  return {
+    ranges: demo.ranges as unknown as Record<string, RangeBundle>,
+    heat: demo.heat as unknown as Record<string, ClickMap>,
+    sessionRows: demo.sessionRows as unknown as SessionRow[],
+  };
+}
 /**
  * One list, shared by every range.
  *
  * `listSessions` orders by last seen and all three windows end on the same
  * anchor date, so the newest rows are identical across them, stored once
  * rather than three times, which took 40 KB out of this page's bundle. The
- * generator asserts they really do match before deduplicating.
+ * generator asserts they really do match before deduplicating. (`sessionRows`
+ * in payloads() above.)
  */
-const SESSION_ROWS = demo.sessionRows as unknown as SessionRow[];
 
 const RANGE_OPTIONS = [
   { id: '7', label: '7 days' },
@@ -117,7 +145,44 @@ function prettyAnchor(key: string): string {
   return `${d} ${months[m - 1]} ${y}`;
 }
 
+/** Each panel's own boundary, so one chunk failing costs one slot. */
+function Slot({ children }: { children: ReactNode }) {
+  return (
+    <SceneBoundary
+      scope="showcase-chunk"
+      onError={(scope) => queueEvent('error', { props: { scope } })}
+      fallback={<p className="rounded-lg border p-4 text-xs text-muted-foreground">This panel did not load. <button type="button" className="underline underline-offset-2" onClick={() => location.reload()}>Reload the page</button> to try again.</p>}
+    >
+      <Suspense fallback={<div className="min-h-40 rounded-lg border p-4 text-xs text-muted-foreground">Loading…</div>}>{children}</Suspense>
+    </SceneBoundary>
+  );
+}
+
 export function ShowcaseShell() {
+  const active = useAdminSectionNav(SHOWCASE_SECTION_IDS);
+  // The navigation needs no data, so it sits outside the boundary and stays
+  // usable whatever happens to the dataset's chunk.
+  return (
+    <SidebarProvider>
+      <AdminNav active={active} sections={SHOWCASE_SECTIONS} />
+      <SidebarInset>
+        <SceneBoundary
+          scope="showcase-chunk"
+          onError={(scope) => queueEvent('error', { props: { scope } })}
+          fallback={<p className="px-4 py-10 text-sm text-muted-foreground">The sample data did not load. <button type="button" className="underline underline-offset-2" onClick={() => location.reload()}>Reload the page</button> to try again.</p>}
+        >
+          <Suspense fallback={<p className="px-4 py-10 text-sm text-muted-foreground">Loading the sample data…</p>}>
+            <Showcase />
+          </Suspense>
+        </SceneBoundary>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+function Showcase() {
+  const demo = use(DEMO);
+  const { ranges: RANGES, heat: HEAT, sessionRows: SESSION_ROWS } = useMemo(() => payloads(demo), [demo]);
   const [rangeId, setRangeId] = useState<string>('30');
   const [device, setDevice] = useState<Device>('desktop');
   const [kind, setKind] = useState<'click' | 'dead' | 'rage'>('click');
@@ -129,16 +194,13 @@ export function ShowcaseShell() {
   // stale figure on screen contradicting the rest.
   const heat = useMemo(
     () => HEAT[`${rangeId}:${device}:${kind}:${mode}`] ?? null,
-    [rangeId, device, kind, mode],
+    [HEAT, rangeId, device, kind, mode],
   );
 
-  const active = useAdminSectionNav(SHOWCASE_SECTION_IDS);
   const anchor = prettyAnchor(demo.anchor);
 
   return (
-    <SidebarProvider>
-      <AdminNav active={active} sections={SHOWCASE_SECTIONS} />
-      <SidebarInset>
+    <>
         <header className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
           <SidebarTrigger />
           <div className="min-w-0 flex-1">
@@ -156,7 +218,7 @@ export function ShowcaseShell() {
         </header>
 
         <main className="flex flex-col gap-8 px-4 py-5">
-          <SampleNotice anchor={anchor} />
+          <SampleNotice anchor={anchor} totalSessions={demo.totalSessions} days={demo.days} />
 
           {/* The range control. Deliberately not labelled "Last 7 days": these
               are windows into a fixed sample, and a relative label would be a
@@ -191,7 +253,7 @@ export function ShowcaseShell() {
             title={adminSection('admin-overview').label}
             blurb={adminSection('admin-overview').blurb}
           >
-            <AnalyticsPanel data={bundle.overview} />
+            <Slot><AnalyticsPanel data={bundle.overview} /></Slot>
           </AdminSection>
 
           <AdminSection
@@ -199,7 +261,7 @@ export function ShowcaseShell() {
             title={adminSection('admin-clicks').label}
             blurb={adminSection('admin-clicks').blurb}
           >
-            <ClicksPanel data={bundle.overview} />
+            <Slot><ClicksPanel data={bundle.overview} /></Slot>
           </AdminSection>
 
           <AdminSection
@@ -207,11 +269,12 @@ export function ShowcaseShell() {
             title={adminSection('admin-heatmap').label}
             blurb={adminSection('admin-heatmap').blurb}
           >
-            {/* `loading` is false and `error` null forever: the data is in the
-                bundle, so there is nothing to wait for and nothing to fail.
+            {/* `loading` is false and `error` null forever: `use(DEMO)` has
+                the data before this renders, so there is nothing to wait for
+                and nothing to fail.
                 onRefresh is a no-op for the same reason, a Refresh button
                 that re-renders identical data would imply the numbers move. */}
-            <ClickHeatmap
+            <Slot><ClickHeatmap
               data={heat}
               device={device}
               kind={kind}
@@ -222,7 +285,7 @@ export function ShowcaseShell() {
               onKind={setKind}
               onMode={setMode}
               onRefresh={() => {}}
-            />
+            /></Slot>
           </AdminSection>
 
           <AdminSection
@@ -230,7 +293,7 @@ export function ShowcaseShell() {
             title={adminSection('admin-audience').label}
             blurb={adminSection('admin-audience').blurb}
           >
-            <AudiencePanel data={bundle.audience} />
+            <Slot><AudiencePanel data={bundle.audience} /></Slot>
           </AdminSection>
 
           <AdminSection
@@ -238,7 +301,7 @@ export function ShowcaseShell() {
             title={adminSection('admin-chat').label}
             blurb={adminSection('admin-chat').blurb}
           >
-            <ChatPanel data={bundle.chat} />
+            <Slot><ChatPanel data={bundle.chat} /></Slot>
           </AdminSection>
 
           <AdminSection
@@ -246,7 +309,7 @@ export function ShowcaseShell() {
             title={adminSection('admin-campaigns').label}
             blurb={adminSection('admin-campaigns').blurb}
           >
-            <CampaignsPanel data={bundle.campaigns} />
+            <Slot><CampaignsPanel data={bundle.campaigns} /></Slot>
           </AdminSection>
 
           <AdminSection
@@ -254,13 +317,12 @@ export function ShowcaseShell() {
             title={adminSection('admin-sessions').label}
             blurb={adminSection('admin-sessions').blurb}
           >
-            <SessionsPanel rows={SESSION_ROWS} />
+            <Slot><SessionsPanel rows={SESSION_ROWS} /></Slot>
           </AdminSection>
 
           <HowItWorks />
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </>
   );
 }
 
@@ -272,7 +334,7 @@ export function ShowcaseShell() {
  * kind of artefact people assume is real. Saying so underneath would be a
  * footnote to a claim already made.
  */
-function SampleNotice({ anchor }: { anchor: string }) {
+function SampleNotice({ anchor, totalSessions, days }: { anchor: string; totalSessions: number; days: number }) {
   return (
     <div className="rounded-lg border border-[var(--color-chart-4)]/40 bg-[var(--color-chart-4)]/5 p-4">
       <p className="text-sm font-medium">
@@ -280,8 +342,8 @@ function SampleNotice({ anchor }: { anchor: string }) {
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         This is a working copy of my private analytics dashboard, running on{' '}
-        {demo.totalSessions.toLocaleString('en-IN')} generated sessions over{' '}
-        {demo.days} days ending {anchor}. No real visitor is represented, and
+        {totalSessions.toLocaleString('en-IN')} generated sessions over{' '}
+        {days} days ending {anchor}. No real visitor is represented, and
         nothing here was measured from anyone who read this site, including
         you. The panels, queries and charts are the production ones; only the
         rows underneath are invented.

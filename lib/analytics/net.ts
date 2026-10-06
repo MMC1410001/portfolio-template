@@ -55,6 +55,20 @@ function forwardedForTrusted(): boolean {
 }
 
 /**
+ * Whether the Workers runtime handed us this request: it carries `request.cf`.
+ * Read with Reflect.get, the way vinext reads it, and guarded, because vinext
+ * makes it a getter that throws during static generation.
+ */
+function fromEdge(request: Request): boolean {
+  try {
+    const cf: unknown = Reflect.get(request, 'cf');
+    return typeof cf === 'object' && cf !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The caller's address, from infrastructure headers only.
  *
  * A browser cannot read its own public IP and anything in a request body is
@@ -67,12 +81,22 @@ function forwardedForTrusted(): boolean {
  * that overwrites them. With no trusted address the answer is null, which
  * every caller already treats as no budget, no write and no exemption.
  *
+ * `cf-connecting-ip` itself is believed only on a request that came through
+ * Cloudflare's edge, which is what overwrites it. The proof is `request.cf`:
+ * the Workers runtime attaches it to every inbound request and no header can
+ * create it, and vinext re-attaches it whenever it rebuilds the Request
+ * (attachRequestCfMetadata in its request-pipeline). On any other host, the
+ * same bundle under Node for one, the header is just text the caller typed.
+ *
  * Local dev needs no exception: `vinext dev` (Miniflare) sets
- * `cf-connecting-ip` on every request, 127.0.0.1 from this machine.
+ * `cf-connecting-ip` on every request, 127.0.0.1 from this machine, and
+ * attaches `request.cf` too (checked through the admin `whoami` action,
+ * which lists its keys). A unit test builds its Request by hand, so it has
+ * to attach a `cf` object to stand in for the runtime.
  */
 export function clientIp(request: Request): ClientIp {
   const chain = request.headers.get('x-forwarded-for');
-  const candidates = [request.headers.get('cf-connecting-ip')];
+  const candidates = [fromEdge(request) ? request.headers.get('cf-connecting-ip') : null];
   if (forwardedForTrusted()) {
     candidates.push(request.headers.get('x-real-ip'), chain?.split(',')[0] ?? null);
   }

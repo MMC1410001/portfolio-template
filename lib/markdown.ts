@@ -136,6 +136,20 @@ export function parseMarkdown(source: string): Block[] {
  * Inline marks, in precedence order: a code span is taken first and nothing
  * inside it is interpreted, so `*` in `a*b` stays an asterisk.
  */
+/**
+ * The only hrefs a `[text](href)` becomes a link with: http(s), mailto, a
+ * root-relative path and an in-page anchor, the same allowlist-by-pattern as
+ * lib/chat/linkify.ts, so `javascript:` and `data:` cannot be expressed at all.
+ * A root-relative path must not start `//` or `/\`: both are protocol-relative
+ * to a browser (it reads the backslash as a slash), so `//evil.example` would
+ * pass a bare `^\/` as a same-site link while leaving the site. Anything else,
+ * a bare relative path included, keeps its text and loses the link.
+ */
+const SAFE_HREF = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)/i;
+export function safeHref(href: string): boolean {
+  return SAFE_HREF.test(href);
+}
+
 const INLINE = /`([^`]+)`|\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)\s]+)\)|(?<![\w*])\*(?!\s)([^*]+?)\*(?![\w*])/;
 
 export function parseInline(text: string): Inline[] {
@@ -150,7 +164,10 @@ export function parseInline(text: string): Inline[] {
     if (m.index) out.push({ kind: 'text', text: rest.slice(0, m.index) });
     if (m[1] !== undefined) out.push({ kind: 'code', text: m[1] });
     else if (m[2] !== undefined) out.push({ kind: 'strong', children: parseInline(m[2]) });
-    else if (m[3] !== undefined) out.push({ kind: 'link', href: m[4], children: parseInline(m[3]) });
+    else if (m[3] !== undefined) {
+      if (safeHref(m[4])) out.push({ kind: 'link', href: m[4], children: parseInline(m[3]) });
+      else out.push(...parseInline(m[3]));
+    }
     else out.push({ kind: 'em', children: parseInline(m[5]) });
     rest = rest.slice(m.index + m[0].length);
   }

@@ -97,6 +97,15 @@ session can hold several terminal rows and **the last one is the exit**. The
 queue latches one exit per hidden period, so the `pagehide` that follows a
 hide on desktop adds nothing.
 
+When two sections share the 20% centre band, the **lower** one in document
+order is the active one. That used to be the other way round, and in plain
+flow the difference is a boundary crossing the band. The homepage now stacks
+its sections in sticky chapters that slide over one another, and a covered
+chapter stays under the band for the rest of the page. IntersectionObserver
+does not report occlusion, so "highest wins" would have held the dwell on a
+section nobody could see. The lowest intersecting section is the one painted
+on top. The header nav's scroll-spy follows the same rule.
+
 ### `/dashboards` is tracked, and has no sections
 
 `AnalyticsProvider` sits in `app/layout.tsx`, so it mounts on every route, and
@@ -359,7 +368,7 @@ Prefixes broader than `/16` (v4) or `/32` (v6) are **skipped with a warning,
 not applied**: a stray `/0` would mark every visitor internal and zero the
 panel, and the failure presents as "no traffic" rather than as an error.
 
-The client address that all of this keys on comes from `cf-connecting-ip` alone, unless
+The client address that all of this keys on comes from `cf-connecting-ip` alone, and only when the request carries `request.cf`, unless
 `TRUST_FORWARDED_FOR=1` (see `net.ts`). Trusted networks added from the panel must be /24 (IPv4)
 or /48 (IPv6) or narrower, and "Add my current IP" adds the /64 for IPv6. A failed read of the list
 is cached for 3 seconds, not 30.
@@ -574,7 +583,7 @@ cookie cannot name two paths.
 npm run dev            # the site, plus a local Miniflare D1
 npm run test:units     # 35 pure-logic checks, no server needed
 npm run test:analytics # 62 checks against a live dev server
-npm test               # all three suites
+npm test               # units + Python; npm run test:e2e runs the live-server suites
 npm run emit:migration # regenerate migrations/ and drizzle/ from schema.ts
 ```
 

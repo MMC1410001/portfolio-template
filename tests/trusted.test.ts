@@ -181,7 +181,8 @@ test('a network added in the panel lifts the chat limits for it', async () => {
   const { db, close } = freshDb();
   try {
     await withEnv({ ...NO_ENV, ADMIN_TOKEN: undefined }, async () => {
-      const from = (ip: string) => new Request('https://x.test/api/chat', { method: 'POST', headers: { 'cf-connecting-ip': ip } });
+      // `cf` stands in for the Workers runtime: clientIp() believes the header only beside it.
+      const from = (ip: string) => Object.defineProperty(new Request('https://x.test/api/chat', { method: 'POST', headers: { 'cf-connecting-ip': ip } }), 'cf', { value: {} });
       assert.equal(await chatExemption(from('203.0.113.7'), db), null);
       await addTrusted(db, '203.0.113.0/24', 'Office', 'x');
       assert.equal(await chatExemption(from('203.0.113.7'), db), 'network');

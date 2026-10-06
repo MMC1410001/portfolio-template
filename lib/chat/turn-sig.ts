@@ -40,21 +40,16 @@
 /** How much of a reply the browser keeps, and so how much is signed. */
 export const TURN_CHARS = 320;
 
+import { b64urlToBytes, bytesToB64url } from '../b64url';
+
 const LABEL = 'portfolio chat-turn key v1';
 const encoder = new TextEncoder();
 
-function b64url(bytes: ArrayBuffer): string {
-  let binary = '';
-  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
+// Strict on purpose: exactly a 32-byte MAC in the URL alphabet, or null, before
+// the lenient shared decoder sees it.
 function fromB64url(text: string): Uint8Array<ArrayBuffer> | null {
   if (!/^[A-Za-z0-9_-]{43}$/.test(text)) return null; // 32 bytes, unpadded
-  const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/') + '=');
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  return b64urlToBytes(text);
 }
 
 /**
@@ -81,7 +76,7 @@ function signingKey(secret: string, label: string): Promise<CryptoKey> {
 /** HMAC-SHA256 of `message` under the key derived for `label`, base64url. */
 export async function signWith(label: string, message: string, secret: string): Promise<string> {
   const key = await signingKey(secret, label);
-  return b64url(await crypto.subtle.sign('HMAC', key, encoder.encode(message)));
+  return bytesToB64url(await crypto.subtle.sign('HMAC', key, encoder.encode(message)));
 }
 
 /** Constant-time, via WebCrypto's own verify. Malformed input is simply false. */

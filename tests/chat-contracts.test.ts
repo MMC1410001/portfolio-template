@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { answers, answerQuestion } from '@/content/faq';
+import { FIRST_TOKEN_MS, HEADER_CEILING_MS } from '@/lib/chat/ask';
+import { STREAM_TOTAL_MS } from '@/lib/chat/nim';
 import { speechFailureHint } from '@/lib/chat/speech-text';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -21,31 +23,27 @@ test('the model budget stays inside the browser timeout', () => {
   // Measured in production at 9.7s, 9.9s and 12.3s, all after Chat.tsx had
   // aborted at 8.5s and served the offline answer. The model call was paid
   // for and discarded every time.
+  // TOTAL_BUDGET_MS is not exported, so it is read from the source; the two
+  // browser clocks are imported from lib/chat/ask.ts, where tests/ask.test.ts
+  // proves each one actually aborts at its number.
   const nim = read('lib/chat/nim.ts');
-  const chat = read('components/portfolio/Chat.tsx');
   const budget = Number(/const TOTAL_BUDGET_MS = (\d+)/.exec(nim)?.[1]);
+  assert.ok(budget > 0, 'TOTAL_BUDGET_MS not found in lib/chat/nim.ts');
   // Two browser clocks. The HEADER ceiling is what the non-streaming path
   // has to beat, because it sends no headers until it has the whole answer.
   // This used to be compared against the 12s first-token watchdog instead,
   // which only starts once headers have arrived and so never bounded the
   // JSON path at all.
-  const headerCeiling = Number(/const HEADER_CEILING_MS=(\d+)/.exec(chat)?.[1]);
-  const firstToken = Number(/firstTokenMs:(\d+)/.exec(chat)?.[1]);
-  assert.ok(budget > 0, 'TOTAL_BUDGET_MS not found in lib/chat/nim.ts');
-  assert.ok(headerCeiling > 0, 'HEADER_CEILING_MS was not found in Chat.tsx');
-  assert.ok(firstToken > 0, 'firstTokenMs was not found in Chat.tsx');
-  assert.match(chat, /setTimeout\(\(\)=>controller\.abort\('slow'\),HEADER_CEILING_MS\)/, 'the header ceiling must actually abort');
   assert.ok(
-    budget + 500 <= headerCeiling,
-    `the Worker may spend ${budget}ms while the browser gives up waiting for headers at ${headerCeiling}ms`,
+    budget + 500 <= HEADER_CEILING_MS,
+    `the Worker may spend ${budget}ms while the browser gives up waiting for headers at ${HEADER_CEILING_MS}ms`,
   );
   // Streaming is what the first-token watchdog is for, and it has to be
   // the looser clock or streaming buys nothing.
-  assert.ok(firstToken > headerCeiling, 'the first-token watchdog must outlast the header ceiling');
+  assert.ok(FIRST_TOKEN_MS > HEADER_CEILING_MS, 'the first-token watchdog must outlast the header ceiling');
   // And the stream's own ceiling looser still: the whole point is that a
   // 10.9s answer is readable from 1s.
-  const streamTotal = Number(/export const STREAM_TOTAL_MS = (\d+)/.exec(nim)?.[1]);
-  assert.ok(streamTotal > firstToken, 'the stream ceiling must outlast the first-token deadline');
+  assert.ok(STREAM_TOTAL_MS > FIRST_TOKEN_MS, 'the stream ceiling must outlast the first-token deadline');
   // And the retry must draw from that budget rather than from the per-call
   // ceiling, which is the specific line that was wrong.
   assert.match(nim, /TOTAL_BUDGET_MS - \(Date\.now\(\) - started\)/);
@@ -211,10 +209,17 @@ test('the panel is a lazy chunk behind an eager launcher that looks and tracks t
   assert.match(chat, /trackChatOpen\('launcher'\)/);
 });
 
-test('a JSON reply is checked before it is rendered', () => {
+test('the panel leaves the transport to lib/chat/ask.ts', () => {
+  // The deadlines, the allowance headers, the 429s and the fallback labels
+  // are tested as behaviour in tests/ask.test.ts. That only covers the panel
+  // if the panel uses it, rather than growing a second fetch of its own.
   const chat = read('components/portfolio/Chat.tsx');
-  assert.ok(!/result=await response\.json\(\)/.test(chat), 'the JSON path must not cast the body');
-  assert.match(chat, /toPayload\(data as Record<string,unknown>\)/);
+  assert.match(chat, /await ask\(\{question,history:prior,carried:carriedRef\.current,controller\}/);
+  assert.ok(!/\bfetch\(/.test(chat), 'Chat.tsx must not call /api/chat itself');
+  assert.match(chat, /inflight\.current\?\.abort\('user'\)/, 'Stop must abort with the reason ask() labels as Stopped');
+  // The signed reply goes back as history; a reply answered locally has no
+  // signature to send. See lib/chat/turn-sig.ts.
+  assert.ok(chat.includes('remember(result.answer,outcome.guarded,outcome.offline?undefined:result.sig);'));
 });
 
 test('a cancelled stream stops the model call and is not counted as a failure', () => {

@@ -28,7 +28,8 @@
  * ── Degrading open ─────────────────────────────────────────────────────────
  * No database or no salt means no allowance, the same choice chat-limit.ts
  * makes and for the same reason: the chatbot answering matters more than the
- * counter. A failure while counting is logged and the question allowed.
+ * counter. A failure while counting is logged and the question allowed. That
+ * holds for the curated answer only: the model cap below fails closed.
  *
  * The database is passed in, already through ensureSchema(), rather than
  * fetched here: db.ts imports `cloudflare:workers`, and this file is
@@ -81,22 +82,25 @@ export async function mintBrowserId(secret: string): Promise<{ id: string; cooki
 }
 
 /**
- * Charge one question to `bucket`, in one statement.
+ * The upsert that charges one question to `bucket`.
  *
  * The count is capped at limit + 1, so a refused caller who keeps asking does
  * not keep writing a larger number; +1 is what says "refused". SQLite
  * evaluates every SET expression against the old row, so both CASEs see the
  * same window.
+ *
+ * With `gate`, the charge applies only while the `gate.bucket` row stands at
+ * or under `gate.limit`. That is how the network is charged in the same batch
+ * as the browser and still only when the browser was allowed: a batch runs
+ * its statements in order, in one transaction, so the gate reads the browser
+ * row the statement before it has just written. `WHERE` is also what keeps
+ * `INSERT … SELECT … ON CONFLICT` parseable; SQLite needs one there.
  */
-export async function chargeQuota(
-  db: D1Database,
-  bucket: string,
-  limit: number,
-  now: number,
-): Promise<{ allowed: boolean; used: number; resetAt: number }> {
-  const row = await db
+function quotaUpsert(db: D1Database, bucket: string, limit: number, now: number, gate?: { bucket: string; limit: number }): D1PreparedStatement {
+  return db
     .prepare(
-      `INSERT INTO chat_quota (bucket, window_start, questions) VALUES (?1, ?2, 1)
+      `INSERT INTO chat_quota (bucket, window_start, questions)
+       SELECT ?1, ?2, 1 WHERE ${gate ? '(SELECT questions FROM chat_quota WHERE bucket = ?5) <= ?6' : '1'}
        ON CONFLICT(bucket) DO UPDATE SET
          questions = CASE WHEN chat_quota.window_start > ?2 - ?4
                           THEN MIN(chat_quota.questions + 1, ?3 + 1) ELSE 1 END,
@@ -104,10 +108,23 @@ export async function chargeQuota(
                              THEN chat_quota.window_start ELSE ?2 END
        RETURNING questions, window_start`,
     )
-    .bind(bucket, now, limit, QUOTA_WINDOW_MS)
-    .first<{ questions: number; window_start: number }>();
+    .bind(bucket, now, limit, QUOTA_WINDOW_MS, ...(gate ? [gate.bucket, gate.limit] : []));
+}
+
+type QuotaRow = { bucket?: string; questions: number; window_start: number };
+const readRow = (row: QuotaRow | null | undefined, limit: number, now: number) => {
   const used = row?.questions ?? 1;
   return { allowed: used <= limit, used, resetAt: (row?.window_start ?? now) + QUOTA_WINDOW_MS };
+};
+
+/** Charge one question to `bucket`, in one statement. */
+export async function chargeQuota(
+  db: D1Database,
+  bucket: string,
+  limit: number,
+  now: number,
+): Promise<{ allowed: boolean; used: number; resetAt: number }> {
+  return readRow(await quotaUpsert(db, bucket, limit, now).first<QuotaRow>(), limit, now);
 }
 
 export interface QuotaVerdict {
@@ -161,6 +178,12 @@ export async function chatExemption(request: Request, db: D1Database | null): Pr
  * Browser first: a browser already over its allowance is refused without
  * touching the network counter, so one visitor hammering a closed chat cannot
  * spend the allowance of everyone else on the same office connection.
+ *
+ * One round trip, not two: both upserts and the read-back go in one batch,
+ * the network upsert gated on the browser row it follows (quotaUpsert). The
+ * counts are read back with a SELECT rather than from RETURNING, because a
+ * gated upsert that does nothing returns no row, and the local D1 facade
+ * (scripts/d1-sqlite.ts) does not surface RETURNING rows from a batch.
  */
 export async function chargeChatQuota(
   request: Request,
@@ -177,12 +200,21 @@ export async function chargeChatQuota(
     if (!id) ({ id, cookie: setCookie } = await mintBrowserId(secret));
 
     const limit = chatDailyLimit();
-    const browser = await chargeQuota(db, `b:${id}`, limit, now);
+    const networkLimit = chatDailyNetworkLimit();
+    const b = `b:${id}`;
+    const n = networkBucket ? `n:${networkBucket}` : null;
+    const results = await db.batch<QuotaRow>([
+      quotaUpsert(db, b, limit, now),
+      ...(n ? [quotaUpsert(db, n, networkLimit, now, { bucket: b, limit })] : []),
+      db.prepare('SELECT bucket, questions, window_start FROM chat_quota WHERE bucket IN (?1, ?2)').bind(b, n ?? b),
+    ]);
+    const rows = results[results.length - 1]?.results ?? [];
+    const browser = readRow(rows.find((row) => row.bucket === b), limit, now);
     const quota: Quota = { limit, remaining: Math.max(0, limit - browser.used), resetAt: browser.resetAt };
     if (!browser.allowed) return { allowed: false, refusedBy: 'browser', quota, setCookie };
 
-    if (networkBucket) {
-      const network = await chargeQuota(db, `n:${networkBucket}`, chatDailyNetworkLimit(), now);
+    if (n) {
+      const network = readRow(rows.find((row) => row.bucket === n), networkLimit, now);
       if (!network.allowed) return { allowed: false, refusedBy: 'network', quota: { limit, remaining: 0, resetAt: network.resetAt }, setCookie };
     }
     return { allowed: true, refusedBy: null, quota, setCookie };
@@ -207,20 +239,25 @@ export function chatModelDailyLimit(): number {
 }
 
 /**
- * Charge one model call. False means today's ceiling is spent and the caller
- * serves the curated answer instead, which is not an error to the visitor.
+ * Charge one model call: 'allowed', 'capped' when today's ceiling is spent,
+ * or 'unavailable' when there is no database or the count failed.
  *
- * Degrades open, like everything here: no database, or a failure counting,
- * allows the call. Exempt callers (chatExemption) are charged, so the
- * counter tells the truth about spend, but the route does not refuse them.
+ * Fails CLOSED, unlike the question allowance above. That one guards a free
+ * answer, and degrading it open costs nothing but a counter; this one is the
+ * only thing bounding a paid API, so a cap that cannot be checked is treated
+ * as spent and the route serves the curated answer, as it does past the cap.
+ * Exempt callers (chatExemption) are charged, so the counter tells the truth
+ * about spend, and the route does not refuse them at the cap, but it does
+ * when the cap cannot be read: with no counter there is no ceiling at all.
  */
-export async function chargeModelCall(db: D1Database | null, now: number = Date.now()): Promise<boolean> {
-  if (!db) return true;
+export type ModelCharge = 'allowed' | 'capped' | 'unavailable';
+export async function chargeModelCall(db: D1Database | null, now: number = Date.now()): Promise<ModelCharge> {
+  if (!db) return 'unavailable';
   try {
-    return (await chargeQuota(db, MODEL_BUCKET, chatModelDailyLimit(), now)).allowed;
+    return (await chargeQuota(db, MODEL_BUCKET, chatModelDailyLimit(), now)).allowed ? 'allowed' : 'capped';
   } catch (error) {
     console.error('[chat] model cap check failed', error);
-    return true;
+    return 'unavailable';
   }
 }
 

@@ -233,7 +233,7 @@ export const dashboards: Dashboard[] = [
     purpose:
       'OKRs were set per employee and reviewed per manager, which meant the organisation-level questions (how many people have actually submitted, which departments are behind, who has had no manager review) could only be answered by opening every record. At a hundred-plus employees that stopped being possible.',
     shows:
-      'The quarter for the whole organisation: submission and achievement rates, average progress and its status distribution, department averages flagged on track, at risk or off track, top and lowest performers, and a searchable employee table with manager, targets set, achieved and latest review.',
+      'The quarter for the whole organisation: submission and achievement rates, average progress and its status distribution, department averages flagged on track, at risk or off track, top and lowest performers, manager review coverage per reporting manager (monthly reviews marked in the picked month, and at period end achievement submitted against OKRs marked Completed), and a searchable employee table with manager, targets set, achieved and latest review.',
     stack: [
       'Frappe / ERPNext',
       'Python',

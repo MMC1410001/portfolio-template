@@ -154,6 +154,14 @@ jobs:
 #       - name: knowledge.json is committed in sync
 #         run: git diff --exit-code backend/knowledge.json
 #
+#       # The /analytics showcase renders content/analytics-demo.json, which is
+#       # generated from the real queries. A query whose payload shape changed
+#       # without a re-seed leaves the public page silently on the old shape.
+#       # The seeder is deterministic (fixed ANCHOR and SEED, generatedAt
+#       # pinned), so any diff here is a stale file, not noise.
+#       - name: analytics-demo.json is committed in sync
+#         run: npm run seed:demo && git diff --exit-code content/analytics-demo.json
+#
 #       # The same check for the schema. scripts/emit-migration.mjs also exits
 #       # non-zero when a statement in lib/analytics/schema.ts is not claimed by
 #       # a schema version, which is what stops a new table being filed under a
@@ -179,3 +187,21 @@ jobs:
 #         env:
 #           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 #           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#
+#       # A deploy that "succeeded" can still serve a broken site: a header rule
+#       # that stopped matching '/', or a chat route that throws. Checked from
+#       # outside, as a visitor would see it. The retries cover propagation of
+#       # the new version across Cloudflare's edge. One documented question is
+#       # one chat_health row and one question from the runner's daily
+#       # allowance per deploy, which is the whole cost.
+#       - name: Smoke test production
+#         env:
+#           SITE_URL: ${{ vars.SITE_URL || 'https://portfolio-template.example.workers.dev' }}
+#         run: |
+#           set -euo pipefail
+#           sleep 10
+#           curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors -o /dev/null -D headers.txt "${SITE_URL}/"
+#           grep -qi '^content-security-policy:' headers.txt || { echo "::error::/ is served without a Content-Security-Policy header"; cat headers.txt; exit 1; }
+#           answer=$(curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
+#             -H 'Content-Type: application/json' -d '{"message":"What is his stack?"}' "${SITE_URL}/api/chat" | jq -r '.answer // empty')
+#           [ -n "${answer}" ] || { echo "::error::/api/chat returned no answer for a documented question"; exit 1; }

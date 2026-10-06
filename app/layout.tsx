@@ -15,5 +15,8 @@ export const metadata: Metadata = {title:'Alex Rivera, AI Full Stack Developer',
  // app/dashboards repeats the image. The square avatar is the one existing
  // image that crops cleanly into both a summary card and a link preview.
  openGraph:{type:'website',siteName:profile.name,locale:'en_IN',images:[{url:profile.avatar,width:720,height:720,alt:profile.name}]},
- twitter:{card:'summary'}};
+ twitter:{card:'summary'},
+ // public/favicon.svg existed and nothing linked it, so browsers fell back to
+ // requesting /favicon.ico, which does not exist.
+ icons:{icon:'/favicon.svg'}};
 export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body className={`${display.variable} ${body.variable} ${mono.variable}`}>{children}<AnalyticsProvider/></body></html>}

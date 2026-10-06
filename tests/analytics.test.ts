@@ -530,10 +530,16 @@ test('matchesAnyCidr matches inside the prefix and not outside', () => {
 });
 
 test('clientIp believes cf-connecting-ip only, unless TRUST_FORWARDED_FOR says a proxy rewrites the rest', async () => {
-  const req = (headers: Record<string, string>) => new Request('https://x.test/api/track', { method: 'POST', headers });
+  // `request.cf` is what the Workers runtime attaches; a hand-built Request has to stand in for it.
+  const req = (headers: Record<string, string>, cf: object | null = {}) => {
+    const request = new Request('https://x.test/api/track', { method: 'POST', headers });
+    return cf ? Object.defineProperty(request, 'cf', { value: cf }) : request;
+  };
   const forged = { 'x-real-ip': '198.51.100.1', 'x-forwarded-for': '198.51.100.2, 10.0.0.1' };
   await withEnv({ TRUST_FORWARDED_FOR: undefined }, () => {
     assert.equal(clientIp(req({ 'cf-connecting-ip': '203.0.113.7', ...forged })).ip, '203.0.113.7');
+    // Off Cloudflare's edge the header is just text the caller typed.
+    assert.equal(clientIp(req({ 'cf-connecting-ip': '203.0.113.7' }, null)).ip, null, 'cf-connecting-ip without request.cf');
     // No trusted address is no address: no budget, no write, no exemption.
     assert.equal(clientIp(req(forged)).ip, null);
     assert.equal(clientIp(req({ 'x-forwarded-for': '198.51.100.2' })).chain, '198.51.100.2');

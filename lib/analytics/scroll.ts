@@ -15,6 +15,7 @@ import { queueEvent, onSessionExit } from './queue';
 import { isUntrackedPath, trackingSuppressed } from './scope';
 import { currentSection } from './sections';
 import { currentMode } from './mode';
+import { docHeight } from './dom';
 
 /**
  * 100 means the bottom of the document is on screen, not that the scroll
@@ -45,11 +46,6 @@ let timer: ReturnType<typeof setTimeout> | null = null;
  */
 let maxScrollPx = 0;
 let maxDocH = 0;
-
-function docHeight(): number {
-  const doc = document.documentElement;
-  return Math.max(doc.scrollHeight, window.innerHeight, 1);
-}
 
 /** Depth of the deepest point currently visible, as a whole percentage. */
 function currentDepth(): number {

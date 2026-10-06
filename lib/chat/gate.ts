@@ -46,7 +46,8 @@
  *
  * No DOM and no React, so `npm run test:units` can import it.
  */
-import { answerQuestion, hasFormatChars, type Answer } from '@/content/faq';
+import { answerQuestion, hasFormatChars, VERBATIM_IDS, type Answer } from '@/content/faq';
+import { isFitQuestion } from './fit';
 import { detectLanguage, type DetectedLanguage } from './language';
 import type { ChatTurn } from './nim';
 
@@ -68,7 +69,12 @@ function unmatchedMayCompose(question: string): boolean {
  */
 export function modelEligible(fallback: Answer, history: ChatTurn[], question: string): boolean {
   if (fallback.unmatched === true) return unmatchedMayCompose(question);
-  return fallback.source === 'From the portfolio' && (history.length > 0 || detectLanguage(question) !== null);
+  if (fallback.source !== 'From the portfolio') return false;
+  if (fallback.id && VERBATIM_IDS.includes(fallback.id)) return false;
+  // A fit question composes from the first turn, in English only, by the
+  // same tests an unmatched question passes. See lib/chat/fit.ts.
+  if (isFitQuestion(question) && unmatchedMayCompose(question)) return true;
+  return history.length > 0 || detectLanguage(question) !== null;
 }
 
 /**

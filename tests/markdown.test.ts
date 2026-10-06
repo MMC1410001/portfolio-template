@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { parseInline, parseMarkdown, slugify } from '../lib/markdown';
+import { parseInline, parseMarkdown, safeHref, slugify } from '../lib/markdown';
 
 test('headings get anchors, and repeated headings distinct ones', () => {
   const blocks = parseMarkdown('## The `ev` CTE\n\n## The `ev` CTE');
@@ -64,11 +64,18 @@ test('ANALYTICS.md parses with nothing lost', () => {
 });
 
 test('link hrefs: ordinary ones pass, protocol-relative and script ones do not', () => {
-  // Read out of the component as text: a bare Node process cannot import JSX.
-  const source = readFileSync(new URL('../components/showcase/Markdown.tsx', import.meta.url), 'utf8');
-  const pattern = /const SAFE_HREF = \/(.+)\/;\n/.exec(source)?.[1];
-  assert.ok(pattern, 'SAFE_HREF is no longer a one-line regex literal');
-  const safe = new RegExp(pattern);
-  for (const href of ['https://x.test', 'http://x.test/a', '/analytics', '/', '#the-ev-cte']) assert.ok(safe.test(href), href);
-  for (const href of ['//evil.test', '/\\evil.test', 'javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.test', 'evil.test']) assert.ok(!safe.test(href), href);
+  for (const href of ['https://x.test', 'http://x.test/a', 'HTTPS://x.test', 'mailto:a@b.test', '/analytics', '/', '#the-ev-cte']) assert.ok(safeHref(href), href);
+  for (const href of ['//evil.test', '/\\evil.test', 'javascript:alert(1)', 'JavaScript:alert(1)', 'data:text/html,x', 'vbscript:x', 'evil.test', 'docs/a:b', './x:y', 'foo:bar']) assert.ok(!safeHref(href), href);
+});
+
+test('an unsafe link keeps its text and loses the href', () => {
+  // The href stops at the first `)`, so the script's own `)` is left as text.
+  assert.deepEqual(parseInline('a [click](javascript:alert(1)) b'), [
+    { kind: 'text', text: 'a ' },
+    { kind: 'text', text: 'click' },
+    { kind: 'text', text: ') b' },
+  ]);
+  assert.deepEqual(parseInline('[x](data:text/html,y)'), [{ kind: 'text', text: 'x' }]);
+  assert.deepEqual(parseInline('[**r**](docs/a:b)'), [{ kind: 'strong', children: [{ kind: 'text', text: 'r' }] }]);
+  assert.deepEqual(parseInline('[m](mailto:a@b.test)'), [{ kind: 'link', href: 'mailto:a@b.test', children: [{ kind: 'text', text: 'm' }] }]);
 });

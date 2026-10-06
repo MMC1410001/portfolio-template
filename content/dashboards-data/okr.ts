@@ -5,7 +5,8 @@ export type OkrApproval =
   | 'Approved'
   | 'Revision requested'
   | 'Pending approval'
-  | 'Achievement review';
+  | 'Achievement review'
+  | 'Completed';
 
 export interface OkrRow {
   name: string;
@@ -16,35 +17,41 @@ export interface OkrRow {
   achieved: number;
   progress: number;
   status: OkrApproval;
+  /** Dates (YYYY-MM-DD) the manager marked a monthly review. The month a review counts towards is the month of this date. */
+  reviews?: string[];
+  /** Last time the employee submitted their achievement, i.e. arrived at Achievement review. */
+  submittedOn?: string;
+  /** Last time the manager marked the OKR Completed. */
+  completedOn?: string;
 }
 
 export const okrRows: OkrRow[] = [
-  { name: 'Samuel Brooks', empId: 'EMP-00373', department: 'QA', manager: 'Richard Hayes', set: 4, achieved: 3, progress: 99.5, status: 'Approved' },
-  { name: 'Daniel Foster', empId: 'EMP-00405', department: 'Engineering', manager: 'Matthew Ellis', set: 3, achieved: 1, progress: 90.0, status: 'Approved' },
-  { name: 'Ryan Palmer', empId: 'EMP-00334', department: 'QA', manager: 'Oliver Bennett', set: 6, achieved: 4, progress: 88.6, status: 'Approved' },
-  { name: 'Luke Chapman', empId: 'EMP-00380', department: 'Engineering', manager: 'Matthew Ellis', set: 3, achieved: 0, progress: 83.3, status: 'Approved' },
-  { name: 'Adam Fletcher', empId: 'EMP-00326', department: 'Engineering', manager: 'Andrew Lawson', set: 6, achieved: 2, progress: 80.4, status: 'Approved' },
-  { name: 'Nathan Stone', empId: 'EMP-00384', department: 'DevOps', manager: 'Andrew Lawson', set: 8, achieved: 1, progress: 78.5, status: 'Approved' },
-  { name: 'Michael Rowe', empId: 'EMP-00352', department: 'Engineering', manager: 'Matthew Ellis', set: 4, achieved: 0, progress: 77.9, status: 'Approved' },
-  { name: 'Joseph Kirby', empId: 'EMP-00376', department: 'Engineering', manager: 'Oliver Bennett', set: 4, achieved: 1, progress: 75.4, status: 'Approved' },
-  { name: 'Ethan Porter', empId: 'EMP-00383', department: 'Product', manager: 'Andrew Lawson', set: 5, achieved: 1, progress: 73.0, status: 'Approved' },
-  { name: 'Owen Barker', empId: 'EMP-00409', department: 'DevOps', manager: 'Nathan Stone', set: 4, achieved: 0, progress: 60.0, status: 'Approved' },
-  { name: 'Alfie Lambert', empId: 'EMP-00320', department: 'DevOps', manager: 'Nathan Stone', set: 7, achieved: 0, progress: 60.0, status: 'Approved' },
-  { name: 'Henry Grant', empId: 'EMP-00283', department: 'DevOps', manager: 'Nathan Stone', set: 3, achieved: 0, progress: 56.7, status: 'Approved' },
-  { name: 'Katie Pearson', empId: 'EMP-00391', department: 'QA', manager: 'Richard Hayes', set: 5, achieved: 1, progress: 52.0, status: 'Approved' },
-  { name: 'Sarah Atkins', empId: 'EMP-00366', department: 'QA', manager: 'Richard Hayes', set: 4, achieved: 2, progress: 47.0, status: 'Approved' },
-  { name: 'Rebecca Shaw', empId: 'EMP-00399', department: 'QA', manager: 'Richard Hayes', set: 3, achieved: 0, progress: 44.0, status: 'Approved' },
-  { name: 'Megan Doyle', empId: 'EMP-00344', department: 'Product', manager: 'Andrew Lawson', set: 6, achieved: 1, progress: 38.2, status: 'Revision requested' },
+  { name: 'Samuel Brooks', empId: 'EMP-00373', department: 'QA', manager: 'Richard Hayes', set: 4, achieved: 3, progress: 99.5, status: 'Completed', reviews: ['2026-04-13', '2026-05-12', '2026-06-09'], submittedOn: '2026-06-24', completedOn: '2026-06-29' },
+  { name: 'Daniel Foster', empId: 'EMP-00405', department: 'Engineering', manager: 'Matthew Ellis', set: 3, achieved: 1, progress: 90.0, status: 'Achievement review', reviews: ['2026-04-15', '2026-05-14', '2026-06-11'], submittedOn: '2026-06-27' },
+  { name: 'Ryan Palmer', empId: 'EMP-00334', department: 'QA', manager: 'Oliver Bennett', set: 6, achieved: 4, progress: 88.6, status: 'Completed', reviews: ['2026-04-10', '2026-05-08', '2026-06-05'], submittedOn: '2026-06-22', completedOn: '2026-06-26' },
+  { name: 'Luke Chapman', empId: 'EMP-00380', department: 'Engineering', manager: 'Matthew Ellis', set: 3, achieved: 0, progress: 83.3, status: 'Approved', reviews: ['2026-04-15', '2026-05-14', '2026-06-11'] },
+  { name: 'Adam Fletcher', empId: 'EMP-00326', department: 'Engineering', manager: 'Andrew Lawson', set: 6, achieved: 2, progress: 80.4, status: 'Completed', reviews: ['2026-04-20', '2026-05-19'], submittedOn: '2026-06-23', completedOn: '2026-06-30' },
+  { name: 'Nathan Stone', empId: 'EMP-00384', department: 'DevOps', manager: 'Andrew Lawson', set: 8, achieved: 1, progress: 78.5, status: 'Achievement review', reviews: ['2026-04-20', '2026-05-19'], submittedOn: '2026-06-25' },
+  { name: 'Michael Rowe', empId: 'EMP-00352', department: 'Engineering', manager: 'Matthew Ellis', set: 4, achieved: 0, progress: 77.9, status: 'Approved', reviews: ['2026-04-15', '2026-05-14'] },
+  { name: 'Joseph Kirby', empId: 'EMP-00376', department: 'Engineering', manager: 'Oliver Bennett', set: 4, achieved: 1, progress: 75.4, status: 'Approved', reviews: ['2026-04-10', '2026-06-05'] },
+  { name: 'Ethan Porter', empId: 'EMP-00383', department: 'Product', manager: 'Andrew Lawson', set: 5, achieved: 1, progress: 73.0, status: 'Approved', reviews: ['2026-04-20'] },
+  { name: 'Owen Barker', empId: 'EMP-00409', department: 'DevOps', manager: 'Nathan Stone', set: 4, achieved: 0, progress: 60.0, status: 'Approved', reviews: ['2026-05-01', '2026-06-02'] },
+  { name: 'Alfie Lambert', empId: 'EMP-00320', department: 'DevOps', manager: 'Nathan Stone', set: 7, achieved: 0, progress: 60.0, status: 'Approved', reviews: ['2026-04-24', '2026-05-22', '2026-06-02'] },
+  { name: 'Henry Grant', empId: 'EMP-00283', department: 'DevOps', manager: 'Nathan Stone', set: 3, achieved: 0, progress: 56.7, status: 'Approved', reviews: ['2026-04-24', '2026-06-03'] },
+  { name: 'Katie Pearson', empId: 'EMP-00391', department: 'QA', manager: 'Richard Hayes', set: 5, achieved: 1, progress: 52.0, status: 'Achievement review', reviews: ['2026-04-13', '2026-05-12', '2026-06-09'], submittedOn: '2026-06-28' },
+  { name: 'Sarah Atkins', empId: 'EMP-00366', department: 'QA', manager: 'Richard Hayes', set: 4, achieved: 2, progress: 47.0, status: 'Approved', reviews: ['2026-05-12', '2026-06-16'] },
+  { name: 'Rebecca Shaw', empId: 'EMP-00399', department: 'QA', manager: 'Richard Hayes', set: 3, achieved: 0, progress: 44.0, status: 'Approved', reviews: ['2026-04-13'] },
+  { name: 'Megan Doyle', empId: 'EMP-00344', department: 'Product', manager: 'Andrew Lawson', set: 6, achieved: 1, progress: 38.2, status: 'Revision requested', reviews: ['2026-05-19'] },
   { name: 'Aaron Parker', empId: 'EMP-00311', department: 'Engineering', manager: 'Matthew Ellis', set: 3, achieved: 0, progress: 0, status: 'Pending approval' },
-  { name: 'Kieran Wells', empId: 'EMP-00358', department: 'Engineering', manager: 'Matthew Ellis', set: 4, achieved: 0, progress: 0, status: 'Approved' },
+  { name: 'Kieran Wells', empId: 'EMP-00358', department: 'Engineering', manager: 'Matthew Ellis', set: 4, achieved: 0, progress: 0, status: 'Approved', reviews: ['2026-05-14'] },
   { name: 'Isla Graham', empId: 'EMP-00362', department: 'Product', manager: 'Andrew Lawson', set: 4, achieved: 0, progress: 0, status: 'Approved' },
-  { name: 'Jacob Webb', empId: 'EMP-00347', department: 'Engineering', manager: 'Matthew Ellis', set: 3, achieved: 0, progress: 0, status: 'Achievement review' },
+  { name: 'Jacob Webb', empId: 'EMP-00347', department: 'Engineering', manager: 'Matthew Ellis', set: 3, achieved: 0, progress: 0, status: 'Achievement review', reviews: ['2026-04-15'], submittedOn: '2026-06-26' },
   { name: 'William Vaughan', empId: 'EMP-00338', department: 'Engineering', manager: 'Matthew Ellis', set: 3, achieved: 0, progress: 0, status: 'Approved' },
-  { name: 'Laura Fisher', empId: 'EMP-00301', department: 'HR', manager: 'Andrew Lawson', set: 7, achieved: 1, progress: 62.0, status: 'Approved' },
+  { name: 'Laura Fisher', empId: 'EMP-00301', department: 'HR', manager: 'Andrew Lawson', set: 7, achieved: 1, progress: 62.0, status: 'Approved', reviews: ['2026-04-20', '2026-05-19'] },
   { name: 'Rachel Knight', empId: 'EMP-00308', department: 'HR', manager: 'Andrew Lawson', set: 7, achieved: 0, progress: 22.0, status: 'Revision requested' },
   { name: 'Noah Russell', empId: 'EMP-00295', department: 'Delivery', manager: 'Andrew Lawson', set: 5, achieved: 0, progress: 0, status: 'Pending approval' },
   { name: 'Abigail Wood', empId: 'EMP-00271', department: 'Management', manager: 'n/a', set: 8, achieved: 0, progress: 0, status: 'Pending approval' },
-  { name: 'Simon Pratt', empId: 'EMP-00288', department: 'PMO', manager: 'Abigail Wood', set: 6, achieved: 0, progress: 0, status: 'Approved' },
+  { name: 'Simon Pratt', empId: 'EMP-00288', department: 'PMO', manager: 'Abigail Wood', set: 6, achieved: 0, progress: 0, status: 'Approved', reviews: ['2026-05-06', '2026-06-08'] },
   { name: 'Isabel Clarke', empId: 'EMP-00293', department: 'PMO', manager: 'Abigail Wood', set: 5, achieved: 0, progress: 0, status: 'Pending approval' },
 ];
 

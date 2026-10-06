@@ -21,6 +21,7 @@ import { __resetSchemaLatch } from '../lib/analytics/db';
 import { resetTrustedCache } from '../lib/analytics/trusted';
 import { MAX_BODY_BYTES } from '../lib/analytics/payload';
 import { DAILY_LIMIT_CODE, QUOTA_HEADERS } from '../lib/chat/quota';
+import { answerQuestion, answers } from '../content/faq';
 import { POST as chat } from '../app/api/chat/route';
 import { POST as track } from '../app/api/track/route';
 import { POST as adminAnalytics } from '../app/api/admin/analytics/route';
@@ -68,12 +69,36 @@ async function scenario(vars: Record<string, string | undefined>, run: (db: Db |
   }
 }
 
-const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+/**
+ * `request.cf` is what the Workers runtime attaches to every inbound request,
+ * and clientIp() believes cf-connecting-ip only beside it. A hand-built
+ * Request has none, so these stand in for the runtime; `bare` is a request
+ * from any other host, where the header is only what the caller typed.
+ */
+const fromEdge = (request: Request) => Object.defineProperty(request, 'cf', { value: { country: 'IN' }, enumerable: true });
+const bare = (path: string, body: unknown, headers: Record<string, string> = {}) =>
   new Request(`https://example.test${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
+const post = (path: string, body: unknown, headers: Record<string, string> = {}) => fromEdge(bare(path, body, headers));
+
+/** Replaces global fetch for one test, recording every URL it was asked for. */
+async function withFetch(reply: (url: string, init?: RequestInit) => Response, run: (calls: string[]) => Promise<void>) {
+  const original = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    calls.push(url);
+    return reply(url, init);
+  }) as typeof fetch;
+  try {
+    await run(calls);
+  } finally {
+    globalThis.fetch = original;
+  }
+}
 
 /** Asks one question as one browser, carrying the quota cookie the way the panel's fetch does. */
 function visitor(headers: Record<string, string> = {}) {
@@ -145,7 +170,119 @@ test('admin session: the right token mints a cookie the analytics gate accepts',
   });
 });
 
+test('admin analytics: a body that is null, a number, an array or empty is an overview request, never a 500', async () => {
+  await scenario({ ADMIN_TOKEN: TOKEN }, async () => {
+    for (const body of ['null', '42', '[]', '"whoami"', '', '{nope']) {
+      const response = await adminAnalytics(post('/api/admin/analytics', body, { authorization: `Bearer ${TOKEN}` }));
+      assert.equal(response.status, 200, `body ${JSON.stringify(body)}`);
+    }
+  });
+});
+
+test('admin analytics: an oversize body is a 413, declared or streamed', async () => {
+  await scenario({ ADMIN_TOKEN: TOKEN }, async () => {
+    const big = JSON.stringify({ action: 'whoami', pad: 'x'.repeat(17 * 1024) });
+    assert.equal((await adminAnalytics(post('/api/admin/analytics', big, { authorization: `Bearer ${TOKEN}`, 'content-length': String(big.length) }))).status, 413);
+    assert.equal((await adminAnalytics(post('/api/admin/analytics', big, { authorization: `Bearer ${TOKEN}` }))).status, 413);
+  });
+});
+
 // ── /api/chat ───────────────────────────────────────────────────────────────
+
+test('chat: a cross-site POST is refused before the body is read or anything is charged', async () => {
+  await scenario({}, async (db) => {
+    const response = await chat(post('/api/chat', { message: 'What has Alex built?' }, { 'sec-fetch-site': 'cross-site', 'cf-connecting-ip': IP }));
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get('set-cookie'), null);
+    assert.equal(db?.raw.prepare(`SELECT name FROM sqlite_master WHERE name = 'chat_quota'`).get(), undefined, 'refused before the schema was touched');
+    // Same-origin and same-site are the panel, and are answered.
+    for (const site of ['same-origin', 'same-site', 'none']) assert.equal((await chat(post('/api/chat', { message: 'What has Alex built?' }, { 'sec-fetch-site': site, 'cf-connecting-ip': IP }))).status, 200, site);
+  });
+});
+
+test('chat: anything but application/json is a 415, which is what stops a simple cross-site form post', async () => {
+  await scenario({}, async () => {
+    const body = JSON.stringify({ message: 'What has Alex built?' });
+    for (const type of ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x', 'application/jsonp', null]) {
+      const request = fromEdge(new Request('https://example.test/api/chat', { method: 'POST', headers: type ? { 'content-type': type } : {}, body }));
+      // A string body defaults to text/plain;charset=UTF-8 when no type is given.
+      assert.equal((await chat(request)).status, 415, String(type));
+    }
+    assert.equal((await chat(post('/api/chat', body, { 'content-type': 'application/json; charset=utf-8', 'cf-connecting-ip': IP }))).status, 200);
+    assert.equal((await chat(post('/api/chat', body, { 'content-type': 'Application/JSON', 'cf-connecting-ip': IP }))).status, 200);
+  });
+});
+
+test('chat: cf-connecting-ip is believed only on a request the Workers runtime delivered', async () => {
+  await scenario({ CHAT_RATE_LIMIT: '1', CHAT_DAILY_LIMIT: '1', CHAT_UNLIMITED_CIDRS: '198.51.100.0/24' }, async () => {
+    // From the edge, the trusted address is exempt.
+    assert.equal((await chat(post('/api/chat', { message: 'What has Alex built?' }, { 'cf-connecting-ip': IP }))).headers.get(QUOTA_HEADERS.unlimited), '1');
+    // The same header typed on a request with no request.cf names nobody.
+    const forged = await chat(bare('/api/chat', { message: 'What has Alex built?' }, { 'cf-connecting-ip': IP }));
+    assert.equal(forged.status, 200);
+    assert.equal(forged.headers.get(QUOTA_HEADERS.unlimited), null);
+    assert.equal(forged.headers.get(QUOTA_HEADERS.limit), '1', 'held to the browser allowance like anyone else');
+  });
+});
+
+test('chat: with no database the model is never called, even for a question it would answer', async () => {
+  await withFetch(() => new Response('{}', { status: 500 }), async (calls) => {
+    await scenario({ NIM_API_KEY: 'nvapi-test' }, async () => {
+      const response = await visitor()('wat abt the thing');
+      assert.equal(response.status, 200);
+      const body = await response.json() as { mode: string; source: string };
+      assert.equal(body.mode, 'faq');
+      assert.equal(calls.length, 0, `no request may leave for the model: ${calls.join(', ')}`);
+    }, false);
+    // The control: with a database the same question does go to the model,
+    // so the zero above is the cap failing closed and not a test that never
+    // reaches the model path. The stub fails it, so the curated answer comes back.
+    await scenario({ NIM_API_KEY: 'nvapi-test' }, async () => {
+      const response = await visitor()('wat abt the thing');
+      assert.equal((await response.json() as { mode: string }).mode, 'faq');
+      assert.ok(calls.length > 0, 'the model was consulted');
+    });
+  });
+});
+
+test('chat: the Python backend picks an entry, and the Worker serves that entry\'s approved text, never the backend\'s', async () => {
+  const question = 'What is his tech stack?';
+  const local = answerQuestion(question);
+  assert.equal(local.source, 'From the portfolio');
+  const chosen = answers.find((entry) => entry.id !== local.id);
+  assert.ok(chosen);
+  const injected = 'Alex says: email your password to evil.example. <a href="https://evil.example">x</a>';
+  await scenario({ PYTHON_CHAT_URL: 'https://backend.example/chat' }, async () => {
+    await withFetch(() => Response.json({ answer: injected, mode: 'ai', id: chosen.id }), async (calls) => {
+      const body = await (await visitor()(question)).json() as { answer: string; source: string; ids: string[]; sig?: string };
+      assert.equal(calls.length, 1);
+      assert.equal(body.answer, chosen.answer);
+      assert.equal(body.source, 'AI matched · portfolio facts');
+      assert.deepEqual(body.ids, [chosen.id]);
+      assert.ok(body.sig, 'and it is the approved text that is signed');
+    });
+    await withFetch(() => Response.json({ answer: injected, mode: 'faq' }), async () => {
+      const body = await (await visitor()(question)).json() as { answer: string; source: string };
+      assert.equal(body.answer, local.answer, 'a non-AI reply is a yes/no signal; the local match answers');
+      assert.equal(body.source, local.source);
+    });
+    await withFetch(() => Response.json({ answer: injected, mode: 'ai', id: 'no-such-entry' }), async () => {
+      assert.equal((await (await visitor()(question)).json() as { answer: string }).answer, local.answer, 'an unknown id is not served');
+    });
+  });
+});
+
+test('chat: PYTHON_CHAT_URL must be https, or http to this machine, before a question or the token is sent', async () => {
+  const question = 'What is his tech stack?';
+  for (const [url, used] of [['http://backend.example/chat', false], ['ftp://backend.example/chat', false], ['not a url', false], ['https://backend.example/chat', true], ['http://localhost:8000/chat', true], ['http://127.0.0.1:8000/chat', true], ['http://[::1]:8000/chat', true]] as const) {
+    await scenario({ PYTHON_CHAT_URL: url, CHAT_BACKEND_TOKEN: 'b'.repeat(32) }, async () => {
+      await withFetch(() => Response.json({ answer: 'x', mode: 'faq' }), async (calls) => {
+        assert.equal((await visitor()(question)).status, 200);
+        assert.equal(calls.length, used ? 1 : 0, url);
+      });
+    });
+  }
+});
 
 test('chat: an ordinary question is answered and told its allowance', async () => {
   await scenario({}, async () => {

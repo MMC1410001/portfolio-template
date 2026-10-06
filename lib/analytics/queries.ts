@@ -903,10 +903,11 @@ export async function listSessions(
                 WHERE e.session_id = s.session_id) AS verbs,
               (SELECT MAX(is_internal) FROM events x
                 WHERE x.session_id = s.session_id) AS internal
-         FROM sess s
-        ORDER BY s.last_seen DESC
-        LIMIT ?4`,
+         FROM (SELECT * FROM sess ORDER BY last_seen DESC LIMIT ?4) s
+        ORDER BY s.last_seen DESC`,
     )
+    // The limit is applied inside, so the three correlated subqueries run for
+    // the rows returned rather than for every session in the range.
     // Clamped at BOTH ends: SQLite reads a negative LIMIT as unbounded, so a
     // `Math.min` alone turns `limit: -1` into a whole-table dump.
     .bind(since, until, excl, Math.max(1, Math.min(Math.floor(o.limit), 200)))

@@ -61,6 +61,7 @@
  * credential" and "wrong credential". Lumen could afford real status codes
  * because it sat behind an authenticated app; this does not.
  */
+import { b64urlToBytes, bytesToB64url } from '../b64url';
 
 export type AdminIdentity =
   | { via: 'platform'; who: string }
@@ -202,29 +203,11 @@ async function hmacHex(secret: string, message: string): Promise<string> {
  * depended on to round-trip through encodeURIComponent.
  */
 function b64url(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return bytesToB64url(new TextEncoder().encode(value));
 }
 
-/**
- * base64url -> bytes. Shared with google-auth.ts, which decodes JWT segments.
- *
- * Hand-rolled rather than reached for, because `atob` wants standard base64
- * and base64url strips the padding. Feeding one to the other silently mangles
- * any segment whose length is not a multiple of four, which is most of them.
- */
-// The `<ArrayBuffer>` argument is not decoration: `crypto.subtle.verify` wants
-// a BufferSource, and a bare `Uint8Array` widens to `ArrayBufferLike`, which
-// includes SharedArrayBuffer and so is not assignable.
-export function b64urlToBytes(segment: string): Uint8Array<ArrayBuffer> {
-  const padded = segment.replace(/-/g, '+').replace(/_/g, '/');
-  const binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
-  return out;
-}
+// Re-exported: google-auth.ts and the tests import it from here.
+export { b64urlToBytes };
 
 function unb64url(value: string): string {
   return new TextDecoder().decode(b64urlToBytes(value));

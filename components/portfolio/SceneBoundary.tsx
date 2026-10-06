@@ -21,13 +21,13 @@
  * A class component because `componentDidCatch` has no hook equivalent.
  *
  * `scope` is what makes the failures distinguishable in the panel's error
- * rows: 'immersive-chunk' and 'dashboard-chunk' are downloads that never
- * arrived, 'immersive-scene' is the turntable failing once it did. They have
+ * rows: 'immersive-chunk', 'dashboard-chunk' and 'showcase-chunk' (a panel
+ * or the dataset on /analytics) are downloads that never arrived, 'immersive-scene' is the turntable failing once it did. They have
  * entirely different fixes.
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
-export type BoundaryScope = 'immersive-chunk' | 'immersive-scene' | 'dashboard-chunk';
+export type BoundaryScope = 'immersive-chunk' | 'immersive-scene' | 'dashboard-chunk' | 'showcase-chunk';
 
 interface Props {
   children: ReactNode;

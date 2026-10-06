@@ -187,6 +187,25 @@ test('a hide ends the view once, and pagehide after it adds nothing', (t) => {
   assert.equal(sent.filter((e) => e.event === 'session_end').length, 2, 'one per hidden period');
 });
 
+// ── Stacked chapters: the section on top is the one being read ──────────
+
+test('a covered section still in the band does not keep the dwell', (t) => {
+  fresh(t);
+  const { hero, work } = sections();
+  mount(hero, work);
+  installSectionTracking();
+  enter(t, hero);
+  t.mock.timers.tick(2_000);
+  // A sticky chapter never leaves the band once the next one covers it, so
+  // hero stays intersecting. "Highest in document order" kept it active.
+  enter(t, work);
+  assert.equal(currentSection(), 'work');
+  const views = rows('page_view');
+  assert.equal(views.length, 1);
+  assert.equal(views[0].path, '/#hero');
+  assert.equal(views[0].props?.to, 'work');
+});
+
 // ── Scroll depth is per page ────────────────────────────────────────────
 
 test('resetScrollDepth lets a new page report its own milestones and depth', (t) => {

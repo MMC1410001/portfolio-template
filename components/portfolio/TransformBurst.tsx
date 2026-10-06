@@ -7,7 +7,7 @@
  *
  * This is the ascent: a white core flash, a shockwave ring, an upward aura
  * column, and six lightning arcs that strike, flicker and die. Blue-white
- * rather than gold, because `--signal` is #285ce5 / #82a2ff and a gold aura
+ * rather than gold, because `--signal` is #285ce5 / #4f9dff and a gold aura
  * would be the only warm thing on the site.
  *
  * Three constraints it is built around:

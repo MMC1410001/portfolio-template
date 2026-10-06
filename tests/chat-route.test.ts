@@ -17,6 +17,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { answerQuestion } from '@/content/faq';
+import { FIT_ID, isFitQuestion, withFitFallback } from '@/lib/chat/fit';
 import { modelEligible, screenHistory, translationTarget } from '@/lib/chat/gate';
 import type { ChatTurn } from '@/lib/chat/nim';
 
@@ -78,7 +79,7 @@ test('an unmatched English question still composes, and a guarded one never does
   }
 });
 
-test('a matched question composes only mid-conversation or in another language', () => {
+test('any other matched question composes only mid-conversation or in another language', () => {
   const matched = 'What is his tech stack?';
   assert.equal(answerQuestion(matched).source, 'From the portfolio');
   assert.equal(eligible(matched), false, 'a first question is a topic lookup');
@@ -89,6 +90,55 @@ test('a matched question composes only mid-conversation or in another language',
     assert.equal(answerQuestion(question).source, 'From the portfolio', `${question} should match a pattern`);
     assert.equal(eligible(question), true, `${question} is translated by the model`);
   }
+});
+
+test('a fit question composes from its first turn, a salary question never does', () => {
+  // lib/chat/fit.ts: the curated pitch is the fallback, not the first choice.
+  for (const question of ['Why should I hire Alex?', 'Would he be a good fit for a senior SDET role?', 'Is he a good candidate?', 'Is he suitable for a Java backend developer role?', 'Can he work in a startup?']) {
+    assert.equal(answerQuestion(question).id, FIT_ID, `${question} should match why-hire`);
+    assert.equal(eligible(question), true, `${question} is composed`);
+  }
+  // Unmatched fit questions compose anyway; what they need is the pitch pinned.
+  for (const question of ['Why Alex?', 'Would he suit us?']) {
+    assert.equal(answerQuestion(question).unmatched, true, `${question} should be unmatched`);
+    assert.equal(isFitQuestion(question), true, `${question} pins why-hire`);
+  }
+  // Matched elsewhere, still a fit question: the skills list alone does not answer it.
+  assert.equal(answerQuestion('Is a Java developer role a good match?').id, 'skills');
+  assert.equal(eligible('Is a Java developer role a good match?'), true);
+  for (const question of ['What is his tech stack?', 'Is he available for hire?']) {
+    assert.equal(isFitQuestion(question), false, `${question} is not a fit question`);
+    assert.equal(eligible(question), false, `${question} keeps its curated answer`);
+  }
+  for (const question of ['Why hire him at 12 LPA?', 'What is his expected CTC?', 'How much does he earn?']) {
+    assert.equal(answerQuestion(question).source, 'Not documented', `${question} hits guard.compensation`);
+    assert.equal(eligible(question), false, `${question} must never reach the model`);
+    assert.equal(eligible(question, [{ role: 'user', text: 'Why should I hire him?' }]), false);
+  }
+});
+
+test('answers the owner worded are never paraphrased, and personal questions keep their boundary', () => {
+  const history: ChatTurn[] = [{ role: 'user', text: 'Why should we hire him?' }];
+  for (const question of ['Is he willing to relocate?', 'Is he open to hybrid work?']) {
+    assert.equal(answerQuestion(question).source, 'From the portfolio', `${question} is answered`);
+    assert.equal(eligible(question, history), false, `${question} is served verbatim mid-conversation`);
+  }
+  for (const question of ['Is he married?', 'Does he have siblings?', 'How old is he?']) {
+    assert.equal(answerQuestion(question).source, 'Out of scope', `${question} hits guard.personal`);
+    assert.equal(eligible(question, history), false, `${question} never reaches the model`);
+  }
+});
+
+test('an unmatched fit question falls back to the pitch, and "why NOT hire" does not get it', () => {
+  const question = 'Is he better than other candidates?';
+  assert.equal(answerQuestion(question).unmatched, true);
+  const fallback = withFitFallback(question, answerQuestion(question));
+  assert.equal(fallback.id, FIT_ID);
+  assert.equal(modelEligible(fallback, [], question), true);
+  const not = 'Why should we NOT hire him?';
+  assert.equal(answerQuestion(not).id, 'behavioural');
+  assert.equal(isFitQuestion(not), false);
+  assert.equal(withFitFallback(not, answerQuestion(not)).id, 'behavioural');
 });
 
 test('a format character cannot carry a guarded question past the guards, or an unmatched one to the model', () => {

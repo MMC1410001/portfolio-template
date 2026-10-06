@@ -1,4 +1,4 @@
-import { profile, projects, privateWork, erpProject, experience, skills, recommendations, RELATION_LABEL, certifications, work, publishedAwards, tenure, CAREER_START, NORTHWIND_START, PYTHON_START } from './portfolio';
+import { profile, projects, privateWork, erpProject, experience, skills, recommendations, RELATION_LABEL, certifications, work, publishedAwards, tenure, age, CAREER_START, NORTHWIND_START, PYTHON_START } from './portfolio';
 import { dashboards } from './dashboards';
 /** A project by id. Positional lookups broke the moment the array was reordered. */
 const byId=(id:string)=>projects.find(project=>project.id===id)!;
@@ -17,6 +17,14 @@ const projectHref=(id:string)=>{const project=byId(id);return project.repo?`${pr
 const CERT_MONTHS=['january','february','march','april','may','june','july','august','september','october','november','december'];
 const certMonths=(issued:string|null)=>{if(!issued)return 0;const parts=issued.toLowerCase().split(' ');return Number(parts[1])*12+CERT_MONTHS.indexOf(parts[0]);};
 const newestCertifications=[...certifications].sort((a,b)=>certMonths(b.issued)-certMonths(a.issued));
+/**
+ * profile.relocation as a sentence. The homepage shows it as a short tag,
+ * where a fragment reads well; in a chat answer "Holds a valid passport;
+ * open to…" had no subject.
+ */
+const ABROAD='Abroad, he holds a valid passport and is open to sponsored relocation to the UK, EU, Canada or Australia.';
+/** The owner's answer on moving and commuting, shared by `relocation` and `relocation-affect`. */
+const RELOCATION='Alex is ready to relocate to Denver or Seattle. For Austin no move is needed: he lives there and can commute to the office daily. He is open to remote, hybrid or five-days-a-week office work.';
 const reportCount=recommendations.filter(person=>person.relation==='report').length;
 export const answers = [
  // Awards derive from `publishedAwards`, so an unconfirmed one is absent from
@@ -26,8 +34,14 @@ export const answers = [
  // because the first pattern match wins and the aggregate claims 'award'.
  ...publishedAwards.map(award=>({id:`award-${award.id}`,patterns:award.aliases,answer:`${award.name}, ${award.issuer}, ${award.issued}. ${award.citation} Listed in Alex's LinkedIn honours section.`,href:'/#awards'})),
  ...certifications.map(certificate=>({id:`certification-${certificate.id}`,patterns:certificate.aliases,answer:`Alex completed ${certificate.name}, issued by ${certificate.issuer}.${certificate.issued?` Issued ${certificate.issued}.`:''} This credential is listed on his LinkedIn profile. See the certifications section for the credential link.`,href:'/#certifications'})),
- {id:'availability',patterns:['availability','notice period','open to work','open to relocation','relocate','relocation','joining','buyout','job change','available for hire','currently available','join immediately','immediate joiner','when can he join','hybrid','work from home','wfh','onsite','in office','open to remote','contract','contract role','contract to hire','full time','full-time','permanent','freelance','part time','part-time','engagement type'],answer:`${profile.availability}. Locations: ${profile.openTo}. Reach him at ${profile.email}.`,href:'/#contact'},
- {id:'visa',patterns:['visa','sponsorship','work permit','work authorisation','work authorization','right to work','h1b','h-1b','passport','abroad','overseas','international relocation','outside the us','uk','united kingdom','europe','european','usa','united states','america','australia','work abroad','move abroad','relocate abroad'],answer:`${profile.relocation}. For roles in the US no sponsorship is required; for the UK, EU or Australia he would need visa sponsorship. Within the US he is open to ${profile.openTo}.`,href:'/#contact'},
+ {id:'availability',patterns:['availability','notice period','open to work','joining','buyout','job change','available for hire','currently available','join immediately','immediate joiner','when can he join','contract','contract role','contract to hire','full time','full-time','permanent','freelance','part time','part-time','engagement type'],answer:`${profile.availability}. Locations: ${profile.openTo}. Reach him at ${profile.email}.`,href:'/#contact'},
+ {id:'visa',patterns:['visa','sponsorship','work permit','work authorisation','work authorization','right to work','h1b','h-1b','passport','abroad','overseas','international relocation','outside the us','uk','united kingdom','europe','european','usa','united states','america','australia','work abroad','move abroad','relocate abroad'],answer:`${ABROAD} For roles in the US no sponsorship is required; for the UK, EU or Australia he would need visa sponsorship. Within the US he is open to ${profile.openTo}.`,href:'/#contact'},
+ // Where and how he will work, in his own words. After `visa` on purpose:
+ // "relocate abroad" and "jobs in the UK" belong to it, and first match
+ // wins. All three are in VERBATIM_IDS.
+ {id:'relocation-affect',patterns:['affect relocation','affect his relocation','affect relocating','affect his ability to relocate','stop him relocating','stop him from relocating','prevent him from relocating','problem relocating','issue relocating','issues with relocation','restrictions on his relocation','restriction on relocation','restrictions on relocation'],answer:`No. ${RELOCATION}`,href:'/#contact'},
+ {id:'relocation',patterns:['relocate','relocation','relocating','open to relocation','willing to relocate','ready to relocate','shift to','denver','seattle','commute','commuting','daily travel','travel daily','travel to office','travel to the office','up and down','up-down'],answer:`${RELOCATION} ${ABROAD}`,href:'/#contact'},
+ {id:'work-mode',patterns:['hybrid','remote','remotely','open to remote','work from home','wfh','work from office','wfo','onsite','on-site','on site','in office','in-office','office days','five days','5 days','five day','5 day','five-day','5-day','days a week','days in office','work mode','working mode'],answer:'He is open to remote, hybrid or five-days-a-week office work. In Austin he can commute to the office daily; for Denver or Seattle he is ready to relocate.',href:'/#contact'},
  // ── Answers added because the greedy patterns above used to swallow them ──
  // Each of these questions previously reached a confident, wrong answer: a
  // phone number for "has he built any mobile apps", his home suburb for "is
@@ -35,22 +49,27 @@ export const answers = [
  // fix is two-sided, the greedy pattern loses the word, and the question
  // gets an entry of its own. They sit here, early, because first match wins.
  {id:'colleague-contact',patterns:['manager\'s phone','manager\'s number','manager\'s contact','manager\'s email','manager phone','manager number','manager contact','colleague contact','colleague\'s contact','teammate contact','recommender contact'],answer:`Contact details for Alex\u2019s colleagues, managers and recommenders are not published here. Their LinkedIn recommendations are, each one attributed and dated. For Alex himself: ${profile.email} or ${profile.phone}.`,href:'/#recommendations'},
- {id:'why-hire',patterns:['why hire','why should we hire','why hire alex','why choose alex','why him','what makes him','makes him stand out','stand out','strengths','strength','sell him','elevator pitch','recommend hiring','should we hire','what sets him apart','best thing about him','problem solving','problem-solving','solve complex'],answer:`Judge it from measured work rather than adjectives. At Meridian he led a Playwright TypeScript migration that cut regression time by 50% and reached 90% automation coverage on critical features. At Northwind he has ${erpProject.workflows.length} live internal workflows on Frappe and ERPNext and ${dashboards.length} operational dashboards. Lumen runs publicly at lumen.example with the frontend, mobile UI and first-party analytics pipeline he built. ${recommendations.length} LinkedIn recommendations, ${reportCount} of them from people who reported to him, and ${publishedAwards.length} awards. He came into development through quality engineering, which is why this portfolio ships with its own unit, chatbot and analytics test suites.`,href:'/#work'},
+ {id:'nextjs',patterns:['next.js','nextjs','next js'],answer:'Yes.',href:'/#skills'},
+ // Reasons first, evidence under each. It used to open "Judge it from measured
+ // work" and list projects, which answered "what has he done" and left the
+ // recruiter to work out why that mattered. The model tier, given it as the
+ // shortlist, did the same thing in fewer words.
+ {id:'why-hire',patterns:['why hire','why should we hire','why should i hire','why should anyone hire','why should you hire','why should they hire','why would we hire','why would i hire','why would you hire','why hire alex','why hire him','why choose alex','why choose him','why pick him','why him','reasons to hire','reason to hire','should i hire','worth hiring','convince me','what makes him','makes him stand out','stand out','strengths','strength','sell him','elevator pitch','pitch him','recommend hiring','should we hire','what sets him apart','best thing about him','good fit','right fit','great fit','perfect fit','strong fit','good candidate','strong candidate','right candidate','ideal candidate','best candidate','suitable for','suited for','fit for','hire him for','hire alex for','work in a startup','work at a startup','work for a startup','startup environment','what value','value will he','value would he','value can he','value does he','add value','bring to the table','bring to the team','add to the team','usp','rate him','score him','problem solving','problem-solving','solve complex'],answer:`Four reasons, each one checkable on this site.\n\n1. He ships software that is tested. He spent his first years in QA automation before moving to full stack, so verification is part of how he builds: at Meridian he led a Playwright TypeScript migration that cut regression time by 50% and reached 90% automation coverage on critical features.\n\n2. He delivers end to end. At Northwind he built ${erpProject.workflows.length} internal workflows on Frappe and ERPNext that are live in production, plus ${dashboards.length} operational dashboards. Lumen runs publicly at lumen.example with the frontend, mobile UI and analytics pipeline he built.\n\n3. He builds AI features and measures them. Alongside the voice agent and MCP RAG work, he has built Python evaluation pipelines with LangSmith and RAGAs, so model output is tested rather than assumed.\n\n4. The people he worked with vouch for him: ${recommendations.length} LinkedIn recommendations, ${reportCount} of them from people who reported to him, and ${publishedAwards.length} awards.\n\nAvailability: ${profile.availability}. Reach him at ${profile.email} or ${profile.phone}.`,href:'/#work'},
  // ── Asked by recruiters, answered with numbers ────────────────────────────
  // These sit high on purpose. A screening call is a sequence of specific
  // questions with specific answers, and before this block the chatbot met
  // half of them with "not documented" while the numbers were sitting in
  // content/portfolio.ts one answer away.
  {id:'hardest-problem',patterns:['hardest','hardest problem','toughest','most difficult','difficult problem','complex problem','tricky problem','trade off','trade offs','trade-off','trade-offs','tradeoff','tradeoffs','engineering judgement','engineering judgment','design decision','design decisions','hard call'],answer:'The recurring one is making something measurable without taking more than it needs. The analytics behind this site is first-party on Cloudflare Workers and D1 and stores no visitor IP at all, addresses are salted and hashed and thrown away, and the homepage stays statically rendered, so measurement never costs the visitor a slower page. The chatbot you are using now is the same call made again: a language model may only choose which approved answer fits, and the text always comes from that approved set, so it cannot invent a claim about Alex. On the realtime voice agent the trade-off was latency against interruption handling, and it holds under 2s turn latency with working barge-in across Hindi, English, Gujarati and Marathi. The measurement side is open at /analytics.',href:'/analytics'},
- {id:'stakeholders',patterns:['client facing','client-facing','face the client','stakeholder','stakeholders','business users','work with clients','client communication','requirement gathering','requirements gathering','cross functional','cross-functional'],answer:`Yes, and it is the shape of the job rather than an occasional extra: Northwind is a consulting firm, so the delivery is client delivery. Publicly named engagements include Lumen, Halcyon, Tixly and Taxwise. The internal systems he built are themselves stakeholder machinery, BRD submission with review, approval and rework, RCA documents with version history, and project documents routed through manager and client approval. ${recommendations.length} LinkedIn recommendations back it, ${reportCount} of them from people who reported to him.`,href:'/#recommendations'},
- {id:'next-role',patterns:['next role','looking for in his next','what is he looking for','what does he want','career goal','career goals','five years','5 years','long term','long-term','ambition','aspiration','where does he see himself','motivation'],answer:`What is on record: ${profile.availability}, open to ${profile.openTo}, and ${profile.relocation}. On direction, his own summary is the closest thing documented: "${profile.summary}" The specifics of what he wants next, team, domain and scope, are worth putting to him directly at ${profile.email} or ${profile.phone}.`,href:'/#contact'},
- {id:'behavioural',patterns:['time he failed','a failure','his failure','biggest mistake','a mistake','went wrong','disagreement','disagree','conflict','difficult colleague','difficult manager','handle pressure','under pressure','criticism','negative feedback','weakness','weaknesses'],answer:`Not documented here, and a question better put to him directly at ${profile.email} or ${profile.phone}. What is on record is how the people who worked with him describe it: ${recommendations.length} LinkedIn recommendations, ${reportCount} from people who reported to him and one from a manager. A bootcamp teammate singles out his "ability to disassociate himself from work done by him and analyse it from a third-person perspective", which is the habit that makes a post-mortem worth holding.`,href:'/#recommendations'},
+ {id:'stakeholders',patterns:['client facing','client-facing','face the client','stakeholder','stakeholders','business users','work with clients','client communication','requirement gathering','requirements gathering','cross functional','cross-functional'],answer:`Yes, and it is the shape of the job rather than an occasional extra: Northwind is a consulting firm, so the delivery is client delivery. Publicly named engagements include Lumen, Halcyon, Tixly and Planmytax.ai. The internal systems he built are themselves stakeholder machinery, BRD submission with review, approval and rework, RCA documents with version history, and project documents routed through manager and client approval. ${recommendations.length} LinkedIn recommendations back it, ${reportCount} of them from people who reported to him.`,href:'/#recommendations'},
+ {id:'next-role',patterns:['next role','looking for in his next','what is he looking for','what does he want','career goal','career goals','five years','5 years','long term','long-term','ambition','aspiration','where does he see himself','motivation'],answer:`What is on record: ${profile.availability}, open to ${profile.openTo}. ${ABROAD} On direction, his own summary is the closest thing documented: "${profile.summary}" The specifics of what he wants next, team, domain and scope, are worth putting to him directly at ${profile.email} or ${profile.phone}.`,href:'/#contact'},
+ {id:'behavioural',patterns:['not hire','why not hire','reasons not to hire','red flag','red flags','drawback','drawbacks','concerns about him','time he failed','a failure','his failure','biggest mistake','a mistake','went wrong','disagreement','disagree','conflict','difficult colleague','difficult manager','handle pressure','under pressure','criticism','negative feedback','weakness','weaknesses'],answer:`Not documented here, and a question better put to him directly at ${profile.email} or ${profile.phone}. What is on record is how the people who worked with him describe it: ${recommendations.length} LinkedIn recommendations, ${reportCount} from people who reported to him and one from a manager. A bootcamp teammate singles out his "ability to disassociate himself from work done by him and analyse it from a third-person perspective", which is the habit that makes a post-mortem worth holding.`,href:'/#recommendations'},
  {id:'leadership',patterns:['led a team','lead a team','leading a team','leadership','team lead','managed a team','people management','has he led','does he lead','line manager','has he managed','managed people','how many people','people has he managed','direct reports'],answer:`He has led work and people without having held a manager title. ${reportCount} of his ${recommendations.length} LinkedIn recommendations are from people who reported to him. One calls him \u201ca great leader and mentor\u201d, another describes \u201cstrong ownership and leadership in everything he does\u201d. A peer notes he was managing QA for the AI projects single-handedly. He led the Playwright migration at Meridian and brought the QA team onto the new framework, and at Northwind he has onboarded new joiners and mentored a junior developer and interns.`,href:'/#recommendations'},
  {id:'mobile',patterns:['mobile app','mobile apps','mobile ui','mobile-first','mobile first','android','ios','react native','flutter','responsive','app store','play store','native app','mobile development'],answer:'Mobile-first web rather than a native app. On Lumen he rebuilt the customer-facing product in React and TypeScript, including a mobile-first rework of the interface, and at Northwind he has developed web and mobile automation. No native iOS or Android app is documented, and there is no React Native or Flutter work in the portfolio.',href:'/#products'},
- {id:'spoken-languages',patterns:['languages does he speak','language does he speak','spoken language','spoken languages','does he speak','speak english','fluent','communication skills','soft skills','presentation skills'],answer:`This portfolio documents programming languages rather than spoken ones. For spoken languages, ask Alex directly at ${profile.email}. What is on record: a Coursera credential in English for Running a Successful Business from the University of California, Irvine, and recommendations that single out his communication. One colleague cites \u201cexcellent communication and interpersonal skills\u201d, another that his \u201creporting and presentations are always on point\u201d.`,href:'/#certifications'},
+ {id:'spoken-languages',patterns:['languages does he speak','language does he speak','spoken language','spoken languages','does he speak','speak english','fluent','communication skills','communication','communicator','communicate','soft skills','presentation skills'],answer:`This portfolio documents programming languages rather than spoken ones. For spoken languages, ask Alex directly at ${profile.email}. What is on record: a Coursera credential in English for Running a Successful Business from the University of California, Irvine, and recommendations that single out his communication. One colleague cites \u201cexcellent communication and interpersonal skills\u201d, another that his \u201creporting and presentations are always on point\u201d.`,href:'/#certifications'},
  {id:'clients',patterns:['clients','client list','which clients','who are his clients','engagements','customer names'],answer:`Publicly named engagements: ${work.map(item=>item.name).join(', ')}, alongside Northwind\u2019s own internal ERP. Client names behind the operational dashboards are withheld throughout. Those carry positional labels only, and the same letter always means the same client.`,href:'/#products'},
  {id:'chatbot',patterns:['this chatbot','the chatbot','your chatbot','how do you work','how does this work','are you ai','are you an ai','are you chatgpt','what model','which model','llm powering','who built you','are you human','are you a bot','are you a script','how are you built'],answer:'This guide answers from Alex\u2019s published portfolio content, and it is built so that the model never writes the prose. An approved answer set is computed first; a language model may only choose which answer id fits, and the text you get back is always looked up from that set. It degrades through three tiers so it keeps answering with the server down: the browser answers on its own if the Worker is unreachable, the Cloudflare Worker asks an NVIDIA NIM model which documented answer fits when no pattern matches, and an optional FastAPI service can do the same with Gemini. Both it and the analytics behind this site are Alex\u2019s work.',href:'/analytics'},
- {id:'analytics',patterns:['portfolio analytics','analytics system','analytics behind this site','click heatmap','heatmap','heatmaps','funnel','funnels','admin dashboard','cloudflare','cloudflare workers','vinext','next.js','nextjs','how is this site built','how was this site built','how is this portfolio built','this website','static rendering','tech stack of this site'],answer:projectAnswer('analytics'),href:'/analytics'},
+ {id:'analytics',patterns:['portfolio analytics','portfolio website','this portfolio website','this portfolio','analytics system','analytics behind this site','click heatmap','heatmap','heatmaps','funnel','funnels','admin dashboard','cloudflare','cloudflare workers','vinext','how is this site built','how was this site built','how is this portfolio built','this website','static rendering','tech stack of this site'],answer:projectAnswer('analytics'),href:'/analytics'},
  // One answer per dashboard, before the aggregate below, for the same reason
  // the awards and certifications spreads come before theirs: the first pattern
  // match wins, and the aggregate claims the bare word 'dashboard'. Without
@@ -108,7 +127,7 @@ export const answers = [
  {id:'code-samples',patterns:['see code','see his code','code sample','code samples','source code','show me code','his repositories','his repos','github repos','read his code'],answer:`Public repositories: ${projects.filter(project=>project.repo).map(project=>project.name).join(', ')}. Client and employer work is private. The dashboard from this site\u2019s analytics system is demonstrated publicly on synthetic data at /analytics.`,href:profile.github},
  {id:'security',patterns:['prompt injection','security review','security reviews','security testing','vulnerability','vulnerabilities','owasp','penetration','secure coding','application security'],answer:'At Halcyon Alex ran security vulnerability reviews and performance work across internal sales-team products, and validated the data behind them. This portfolio\u2019s own chatbot is built so the model never authors prose: it may only select an answer id from an approved set, and the served text is always looked up from that set.',href:'/#products'},
  {id:'schedule',patterns:['schedule a call','book a call','set up a call','arrange a call','schedule an interview','interview slot','set up a meeting','book a meeting','next steps','interview','technical interview','screening call','technical round','discussion'],answer:`The fastest route is direct: ${profile.email} or ${profile.phone}. ${profile.availability}. Alex replies to LinkedIn as well.`,href:'/#contact'},
- {id:'leaving',patterns:['why is he leaving','why leave','why did he leave','why he left','why did he quit','reason he left','reason for change','reason for leaving','looking for a change'],answer:`That one is worth asking Alex directly at ${profile.email} or ${profile.phone}. What is documented: ${profile.availability}, open to ${profile.openTo}.`,href:'/#contact'},
+ {id:'leaving',patterns:['why is he leaving','want to switch','wants to switch','why switch','why change jobs','why does he want to change','why is he looking','why leave','why did he leave','why he left','why did he quit','reason he left','reason for change','reason for leaving','looking for a change'],answer:`That one is worth asking Alex directly at ${profile.email} or ${profile.phone}. What is documented: ${profile.availability}, open to ${profile.openTo}.`,href:'/#contact'},
  // A yes/no question, answered yes. It sits above 'contact' because the
  // first pattern match wins, and the generic contact answer replied to
  // "is this number on WhatsApp?" with a list of ways to get in touch,
@@ -174,9 +193,9 @@ export const answers = [
  {id:'skills',patterns:['skill','skills','stack','python','react','java','fastapi','technology','technologies','language','languages','typescript','javascript','html','css'],answer:`Alex works with ${skills.map(g=>`${g.name.toLowerCase()}: ${g.items.join(', ')}`).join('; ')}.`,href:profile.github},
  {id:'education',patterns:['education','college','university','degree','brookfield','diploma','qualification','qualifications','highest qualification','graduation','btech','b.e','bachelor','bachelors','engineering degree','academics'],answer:'Alex completed a PG Diploma in Advanced Computing at Brookfield Institute, Denver in 2022, a BE in Civil Engineering at Riverside College of Engineering in 2021, and a Diploma in Civil Engineering in 2018.',href:'/resume-sample.pdf'},
  {id:'recommendations',patterns:['recommendation','recommendations','recommended','recommend','references','reference check','referral','colleague','team','ajay','pratik','vouch','managed him','who managed','his manager','reported to him','direct reports','supervised','testimonial','testimonials'],answer:`${recommendations.length} LinkedIn recommendations, including colleagues who reported to Alex and a manager. The first few:\n\n${recommendations.slice(0,5).map(r=>`${r.name} (${r.role}, ${RELATION_LABEL[r.relation]}): “${r.quote}”`).join('\n\n')}\n\nThe rest are in the recommendations section.`,href:profile.linkedin},
- {id:'location',patterns:['location','located','based','residence','resident','address','home town','hometown','commute','austin','texas','pin code','which city','where does he live','where does alex live','where is he based','where is he located','where does he stay','current city'],answer:`Alex lives in ${profile.residence}, and is based in the greater Austin area. He is open to ${profile.openTo}. ${profile.relocation}.`,href:profile.linkedin},
+ {id:'location',patterns:['location','located','based','residence','resident','address','home town','hometown','commute','austin','texas','pin code','which city','where does he live','where does alex live','where is he based','where is he located','where does he stay','current city'],answer:`Alex lives in ${profile.residence}, and is based in the greater Austin area. He is open to ${profile.openTo}. ${ABROAD}`,href:profile.linkedin},
  {id:'resume',patterns:['resume','cv','curriculum vitae','resume pdf','download resume','download'],answer:`The résumé PDF covers Alex’s current role as ${experience[0].role} at ${experience[0].company}, his earlier automation engineering work at Meridian Fintech, selected projects, technical skills, education, and certifications.`,href:'/resume-sample.pdf'},
- {id:'about',patterns:['who is alex','who is he','who is alex rivera','full name','what is his name','introduce','introduction','summary','tell me about alex','tell me about him','his profile','bio','overview'],answer:`${profile.fullName} is a ${experience[0].role} at ${experience[0].company}, based in Austin. He previously worked in AI QA at Northwind. ${profile.summary} His professional background is in quality engineering and AI evaluation.`,href:profile.linkedin},
+ {id:'about',patterns:['who is alex','who is he','who is alex rivera','full name','what is his name','introduce','introduction','summary','tell me about alex','tell me about him','tell me about yourself','about yourself','his profile','bio','overview'],answer:`${profile.fullName} is a ${experience[0].role} at ${experience[0].company}, based in Austin. He previously worked in AI QA at Northwind. In his own words: \u201c${profile.summary}\u201d His professional background is in quality engineering and AI evaluation.`,href:profile.linkedin},
 ];
 /**
  * The five guards, in the order answerQuestion() applies them.
@@ -208,8 +227,18 @@ export const answers = [
  * That turned the chatbot into something that nudges a recruiter to ask a
  * candidate his caste. These questions need a boundary, not a redirect, so
  * they get their own tier and their own answer with no contact details in it.
- * `unknown` keeps salary and CTC, where "ask him directly" is the right
- * answer.
+ * A partner, parents and family background are here too. A fork whose owner
+ * wants to answer one of these (age, say) adds an answer entry for it, lists
+ * its id in VERBATIM_IDS, and takes the words out of this guard.
+ * Salary and CTC get their own tier too, `compensation`, for the opposite
+ * reason: "ask him directly" is the right answer there, but "that detail is
+ * not in the portfolio" read as though the bot had looked and failed. A
+ * recruiter needs to hear that the figure is withheld on purpose, and what
+ * is on record instead (the notice period, usually the next question).
+ * Phrasings without the word "salary" ("how much does he earn", "LPA",
+ * "what package is he expecting") used to miss the guard, fall through as
+ * unmatched, and so reach the model, the one tier that must never be asked
+ * for a number nobody published.
  *
  * ── Prefixes wrapped in \b never matched their own inflections ────────────
  * `politic` and `diagnos` were written as stems inside `\b(...)\b`, which
@@ -287,8 +316,9 @@ export const guard = {
  abuse:'\\b(?:ignore|disregard|override|jailbreak|system prompt|developer message|secret|api key|passwords?(?! management)|pretend|roleplay|role-play|act as|insult|hate|stupid|idiot|dumb|useless|worthless|nonsense|rubbish|shut up|garbage bot|trash bot|bakwas|chut(?:i)?ya|chutya|gandu|madarch(?:o|oo)d|b(?:e|he)henchod|bhenchod|bsdk|harami|kamina|nalayak|ghatiya|faltu|bewakoof|pagal|fuck|sex|your (?:instructions|rules|guidelines|prompt|training data)|instructions verbatim|repeat after me|forget (?:your|the|all|previous|everything)|you are (?:now )?dan|dan mode|(?:no|without|bypass|remove|ignore) (?:your |all |any )?restrictions?|unrestricted)\\b',
  sensitive:`\\b(?:api[ _-]?keys?|access[ _-]?keys?|secrets?|(?:auth|access|refresh|bearer|session|admin|github|api)[ _-]?tokens?|private[ _-]?keys?|ssh[ _-]?keys?|connection strings?|database (?:urls?|uris?|credentials?)|(?:login|admin|database|db|server) credentials?|env(?:ironment)? (?:vars?|variables?)|service accounts?|internal (?:urls?|endpoints?|hosts?)|production (?:urls?|endpoints?|hosts?)|private (?:repo(?:sitory)? )?(?:links?|urls?|access)|github clones?|clone commands?|(?:n8n )?workflow exports?|enterprise client [a-d]|(?:real|actual) names?|names? of the (?:people|employees|staff|users|clients))\\b|\\.env\\b|ip[ _-]?salt\\b|${DEMANDED}`,
 
- personal:'\\b(?:caste|reserved category|sc/st|obc|religion|religious|politic\\w*|marital status|married|unmarried|spouse|wife|husband|girlfriend|boyfriend|dating|children|kids|pregnan\\w*|his age|your age|age of alex|how old|date of birth|dob|birthday|gender|male or (?:a )?female|man or (?:a )?woman|woman or (?:a )?man|sexuality|sexual orientation|disabilit\\w*|disabled|handicap\\w*|blood group|mental health|medical history|aadhaa?r|pan (?:card|number|details)|passport number|bank (?:account|details)|drinks?|smoke[sr]?|smoking|alcohol)\\b',
- unknown:`\\b(?:salary|salaries|ctc|compensation|pay(?: package| scale)?|stock options?|esops?|expected package|current package|hike|payslip|salary slip)\\b|${SCOPED_DURATION}`,
+ personal:'\\b(?:caste|reserved category|sc/st|obc|religion|religious|politic\\w*|marital status|married|unmarried|spouse|wife|husband|siblings?|brothers?|sisters?|girlfriend|is (?:he|alex) single|parents|father|mother|dad|mom|mum|(?:his|alex\'?s) family|family (?:background|members?)|boyfriend|dating|children|kids|pregnan\\w*|his age|your age|age of alex|how old|date of birth|dob|birthday|gender|male or (?:a )?female|man or (?:a )?woman|woman or (?:a )?man|sexuality|sexual orientation|disabilit\\w*|disabled|handicap\\w*|blood group|mental health|medical history|aadhaa?r|pan (?:card|number|details)|passport number|bank (?:account|details)|drinks?|smoke[sr]?|smoking|alcohol)\\b',
+ compensation:'\\b(?:salary|salaries|ctc|cost to company|compensation|remuneration|wages?|stipend|pay(?: package| scale| range| expectations?)?|stock options?|esops?|(?:expected|current|salary|pay) package|what package|package (?:is he|does he|he is|he\'s) expect\\w*|hike|increment|payslip|salary slip|lpa|lakhs?|lacs?|per annum|in[- ]hand|take[- ]home|(?:hourly|daily|day|billing|freelance|contract|consulting) rates?|what(?:\'s| is) his rate|how much (?:does|would|will|should|did|do|is|can) (?:he|alex|we|i|you)\\b[^.?!]{0,20}?\\b(?:earn|make|get|paid|pay|charge|cost|expect|ask|draw|want)\\w*|earn(?:s|ing|ings)?|income|negotiable|within (?:our|the|my) budget)\\b',
+ unknown:`${SCOPED_DURATION}`,
  offTopic:'\\b(?:weather|recipe|capital of|president of|prime minister|(?:^|can you |could you |would you |will you |please |now )write\\b[^.?!]{0,30}?\\b(?:function|program|script|query|class|snippet|regex|poem|song|story|essay|sql|code)|solve (?:this|that|the following|for x)|algorithms? (?:question|round|problem|challenge)|leetcode|dsa|bitcoin|crypto price|stock market|medical|diagnos\\w*|poem|joke|calculate (?:this|that|the following)|explain how to|teach me (?:python|java|javascript|to code|how to code)|what is python|explain python|what is javascript|explain javascript|what is java|explain java)\\b',
 };
 /**
@@ -307,6 +337,12 @@ export const guard = {
  * lib/analytics/queries.ts and the demo seeder import this list, so a new
  * guard tier is added here and nowhere else.
  */
+/**
+ * Answers served exactly as written, never composed or translated by the
+ * model. The owner worded these; a paraphrase of a personal answer is a
+ * different answer. lib/chat/gate.ts reads this.
+ */
+export const VERBATIM_IDS:readonly string[]=['nextjs','relocation','relocation-affect','work-mode'];
 export const GUARD_SOURCES:readonly string[]=['Safety boundary','Portfolio guide','Out of scope'];
 export type Answer={answer:string;href?:string;mode:'faq'|'ai';source:string;id?:string;unmatched?:boolean;/** Approved answers this reply drew on. Set by /api/chat, never by answerQuestion(); the client sends them back so a follow-up keeps its subject. */ids?:string[];/** The server's signature over this reply (lib/chat/turn-sig.ts). Set by /api/chat; a reply answered locally has none, and is dropped from the history it is sent back in. */sig?:string};
 /**
@@ -319,6 +355,18 @@ export type Answer={answer:string;href?:string;mode:'faq'|'ai';source:string;id?
  * the pattern `'résumé'` could never match anything, because JavaScript's `\b`
  * is ASCII-only and an accented vowel is not a word character, so the trailing
  * boundary had nothing to sit against.
+ *
+ * Which marks: any combining mark (\p{M}) that sits on an ASCII character, and
+ * no other. On an ASCII letter a mark is decoration, and a hostile one: only
+ * U+0300-036F used to go, so `sa\u20d2lary` or `sal\u0941ary` (a symbol
+ * overlay, a Devanagari vowel sign) split the word, passed guard.compensation
+ * and reached the model, since gate.ts counts letters, not marks. On any other
+ * base it is spelling: Hindi's matras, virama and nukta are combining marks,
+ * and Python's old `unicodedata.combining` filter dropped some of them while
+ * this one kept them, so the two runtimes saw different strings. No guard is
+ * written in those scripts, so keeping them changes no refusal. It runs after
+ * the homoglyph fold, so Greek `ό` (omicron + tonos) folds to `o` first and
+ * then loses its accent, as before.
  *
  * Curly apostrophes fold to straight ones because phone keyboards produce
  * them and every pattern in this file is written with the straight form.
@@ -334,12 +382,41 @@ export type Answer={answer:string;href?:string;mode:'faq'|'ai';source:string;id?
  * or a zero-width space inside `sal\u00adary` or `api\u200b key` is invisible
  * on screen and breaks every pattern at the character, so "What is his
  * salary?" with a soft hyphen in it walked past guard.unknown to the no-match answer, which is
- * model-eligible. NFKD leaves Cf alone. backend/main.py drops the same
- * category, and lib/chat/gate.ts keeps any question that contained one local.
+ * model-eligible. NFKD leaves Cf alone. lib/chat/gate.ts keeps any question
+ * that contained one local.
+ *
+ * backend/main.py `_normalise` repeats these steps in this order, and
+ * tests/normalise-cases.json is asserted by both test suites, so a change
+ * here is a change there.
  */
 export function normaliseQuestion(question:string):string {
- return question.normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(FORMAT_CHARS,'').replace(/[‘’‛]/g,'\'').toLowerCase().replace(/[\u0400-\u04ff\u0370-\u03ff\u0500-\u052f]/g,ch=>HOMOGLYPHS[ch]??ch).trim();
+ return question.normalize('NFKD').replace(FORMAT_CHARS,'').toLowerCase().replace(/[\u0400-\u04ff\u0370-\u03ff\u0500-\u052f]/g,ch=>HOMOGLYPHS[ch]??ch).replace(/(?<=\p{ASCII})\p{M}+/gu,'').replace(/[‘’‛]/g,'\'').trim();
 }
+/**
+ * The fixed replies answerQuestion() gives, in the order it tries them.
+ *
+ * Data rather than branches, because two runtimes serve them.
+ * scripts/sync-knowledge.mjs copies this table, GREETING and FALLBACK into
+ * backend/knowledge.json and backend/main.py walks the same list, so Python
+ * restates neither the wording nor the order. It used to restate both, and
+ * its test pulled the TypeScript text back out with a regex over this file.
+ * One row per guard: a guard missing here would never run, and
+ * tests/knowledge.test.ts fails if the two lists differ.
+ */
+type Fixed={answer:string;source:string;href?:string};
+export const GUARD_REPLIES:readonly ({guard:keyof typeof guard}&Fixed)[]=[
+ {guard:'sensitive',answer:'I can share only safe public summaries of Alex’s work. I do not provide credentials, internal infrastructure, client data, source code, test data, security findings, or private links.',source:'Safety boundary'},
+ {guard:'abuse',answer:'I can help with professional questions about Alex’s projects, skills, certifications, and experience.',source:'Portfolio guide'},
+ // No contact details in this one, on purpose. See guard.personal above.
+ {guard:'personal',answer:'That is personal information, and not something this portfolio covers. I can answer questions about Alex’s work, skills, experience, education and availability.',source:'Out of scope'},
+ {guard:'compensation',answer:`Alex does not disclose his current or expected salary publicly, so this chat cannot share it. For compensation, please ask him directly at ${profile.email} or ${profile.phone}. What is on record: ${profile.availability}.`,href:'/#contact',source:'Not documented'},
+ {guard:'unknown',answer:`That detail is not in the portfolio. Please ask Alex directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,source:'Not documented'},
+ {guard:'offTopic',answer:'I answer questions about Alex’s work. Ask about his projects, skills, certifications, or experience.',source:'Portfolio guide'},
+];
+/** After every guard and before the answer set. `pattern` is a string so Python can run it too. */
+export const GREETING={pattern:'^(hi|hello|hey|thanks|thank you)[!. ]*$',answer:'Hello! I can help you explore Alex’s AI projects, full stack work, skills, certifications, and engineering experience.',source:'Portfolio guide'};
+/** No guard and no pattern. The one reply marked `unmatched`. */
+export const FALLBACK={answer:`I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, availability or experience. You can also reach him directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,source:'Not documented'};
 /**
  * Every regex answerQuestion() runs, built once and on first use.
  *
@@ -350,25 +427,19 @@ export function normaliseQuestion(question:string):string {
  * tries every alternative at every position. Lazy rather than at import, so
  * a module that only wants `answers` or `guard` pays nothing for it.
  */
-type Compiled={sensitive:RegExp;abuse:RegExp;personal:RegExp;unknown:RegExp;offTopic:RegExp;patterns:RegExp[]};
+type Compiled={sensitive:RegExp;abuse:RegExp;personal:RegExp;compensation:RegExp;unknown:RegExp;offTopic:RegExp;greeting:RegExp;patterns:RegExp[]};
 let regexes:Compiled|null=null;
 const escapeRegExp=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function compiled():Compiled {
- return regexes??={sensitive:new RegExp(guard.sensitive,'i'),abuse:new RegExp(guard.abuse,'i'),personal:new RegExp(guard.personal,'i'),unknown:new RegExp(guard.unknown,'i'),offTopic:new RegExp(guard.offTopic,'i'),
+ return regexes??={sensitive:new RegExp(guard.sensitive,'i'),abuse:new RegExp(guard.abuse,'i'),personal:new RegExp(guard.personal,'i'),compensation:new RegExp(guard.compensation,'i'),unknown:new RegExp(guard.unknown,'i'),offTopic:new RegExp(guard.offTopic,'i'),greeting:new RegExp(GREETING.pattern,'i'),
   // An entry with no patterns must match nothing, and `\b(?:)\b` matches almost anything.
   patterns:answers.map(a=>a.patterns.length?new RegExp(`\\b(?:${a.patterns.map(escapeRegExp).join('|')})\\b`,'i'):/(?!)/)};
 }
 export function answerQuestion(question:string):Answer {
  const q=normaliseQuestion(question);const re=compiled();
- const privateWorkBoundary='I can share only safe public summaries of Alex’s work. I do not provide credentials, internal infrastructure, client data, source code, test data, security findings, or private links.';
- if(re.sensitive.test(q))return {answer:privateWorkBoundary,mode:'faq',source:'Safety boundary'};
- if(re.abuse.test(q))return {answer:'I can help with professional questions about Alex’s projects, skills, certifications, and experience.',mode:'faq',source:'Portfolio guide'};
- // No contact details in this one, on purpose. See guard.personal above.
- if(re.personal.test(q))return {answer:'That is personal information, and not something this portfolio covers. I can answer questions about Alex’s work, skills, experience, education and availability.',mode:'faq',source:'Out of scope'};
- if(re.unknown.test(q))return {answer:`That detail is not in the portfolio. Please ask Alex directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,mode:'faq',source:'Not documented'};
- if(re.offTopic.test(q))return {answer:'I answer questions about Alex’s work. Ask about his projects, skills, certifications, or experience.',mode:'faq',source:'Portfolio guide'};
- if(/^(hi|hello|hey|thanks|thank you)[!. ]*$/i.test(q))return {answer:'Hello! I can help you explore Alex’s AI projects, full stack work, skills, certifications, and engineering experience.',mode:'faq',source:'Portfolio guide'};
+ for(const {guard:tier,...reply} of GUARD_REPLIES)if(re[tier].test(q))return {...reply,mode:'faq'};
+ if(re.greeting.test(q))return {answer:GREETING.answer,mode:'faq',source:GREETING.source};
  const found=answers.find((_,at)=>re.patterns[at].test(q));
  if(found)return {answer:found.answer,href:found.href,mode:'faq',source:'From the portfolio',id:found.id};
- return {answer:`I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, availability or experience. You can also reach him directly at ${profile.email} or ${profile.phone}.`,href:profile.linkedin,mode:'faq',source:'Not documented',unmatched:true};
+ return {...FALLBACK,mode:'faq',unmatched:true};
 }

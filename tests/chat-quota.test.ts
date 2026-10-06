@@ -141,16 +141,18 @@ test('every answer the route returns carries the allowance', () => {
   const start = route.indexOf('const allowance=');
   assert.ok(start > 0);
   for (const m of route.slice(start).matchAll(/return (?!answered\()[^;]*Response/g)) assert.fail(`unwrapped: ${m[0].slice(0, 80)}`);
-  const chat = readFileSync(new URL('../components/portfolio/Chat.tsx', import.meta.url), 'utf8');
+  // The panel's request logic lives in lib/chat/ask.ts, beside Chat.tsx.
+  const chat = ['../components/portfolio/Chat.tsx', '../lib/chat/ask.ts'].map((path) => { try { return readFileSync(new URL(path, import.meta.url), 'utf8'); } catch { return ''; } }).join('\n');
   assert.match(chat, /readQuota\(response\.headers\)/);
-  assert.match(chat, /refusal\?\.code===DAILY_LIMIT_CODE/);
+  assert.match(chat, /refusal\?\.code\s*===\s*DAILY_LIMIT_CODE/);
   assert.match(chat, /You can ask up to/);
   assert.match(chat, /left today/);
 });
 
 test('the owner is exempt by network or by admin session; nobody else is', async () => {
   const from = (ip: string, headers: Record<string, string> = {}) =>
-    new Request('https://x.test/api/chat', { method: 'POST', headers: { 'cf-connecting-ip': ip, ...headers } });
+    // `cf` stands in for the Workers runtime: clientIp() believes the header only beside it.
+    Object.defineProperty(new Request('https://x.test/api/chat', { method: 'POST', headers: { 'cf-connecting-ip': ip, ...headers } }), 'cf', { value: {} });
   const token = 't'.repeat(40);
   resetTrustedCache();
   await withEnv({ CHAT_UNLIMITED_CIDRS: '203.0.113.7/32, 2001:db8:1:2::/64', ADMIN_TOKEN: token, ADMIN_EMAILS: undefined }, async () => {
@@ -177,28 +179,97 @@ test('the route skips both limits for an exempt caller, and only for one', () =>
   assert.match(route, /const allowance=exempt\?UNLIMITED_VERDICT:await chargeChatQuota\(/);
 });
 
-test('the site-wide model cap is one row, 1000 a day by default, and degrades open', async () => {
+test('the site-wide model cap is one row, 1000 a day by default, and fails closed', async () => {
   const { db, raw, close } = freshDb();
   try {
     await withEnv({ CHAT_MODEL_DAILY_LIMIT: undefined }, async () => {
       assert.equal(chatModelDailyLimit(), 1000);
     });
     await withEnv({ CHAT_MODEL_DAILY_LIMIT: '2' }, async () => {
-      assert.equal(await chargeModelCall(db, T0), true);
-      assert.equal(await chargeModelCall(db, T0 + 1), true);
-      assert.equal(await chargeModelCall(db, T0 + 2), false, 'the third call in the window is refused');
-      assert.equal(await chargeModelCall(db, T0 + 1 + QUOTA_WINDOW_MS), true, 'and the window resets');
+      assert.equal(await chargeModelCall(db, T0), 'allowed');
+      assert.equal(await chargeModelCall(db, T0 + 1), 'allowed');
+      assert.equal(await chargeModelCall(db, T0 + 2), 'capped', 'the third call in the window is refused');
+      assert.equal(await chargeModelCall(db, T0 + 1 + QUOTA_WINDOW_MS), 'allowed', 'and the window resets');
     });
     assert.deepEqual(raw.prepare('SELECT bucket FROM chat_quota').all().map((row) => row.bucket), [MODEL_BUCKET]);
   } finally {
     close();
   }
-  assert.equal(await chargeModelCall(null, T0), true, 'no database means no cap');
+  // The one limit that is a bill rather than a courtesy: unreadable is spent.
+  assert.equal(await chargeModelCall(null, T0), 'unavailable', 'no database means no model');
+  const broken = { prepare() { throw new Error('D1 is down'); } } as unknown as D1Database;
+  assert.equal(await chargeModelCall(broken, T0), 'unavailable', 'a failed count means no model');
 });
 
-test('the route checks the model cap before either model path, and never refuses an exempt caller', () => {
+test('the route checks the model cap before either model path, and an unreadable cap refuses even an exempt caller', () => {
   const route = readFileSync(new URL('../app/api/chat/route.ts', import.meta.url), 'utf8');
-  assert.match(route, /const capped=wantsModel&&!\(await chargeModelCall\(ready\)\)&&!exempt;/);
+  assert.match(route, /const charge=wantsModel\?await chargeModelCall\(ready\):'unavailable';/);
+  assert.match(route, /const capped=wantsModel&&\(charge==='unavailable'\|\|charge==='capped'&&!exempt\);/);
   assert.match(route, /if\(body\.stream===true&&wantsModel&&!capped\)/);
   assert.match(route, /if\(wantsModel&&!capped\)/);
+});
+
+/** The database, counting how many times the route would wait on D1. */
+function countingDb(db: D1Database) {
+  const trips = { batch: 0, single: 0 };
+  // The local facade runs a batch by calling each statement's own run()/all(),
+  // which is one round trip on D1, not several, so those are not counted.
+  let inBatch = false;
+  const wrap = (statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, {
+    get(target, key, receiver) {
+      const value = Reflect.get(target, key, receiver) as unknown;
+      if (key === 'bind') return (...args: unknown[]) => wrap((value as (...a: unknown[]) => D1PreparedStatement).apply(target, args));
+      if (key === 'first' || key === 'run' || key === 'all') return (...args: unknown[]) => { if (!inBatch) trips.single += 1; return (value as (...a: unknown[]) => unknown).apply(target, args); };
+      return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+    },
+  });
+  const counted = {
+    prepare: (sql: string) => wrap(db.prepare(sql)),
+    batch: async (statements: D1PreparedStatement[]) => {
+      trips.batch += 1;
+      inBatch = true;
+      try { return await db.batch(statements); } finally { inBatch = false; }
+    },
+  } as unknown as D1Database;
+  return { counted, trips };
+}
+
+test('browser and network are charged in one round trip, and the browser still gates the network', async () => {
+  const { db, raw, close } = freshDb();
+  try {
+    await withEnv({ ANALYTICS_IP_SALT: SECRET, CHAT_DAILY_LIMIT: '2', CHAT_DAILY_NETWORK_LIMIT: '50' }, async () => {
+      const { counted, trips } = countingDb(db);
+      const a = await chargeChatQuota(withCookie(null), 'office', counted, T0);
+      assert.deepEqual(trips, { batch: 1, single: 0 }, 'one batch, no other statement');
+      await chargeChatQuota(withCookie(a.setCookie), 'office', counted, T0 + 1);
+      const refused = await chargeChatQuota(withCookie(a.setCookie), 'office', counted, T0 + 2);
+      assert.deepEqual({ allowed: refused.allowed, by: refused.refusedBy, remaining: refused.quota?.remaining }, { allowed: false, by: 'browser', remaining: 0 });
+      assert.equal(trips.batch, 3);
+      const count = (bucket: string) => (raw.prepare('SELECT questions FROM chat_quota WHERE bucket = ?').get(bucket) as { questions: number } | undefined)?.questions;
+      assert.equal(count('n:office'), 2, 'the refused third question did not reach the network row');
+      // And with no network bucket, the browser alone is charged, still in one trip.
+      const solo = await chargeChatQuota(withCookie(null), null, counted, T0 + 3);
+      assert.equal(solo.allowed, true);
+      assert.equal(solo.quota?.remaining, 1);
+      assert.equal(trips.batch, 4);
+    });
+  } finally {
+    close();
+  }
+});
+
+test('a network window that has lapsed is reset by the gated charge, the same as the browser\'s', async () => {
+  const { db, raw, close } = freshDb();
+  try {
+    await withEnv({ ANALYTICS_IP_SALT: SECRET, CHAT_DAILY_LIMIT: '5', CHAT_DAILY_NETWORK_LIMIT: '1' }, async () => {
+      assert.equal((await chargeChatQuota(withCookie(null), 'cafe', db, T0)).allowed, true);
+      const second = await chargeChatQuota(withCookie(null), 'cafe', db, T0 + 1);
+      assert.deepEqual({ allowed: second.allowed, by: second.refusedBy, resetAt: second.quota?.resetAt }, { allowed: false, by: 'network', resetAt: T0 + QUOTA_WINDOW_MS });
+      const later = await chargeChatQuota(withCookie(null), 'cafe', db, T0 + QUOTA_WINDOW_MS + 1);
+      assert.equal(later.allowed, true);
+      assert.deepEqual({ ...raw.prepare('SELECT questions, window_start FROM chat_quota WHERE bucket = ?').get('n:cafe') }, { questions: 1, window_start: T0 + QUOTA_WINDOW_MS + 1 });
+    });
+  } finally {
+    close();
+  }
 });

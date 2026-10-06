@@ -1,18 +1,8 @@
 import type { ReactNode } from 'react';
-import { parseInline, type Block, type Inline } from '@/lib/markdown';
+import { parseInline, safeHref, type Block, type Inline } from '@/lib/markdown';
 
 // Server component: the parse and the render both happen at build time, and
 // none of this reaches the client bundle.
-
-/**
- * Only links that go somewhere ordinary. A `javascript:` href renders as text.
- * A root-relative path must not start `//` or `/\`: both are protocol-relative
- * to a browser (it reads the backslash as a slash), so `//evil.example` would
- * pass a bare `^\/` as a same-site link while leaving the site, and without
- * the `target=_blank` an `http` link gets. tests/markdown.test.ts reads this
- * pattern out of the file, since a bare Node process cannot import JSX.
- */
-const SAFE_HREF = /^(https?:\/\/|\/(?![/\\])|#)/;
 
 function inline(nodes: Inline[]): ReactNode[] {
   return nodes.map((node, at) => {
@@ -21,7 +11,9 @@ function inline(nodes: Inline[]): ReactNode[] {
       case 'code': return <code key={at}>{node.text}</code>;
       case 'strong': return <strong key={at}>{inline(node.children)}</strong>;
       case 'em': return <em key={at}>{inline(node.children)}</em>;
-      case 'link': return SAFE_HREF.test(node.href)
+      // The parser already refuses an unsafe href (lib/markdown.ts); checked
+      // again here because this is the line that writes the attribute.
+      case 'link': return safeHref(node.href)
         ? <a key={at} href={node.href} {...(node.href.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})}>{inline(node.children)}</a>
         : <span key={at}>{inline(node.children)}</span>;
     }

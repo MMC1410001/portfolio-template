@@ -37,6 +37,7 @@
 import { queueEvent, onSessionExit } from './queue';
 import { trackingSuppressed } from './scope';
 import { currentMode } from './mode';
+import { debouncedScan, docHeight } from './dom';
 import {
   DWELL_SECTIONS,
   SECTIONS,
@@ -82,7 +83,6 @@ const SCAN_DEBOUNCE_MS = 250;
 let observer: IntersectionObserver | null = null;
 let scanner: MutationObserver | null = null;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
-let scanTimer: ReturnType<typeof setTimeout> | null = null;
 let registered = false;
 /**
  * The element each id is observed through.
@@ -102,26 +102,27 @@ let previous: string | null = null;
 /** Which ids are intersecting the band right now. */
 const intersecting = new Set<string>();
 
-function docHeight(): number {
-  const doc = document.documentElement;
-  return Math.round(Math.max(doc.scrollHeight, window.innerHeight, 1));
-}
-
 /** The section currently active, for props.section on other event types. */
 export function currentSection(): string | null {
   return active;
 }
 
 /**
- * Whichever intersecting section is highest in document order.
+ * Whichever intersecting section is LOWEST in document order.
  *
- * Lumen's pickActiveEntry names the bug this avoids: setting the active id
- * for every intersecting entry means the last one in the entry list wins, 
- * which is the *lower* section, not the one being read.
+ * It used to be the highest, and in plain flow the two differ only while a
+ * boundary crosses the 20% band. The homepage now stacks its sections in
+ * sticky chapters, each sliding over the one before, and a covered chapter
+ * stays pinned under the band for the rest of the page: IntersectionObserver
+ * does not see occlusion, so "highest" held the dwell on a section nobody
+ * could see. The lowest intersecting section is the one painted on top.
+ *
+ * It is still a document-order rule rather than "last entry wins", which is
+ * the bug Lumen's pickActiveEntry names: entry order is arbitrary.
  */
 function pickActive(): string | null {
-  for (const section of DWELL_SECTIONS) {
-    if (intersecting.has(section.id)) return section.id;
+  for (let i = DWELL_SECTIONS.length - 1; i >= 0; i--) {
+    if (intersecting.has(DWELL_SECTIONS[i].id)) return DWELL_SECTIONS[i].id;
   }
   return null;
 }
@@ -143,7 +144,7 @@ function emitLeave(
       from: previous,
       to: entering,
       mode: currentMode(),
-      doc_h: docHeight(),
+      doc_h: Math.round(docHeight()),
       ...(terminal ? { terminal: true } : {}),
     },
   });
@@ -245,20 +246,11 @@ function observeAll(): void {
  * next/link round trip replaces every section node, and with the scanner gone
  * nothing re-attached them, so the rest of the session had no page_view and
  * `section: null` on every row. It stays alive now, and pays for it with the
- * same filter cta.ts uses: the turntable rewrites a text node on every scroll
- * frame, and no section can arrive in a Text node.
+ * filter in debouncedScan() (dom.ts), shared with cta.ts: the turntable
+ * rewrites a text node on every scroll frame, and no section can arrive in a
+ * Text node.
  */
-function scheduleScan(records: MutationRecord[]): void {
-  if (scanTimer !== null) return;
-  const added = records.some((r) =>
-    Array.from(r.addedNodes).some((n) => n.nodeType === 1),
-  );
-  if (!added) return;
-  scanTimer = setTimeout(() => {
-    scanTimer = null;
-    observeAll();
-  }, SCAN_DEBOUNCE_MS);
-}
+const scans = debouncedScan(SCAN_DEBOUNCE_MS, observeAll);
 
 /**
  * Re-adopt a section after a tab switch.
@@ -313,7 +305,7 @@ export function installSectionTracking(): void {
   // `/` renders every section again. Watching for added elements keeps the
   // observer attached to whichever nodes are current.
   if (typeof MutationObserver === 'function') {
-    scanner = new MutationObserver(scheduleScan);
+    scanner = new MutationObserver(scans.schedule);
     scanner.observe(document.body, { childList: true, subtree: true });
   }
 
@@ -336,10 +328,7 @@ function clearView(): void {
     clearTimeout(settleTimer);
     settleTimer = null;
   }
-  if (scanTimer !== null) {
-    clearTimeout(scanTimer);
-    scanTimer = null;
-  }
+  scans.cancel();
   for (const el of observed.values()) observer?.unobserve(el);
   observed.clear();
   intersecting.clear();

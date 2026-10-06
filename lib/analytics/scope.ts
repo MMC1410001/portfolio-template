@@ -72,15 +72,6 @@ export function selfExcluded(): boolean {
   }
 }
 
-export function setSelfExcluded(on: boolean): void {
-  try {
-    if (on) localStorage.setItem(SELF_EXCLUDE_KEY, '1');
-    else localStorage.removeItem(SELF_EXCLUDE_KEY);
-  } catch {
-    /* private mode, nothing to store, and nothing was being recorded anyway */
-  }
-}
-
 /** The single question every recording path asks before writing anything. */
 export function trackingSuppressed(): boolean {
   try {

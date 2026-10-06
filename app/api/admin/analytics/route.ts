@@ -19,6 +19,8 @@ import {
 } from '@/lib/analytics/admin-auth';
 import { getDbHandle, ensureSchema } from '@/lib/analytics/db';
 import { readWindow } from '@/lib/analytics/time';
+import { isRecord } from '@/lib/analytics/payload';
+import { readCapped } from '@/lib/read-capped';
 import { clientIp, hostNetwork, internalVisitorIds, matchesAnyCidr, parseCidrList } from '@/lib/analytics/net';
 import { addTrusted, listTrusted, removeTrusted, trustedCidrs } from '@/lib/analytics/trusted';
 import { sweepIfDue, sweep } from '@/lib/analytics/retention';
@@ -35,6 +37,9 @@ import {
 export const dynamic = 'force-dynamic';
 
 const HEADERS = { 'Cache-Control': 'private, no-store' } as const;
+const MAX_BODY = 16 * 1024;
+
+const tooLarge = () => Response.json({ error: 'body_too_large' }, { status: 413, headers: HEADERS });
 
 type CfRequest = Request & { cf?: IncomingRequestCfProperties };
 
@@ -56,12 +61,21 @@ export async function POST(request: Request) {
   const identity = await authorizeAdmin(request);
   if (!identity) return notFound();
 
-  let body: Body = {};
+  // Capped like the public routes, and narrowed rather than cast: the gate
+  // has already run, but `null` is valid JSON, and `body.action` on it threw
+  // a 500 out of a request that was only junk. The panel sends a handful of
+  // flat fields, so 16 KB is generous.
+  if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY) return tooLarge();
+  const text = await readCapped(request, MAX_BODY);
+  if (text === null) return tooLarge();
+  let parsed: unknown = null;
   try {
-    body = (await request.json()) as Body;
+    parsed = text.trim() ? JSON.parse(text) : null;
   } catch {
-    /* an empty body is a valid overview request */
+    /* unreadable is treated as empty, as it always was */
   }
+  // An empty body, or anything that is not an object, is an overview request.
+  const body: Body = isRecord(parsed) ? parsed : {};
 
   const action = typeof body.action === 'string' ? body.action : 'analytics';
   // The only audit trail there will be, and it is cheap.

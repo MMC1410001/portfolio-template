@@ -102,11 +102,3 @@ function subscribe(listener: () => void): () => void {
     listeners.delete(listener);
   };
 }
-
-/** Test seam, and the reset a panel would need if one were ever remounted. */
-export function resetSession(): void {
-  if (timer !== null) clearTimeout(timer);
-  timer = null;
-  lastActivityAt = 0;
-  expired = false;
-}

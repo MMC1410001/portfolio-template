@@ -16,6 +16,17 @@
 # public/ has no _headers of its own. With this file present it writes
 # nothing, so the rule is repeated here: drop it and every hashed script,
 # stylesheet and font silently goes back to revalidating on each visit.
+#
+# The /* rule is the static-asset half of next.config.ts's security headers.
+# Cloudflare applies _headers only to files served from static assets, never
+# to a response the Worker generates, and next.config.ts only to the Worker's
+# responses, so without it every image, script and the PDF went out with
+# neither. A request matching several rules inherits all of their headers (a
+# header named twice would be comma-joined, so no two rules here share one).
+# Keep the HSTS value in step with next.config.ts.
+/*
+  X-Content-Type-Options: nosniff
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable
 /turntable/*
@@ -23,4 +34,6 @@
 /avatar*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /portrait*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/favicon.svg
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800

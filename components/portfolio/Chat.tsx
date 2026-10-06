@@ -1,19 +1,19 @@
 'use client';
-import { memo, useEffect, useRef, useState, type RefObject } from 'react';
+import { memo, useEffect, useReducer, useRef, useState, type RefObject } from 'react';
 import { ArrowUpRight, Send, Sparkles, Volume2, Square, User, X } from 'lucide-react';
 import { Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
-import { answerQuestion,GUARD_SOURCES,type Answer } from '@/content/faq';
 import { profile } from '@/content/portfolio';
-import { trackChatOpen, trackChatAsk, trackChatAnswer, trackChatClose, classifyFailure, type ChatFailure } from '@/lib/analytics/chat';
+import { trackChatOpen, trackChatAsk, trackChatAnswer, trackChatClose } from '@/lib/analytics/chat';
 import { pickVoice, speakable, speechFailureHint } from '@/lib/chat/speech-text';
 import { TURN_CHARS } from '@/lib/chat/turn-sig';
 import { nextKey, trimTranscript } from '@/lib/chat/session';
-import { paceChars, readChatStream, toPayload } from '@/lib/chat/stream-client';
+import { paceChars } from '@/lib/chat/stream-client';
+import { ask, type HistoryTurn } from '@/lib/chat/ask';
 import { linkLabel, linkSegments } from '@/lib/chat/linkify';
 import { sessionLapsed, touchSession, useSessionExpired } from '@/hooks/use-idle';
 import { useStored } from '@/hooks/use-stored';
-import { DAILY_LIMIT_CODE, DAILY_QUESTIONS, QUOTA_HEADERS, QUOTA_WARN_AT, UNLIMITED, parseQuota, quotaExpired, readQuota, serialiseQuota } from '@/lib/chat/quota';
+import { DAILY_QUESTIONS, QUOTA_WARN_AT, UNLIMITED, parseQuota, quotaExpired } from '@/lib/chat/quota';
 import { speechSupported, stopSpeaking, useSpeakingId, useSpeechBroken, useVoiceToggle, useVoices } from '@/hooks/use-speech';
 // This whole file is a lazy chunk now, loaded by ChatLauncher.tsx when the
 // browser is idle or the launcher is hovered, focused or pressed. The Sheet,
@@ -50,15 +50,20 @@ function resetLabel(resetAt:number):string{const at=new Date(resetAt);const time
 // Where the counter appears. Far enough back to be a warning, close enough
 // that it is not decoration on a normal question.
 const COUNTER_FROM=420;
-// How long the panel waits for the response HEADERS, not for the answer. The
-// JSON path sends no headers until the whole reply is composed, so for it this
-// is the whole budget, and lib/chat/nim.ts's TOTAL_BUDGET_MS is held under it
-// (tests/chat-contracts.test.ts). The streaming path sends headers at once and
-// is then held to the 12s first-token watchdog below. Without this ceiling
-// that watchdog was the only clock, and it starts only once headers arrive, so
-// a Worker that accepted the connection and never answered left the panel
-// waiting with no deadline at all.
-const HEADER_CEILING_MS=8500;
+// Where a question is in its life. `busy` ends at the first token, because
+// from there the thinking line is replaced by the reply being written.
+// `streaming` covers the rest, until the terminal frame: without it a second
+// question could be sent mid-reply, two requests raced for one transcript, and
+// the Stop button vanished while the first was still arriving. One reducer
+// rather than four setters, because they only ever change together. The
+// clocks that drive it (the header ceiling, the first-token watchdog, "still
+// working") live in lib/chat/ask.ts.
+type Phase={busy:boolean;streaming:boolean;slow:boolean;writingKey:number|null};
+type PhaseAction={type:'ask'|'slow'|'done'}|{type:'token';key:number};
+const IDLE:Phase={busy:false,streaming:false,slow:false,writingKey:null};
+// 'token' and 'slow' return the same object when nothing changes, so a reply
+// arriving in fifty pieces is not fifty extra renders.
+function phaseOf(state:Phase,action:PhaseAction):Phase{switch(action.type){case 'ask':return {...IDLE,busy:true};case 'slow':return state.slow?state:{...state,slow:true};case 'token':return state.streaming&&!state.busy&&!state.slow&&state.writingKey===action.key?state:{busy:false,streaming:true,slow:false,writingKey:action.key};case 'done':return IDLE}}
 const RESET_NOTE='New thread. The last conversation timed out after ten minutes of quiet, so this question is answered on its own.';
 type RowProps={m:Message;live:boolean;writing:boolean;canSpeak:boolean;replyRef?:RefObject<HTMLDivElement|null>;toggleVoice:(id:string,text:string)=>void};
 // One transcript entry, memoised. A streamed reply replaces only its own
@@ -79,13 +84,13 @@ const Row=memo(function Row({m,live,writing,canSpeak,replyRef,toggleVoice}:RowPr
 // principle, having been through this once for scrolling and reading — only
 // a hidden tab pauses the clock.
 export default function Chat({open,onOpenChange}:{open:boolean;onOpenChange:(open:boolean)=>void}) {
- const [storedQuota,setStoredQuota]=useStored(QUOTA_KEY,'');const quota=parseQuota(storedQuota);const exhausted=quota!==null&&quota.remaining===0;const lowQuota=quota!==null&&quota.remaining>0&&quota.remaining<=QUOTA_WARN_AT;const unlimited=storedQuota===UNLIMITED;const [messages,setMessages]=useState<Message[]>([{key:0,role:'assistant',text:'Hi there. I’m Alex’s portfolio guide. Ask me about his AI projects, skills, certifications, or engineering experience.',source:'Answers from the portfolio'}]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const [streaming,setStreaming]=useState(false);const [slow,setSlow]=useState(false);const [writingKey,setWritingKey]=useState<number|null>(null);const [notice,setNotice]=useState<string|null>(null);const inputRef=useRef<HTMLInputElement>(null);const lastReply=useRef<HTMLDivElement>(null);const box=useRef<HTMLDivElement>(null);const inflight=useRef<AbortController|null>(null);
+ const [storedQuota,setStoredQuota]=useStored(QUOTA_KEY,'');const quota=parseQuota(storedQuota);const exhausted=quota!==null&&quota.remaining===0;const lowQuota=quota!==null&&quota.remaining>0&&quota.remaining<=QUOTA_WARN_AT;const unlimited=storedQuota===UNLIMITED;const [messages,setMessages]=useState<Message[]>([{key:0,role:'assistant',text:'Hi there. I’m Alex’s portfolio guide. Ask me about his AI projects, skills, certifications, or engineering experience.',source:'Answers from the portfolio'}]);const [input,setInput]=useState('');const [{busy,streaming,slow,writingKey},dispatch]=useReducer(phaseOf,IDLE);const [notice,setNotice]=useState<string|null>(null);const inputRef=useRef<HTMLInputElement>(null);const lastReply=useRef<HTMLDivElement>(null);const box=useRef<HTMLDivElement>(null);const inflight=useRef<AbortController|null>(null);
  // The chat is stateless on the server, so the client is what remembers.
  // Four turns is enough for a follow-up chain to resolve a pronoun without
  // shipping a whole session; `carriedRef` holds the answer ids the last
  // reply drew on, which is what keeps "why wasn't this production?" on the
  // thing it is asking about. See lib/chat/nim.ts.
- const historyRef=useRef<{role:'user'|'assistant';text:string;sig?:string}[]>([]);const carriedRef=useRef<string[]>([]);
+ const historyRef=useRef<HistoryTurn[]>([]);const carriedRef=useRef<string[]>([]);
  // Ten minutes of silence ends the conversation. Nothing server-side ends,
  // because nothing server-side began: what ends is the context above, and
  // the visitor being told so. See hooks/use-idle.ts.
@@ -143,11 +148,7 @@ export default function Chat({open,onOpenChange}:{open:boolean;onOpenChange:(ope
  // back down every time a word arrives.
  const written=messages.at(-1)?.text.length??0;
  useEffect(()=>{const el=box.current;if(!el)return;if(el.scrollHeight-el.scrollTop-el.clientHeight<140)el.scrollTop=el.scrollHeight},[written]);
- // `busy` ends at the first token, because from there the thinking line is
- // replaced by the reply being written. `streaming` covers the rest, until the
- // terminal frame: without it a second question could be sent mid-reply, two
- // requests raced for one transcript, and the Stop button vanished while the
- // first was still arriving.
+ // `busy` and `streaming` are the phase reducer's; see phaseOf above.
  async function send(text:string,promptIndex:number|null=null){const question=text.trim();if(!question||busy||streaming)return;if(exhausted&&!staleQuota(storedQuota))return;if(question.length>MAX_QUESTION){setNotice(`That question is ${question.length-MAX_QUESTION} characters over the ${MAX_QUESTION} limit. Please shorten it and send again.`);inputRef.current?.focus();return;}
   // Read the clock before restarting it. A lapsed session drops the context
   // rather than carrying an hour-old pronoun into the prompt. `historyRef` is
@@ -162,7 +163,7 @@ export default function Chat({open,onOpenChange}:{open:boolean;onOpenChange:(ope
   // different ids for the same message.
   const noteKey=lapsed?nextKey():0;const userKey=nextKey();
   setMessages(m=>trimTranscript([...m,...(lapsed?[{key:noteKey,role:'system' as const,text:RESET_NOTE}]:[]),{key:userKey,role:'user' as const,text:question}]));
-  setBusy(true);stopSpeaking();
+  dispatch({type:'ask'});stopSpeaking();
   turn.current+=1;asked.current+=1;
   // Queued before the await: a question asked moments before the tab closes
   // is still recorded, and the pagehide beacon carries it.
@@ -180,118 +181,61 @@ export default function Chat({open,onOpenChange}:{open:boolean;onOpenChange:(ope
   // signed; `sig` goes back with it, and a reply without one (answered
   // locally) is dropped server-side. See lib/chat/turn-sig.ts.
   const remember=(reply:string,guarded:boolean,sig?:string)=>{if(!guarded)historyRef.current=[...historyRef.current,{role:'user' as const,text:question},{role:'assistant' as const,text:reply.slice(0,TURN_CHARS),...(sig?{sig}:{})}].slice(-8)};
-  let result:Answer;let limited=false;let offline=false;let failure:ChatFailure=null;let status:number|undefined;let guarded=false;
-  // Three ways to stop: the header ceiling, the first-token watchdog, and the
-  // visitor pressing stop. All land in the same catch, and are meant to: an
-  // abandoned question still gets the offline answer rather than leaving the
-  // panel stuck busy. The reason on the signal is what labels it.
+  // Owned here and not in ask(), because the Stop button aborts it with
+  // 'user'. The transport (both deadlines, the allowance headers, the 429s and
+  // the curated answer with its label) is lib/chat/ask.ts.
   const controller=new AbortController();inflight.current=controller;
   // Minted before the request so the streamed placeholder and the finished
   // reply are the same message rather than two.
   const replyKey=nextKey();
-  // A model reply is written, not looked up, and takes seconds. Saying so
-  // after four of them is the difference between a wait and a hang.
-  const slowTimer=setTimeout(()=>setSlow(true),4000);
-  const headerTimer=setTimeout(()=>controller.abort('slow'),HEADER_CEILING_MS);
-  try{const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({message:question,history:prior,carried:carriedRef.current,stream:true}),signal:controller.signal});clearTimeout(headerTimer);const reported=readQuota(response.headers);if(response.headers.get(QUOTA_HEADERS.unlimited)==='1')setStoredQuota(UNLIMITED);else if(reported)setStoredQuota(serialiseQuota(reported));if(!response.ok){status=response.status;if(status===429){const refusal=await response.json().catch(()=>null) as {code?:string;limit?:number;resetAt?:number}|null;if(refusal?.code===DAILY_LIMIT_CODE){limited=true;if(!reported&&typeof refusal.limit==='number'&&typeof refusal.resetAt==='number')setStoredQuota(serialiseQuota({limit:refusal.limit,remaining:0,resetAt:refusal.resetAt}))}}throw new Error('status')}
-   if(response.headers.get('content-type')?.includes('text/event-stream')&&response.body){
-    // The reply is being written. Put an empty assistant turn on screen now
-    // so the words have somewhere to land, and grow it as they arrive.
-    // The deadline is on the FIRST token, not the whole reply. Once words
-    // are on screen, cutting the connection would delete a half-read
-    // sentence, which is worse than the wait it saves.
-    // Tokens do not arrive at a readable rate. They come in bursts, several
-    // per network read, and React batches the setStates in one tick, so a
-    // whole clause lands in a single frame and then nothing happens for
-    // half a second. Buffering them and releasing a slice per animation
-    // frame turns that into something that reads like writing.
-    //
-    // The slice is a FRACTION of what is waiting rather than a fixed rate,
-    // so it is self-balancing: a full buffer drains fast and never falls
-    // behind the model, an almost-empty one trickles. A hidden tab stops
-    // firing frames and the buffer simply waits; the terminal frame sets
-    // the whole text anyway, so nothing is ever lost.
-    let pending='';let pumping=false;let finished=false;
-    const pump=()=>{
-     if(finished||!pending.length){pumping=false;return}
-     const take=paceChars(pending.length);
-     const piece=pending.slice(0,take);pending=pending.slice(take);
-     setMessages(m=>m.some(entry=>entry.key===replyKey)
-      ?m.map(entry=>entry.key===replyKey?{...entry,text:entry.text+piece}:entry)
-      :trimTranscript([...m,{key:replyKey,role:'assistant' as const,text:piece,source:'AI · grounded in portfolio'}]));
-     requestAnimationFrame(pump);
-    };
-    const outcome=await readChatStream(response.body,text=>{
-     // The turn is created by the first token, not before it: until then
-     // the thinking line is the honest thing to show.
-     clearTimeout(slowTimer);setBusy(false);setStreaming(true);setSlow(false);setWritingKey(replyKey);
-     pending+=text;
-     if(!pumping){pumping=true;requestAnimationFrame(pump)}},{
-     // 12s, where the headers had 8.5s, and the increase is the point of
-     // streaming rather than a regression of it. Measured time-to-first-token
-     // varies 3.3s to 19s, and this is a ceiling before giving up, not a
-     // typical wait: the thinking line says "still working on it" from 4s,
-     // and the moment a token lands the visitor is reading rather than
-     // waiting. Passing it costs them the curated answer they would have had
-     // at 8.5s anyway.
-     firstTokenMs:12000,abort:()=>controller.abort('slow')});
-    if(outcome){
-     // Clearing these here and not only in onDelta is the whole fix for a
-     // bug that shipped: a `fallback` frame arriving before any token left
-     // busy and slow true, so the approved answer appeared UNDERNEATH
-     // "Still working on it" with the stop button still live.
-     finished=true;pending='';
-     clearTimeout(slowTimer);setBusy(false);setStreaming(false);setSlow(false);setWritingKey(null);
-     // 'fallback' is every check in lib/chat/nim.ts that cannot pass on a
-     // partial reply: whatever was shown is replaced by the approved text.
-     // readChatStream has already checked the payload has text to show.
-     const settled=outcome.payload;
-     setMessages(m=>m.some(entry=>entry.key===replyKey)
-      ?m.map(entry=>entry.key===replyKey?{...entry,text:settled.answer,href:settled.href,source:settled.source}:entry)
-      :trimTranscript([...m,{key:replyKey,role:'assistant' as const,text:settled.answer,href:settled.href,source:settled.source}]));
-     inflight.current=null;touchSession();
-     remember(settled.answer,GUARD_SOURCES.includes(settled.source),settled.sig);
-     carriedRef.current=settled.ids?settled.ids.slice(0,4):[];
-     answered.current+=1;lastSource.current=settled.source;
-     trackChatAnswer({source:settled.source,mode:settled.mode,offline:false,failure:null,status,startedAt,hasHref:Boolean(settled.href),answerLen:settled.answer.length,turn:turn.current});
-     inputRef.current?.focus();return;
-    }
-    // No terminal frame: nothing started in time, or the connection died.
-    // Drop the placeholder and take the offline path below.
-    finished=true;pending='';
-    setMessages(m=>m.filter(entry=>entry.key!==replyKey));clearTimeout(slowTimer);setSlow(false);setWritingKey(null);setStreaming(false);setBusy(true);
-    throw new Error('stream');
-   }
-   // Checked, not cast: a 200 whose body is not an answer (a proxy's error
-   // page, a truncated body) used to reach `.slice()` and throw in the
-   // success path. Anything toPayload() refuses takes the offline answer.
-   const data:unknown=await response.json();const payload=data&&typeof data==='object'?toPayload(data as Record<string,unknown>):null;if(!payload)throw new Error('payload');
-   result=payload;guarded=GUARD_SOURCES.includes(result.source)}catch(error){clearTimeout(headerTimer);
-   // The daily allowance, not an outage: nothing is answered, offline or
-   // otherwise, and the input closes. See the note on QUOTA_KEY.
-   if(limited){result={answer:'That is today’s limit of questions for this guide. The chat reopens once the 24 hours are up, and Alex is happy to answer anything else directly.',mode:'faq',source:'Daily limit reached'};guarded=true}
-   else{failure=classifyFailure(error);offline=true;result=answerQuestion(question);
-   // Read before the relabel below, which overwrites the source it is read from.
-   guarded=GUARD_SOURCES.includes(result.source);
-   // A refused request is not an offline one, and saying "Offline" when the
-   // visitor is plainly online teaches them the label means nothing. The
-   // answer served is the same curated text either way; only the reason
-   // differs, and the reason is the part worth being honest about. 'slow' is
-   // either clock giving up, the header ceiling or the first-token watchdog:
-   // the Worker was reachable and simply did not answer in time.
-   if(controller.signal.reason==='user')result.source='Stopped · from the portfolio';
-   else if(controller.signal.reason==='slow'){result.source='Timed out · from the portfolio';failure='timeout'}
-   else if(status===429){result.source='Rate limited · from the portfolio';setNotice('That is faster than the guide can answer. Give it about a minute — these replies still come from the portfolio.')}
-   else result.source='Offline · from the portfolio'}}
+  // Tokens do not arrive at a readable rate. They come in bursts, several per
+  // network read, and React batches the updates in one tick, so a whole clause
+  // lands in a single frame and then nothing happens for half a second.
+  // Buffering them and releasing a slice per animation frame turns that into
+  // something that reads like writing.
+  //
+  // The slice is a FRACTION of what is waiting rather than a fixed rate, so it
+  // is self-balancing: a full buffer drains fast and never falls behind the
+  // model, an almost-empty one trickles. A hidden tab stops firing frames and
+  // the buffer simply waits; the terminal frame sets the whole text anyway, so
+  // nothing is ever lost.
+  let pending='';let pumping=false;let finished=false;
+  const pump=()=>{
+   if(finished||!pending.length){pumping=false;return}
+   const take=paceChars(pending.length);
+   const piece=pending.slice(0,take);pending=pending.slice(take);
+   setMessages(m=>m.some(entry=>entry.key===replyKey)
+    ?m.map(entry=>entry.key===replyKey?{...entry,text:entry.text+piece}:entry)
+    :trimTranscript([...m,{key:replyKey,role:'assistant' as const,text:piece,source:'AI · grounded in portfolio'}]));
+   requestAnimationFrame(pump);
+  };
+  const outcome=await ask({question,history:prior,carried:carriedRef.current,controller},{onQuota:setStoredQuota,onSlow:()=>dispatch({type:'slow'}),
+   // The reply is being written. The turn is created by the first token, not
+   // before it: until then the thinking line is the honest thing to show.
+   onDelta:text=>{dispatch({type:'token',key:replyKey});pending+=text;if(!pumping){pumping=true;requestAnimationFrame(pump)}}});
+  finished=true;pending='';
+  const result=outcome.answer;
+  if(outcome.notice)setNotice(outcome.notice);
+  // Every path ends here, and not only the onDelta one, which is the whole fix
+  // for a bug that shipped: a `fallback` frame arriving before any token left
+  // busy and slow true, so the approved answer appeared UNDERNEATH "Still
+  // working on it" with the stop button still live.
   // The ten minutes runs from the reply, not the question: reading a long
   // answer is not being idle.
-  clearTimeout(slowTimer);setSlow(false);setWritingKey(null);setStreaming(false);
+  dispatch({type:'done'});
   touchSession();
-  remember(result.answer,guarded,offline?undefined:result.sig);
+  remember(result.answer,outcome.guarded,outcome.offline?undefined:result.sig);
   carriedRef.current=Array.isArray(result.ids)?result.ids.slice(0,4):[];
   answered.current+=1;lastSource.current=result.source;
-  trackChatAnswer({source:result.source,mode:result.mode,offline,failure,status,startedAt,hasHref:Boolean(result.href),answerLen:result.answer.length,turn:turn.current});
-  inflight.current=null;setMessages(m=>trimTranscript([...m,{key:replyKey,role:'assistant' as const,text:result.answer,href:result.href,source:result.source}]));setBusy(false);inputRef.current?.focus();
+  trackChatAnswer({source:result.source,mode:result.mode,offline:outcome.offline,failure:outcome.failure,status:outcome.status,startedAt,hasHref:Boolean(result.href),answerLen:result.answer.length,turn:turn.current});
+  // A stream's terminal frame replaces its own placeholder in place: 'done' is
+  // the model's whole reply, and 'fallback' is approved text replacing a
+  // partial one that failed a check in lib/chat/nim.ts. Anything else drops the
+  // placeholder a stream that never finished may have left, and appends.
+  inflight.current=null;setMessages(m=>outcome.kind==='streamed'&&m.some(entry=>entry.key===replyKey)
+   ?m.map(entry=>entry.key===replyKey?{...entry,text:result.answer,href:result.href,source:result.source}:entry)
+   :trimTranscript([...m.filter(entry=>entry.key!==replyKey),{key:replyKey,role:'assistant' as const,text:result.answer,href:result.href,source:result.source}]));
+  inputRef.current?.focus();
  }
  // modal={false} is the whole feature: no focus trap, no scroll lock, no
  // pointer blocking, so the visitor can read and scroll the page with the

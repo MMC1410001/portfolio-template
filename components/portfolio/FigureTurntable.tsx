@@ -61,7 +61,8 @@
  * This used to wait for every frame to decode before drawing anything, about
  * 1MB over the network, so on a slow link the stage sat empty for seconds
  * after the reveal. It now paints the moment frame 0 decodes and fills in as
- * the rest arrive, requested coarse to fine (every 8th, then every 4th, ...),
+ * the rest arrive. Frame 0 is requested alone at high priority, and the rest
+ * only once it has decoded, coarse to fine (every 8th, then every 4th, ...),
  * and a frame that has not arrived yet is drawn as the nearest one that has.
  * Early scrubbing is steppier for a moment, and never blank. The frame
  * geometry and the blend are untouched: only what counts as loaded changed.
@@ -141,10 +142,13 @@ export default function FigureTurntable({reduced,preview,children}:{reduced:bool
    return -1;
   };
 
+  // Layout size, never getBoundingClientRect(): that includes transforms, and
+  // draw() writes a rotateY onto this very canvas, so the measured box changed
+  // with the angle and the backing store was reallocated mid-scroll. Sized on
+  // a resize only, not per draw, for the same reason.
   const fit=()=>{
    const dpr=Math.min(devicePixelRatio||1,2);
-   const box=surface.getBoundingClientRect();
-   const w=Math.max(1,Math.round(box.width*dpr)),h=Math.max(1,Math.round(box.height*dpr));
+   const w=Math.max(1,Math.round(surface.clientWidth*dpr)),h=Math.max(1,Math.round(surface.clientHeight*dpr));
    if(surface.width!==w||surface.height!==h){surface.width=w;surface.height=h;drawn=-1}
   };
   const paint=(index:number,alpha:number)=>{
@@ -162,7 +166,6 @@ export default function FigureTurntable({reduced,preview,children}:{reduced:bool
   const draw=(p:number)=>{
    // Frame 0 first, always: a stand-in for 0 degrees would open on a side view.
    if(!loaded[0])return;
-   fit();
    const exact=p*images.length;
    // Nothing has moved far enough to be worth a repaint. Scaled by the frame
    // count so it stays a constant *angle*, a fixed threshold in frame units
@@ -197,14 +200,28 @@ export default function FigureTurntable({reduced,preview,children}:{reduced:bool
   // Each decoded frame forces a repaint, so the stand-in is replaced as soon as
   // the real frame exists. `drawn=-1` defeats the repaint threshold, which
   // would otherwise skip it when the visitor has not scrolled.
-  for(const i of order){
+  const request=(i:number)=>{
    const img=images[i];img.decoding='async';img.src=sources[i];
-   img.decode().then(()=>{if(!live)return;loaded[i]=true;drawn=-1;draw(progress)},()=>undefined);
-  }
-  const onResize=()=>{drawn=-1;draw(progress)};
+   return img.decode().then(()=>{if(!live)return;loaded[i]=true;drawn=-1;draw(progress)},()=>undefined);
+  };
+  // Frame 0 alone, at high priority, and the rest only once it has settled:
+  // requested together, all of them split the bandwidth and the first paint
+  // waited on 1MB instead of one frame. A frame 0 that fails to decode still
+  // releases the rest.
+  images[0].fetchPriority='high';
+  void request(0).then(()=>{if(live)for(const i of order.slice(1))void request(i)});
+  // The canvas box moves with the layout (the 1050px breakpoint, the sticky
+  // stage's height), not only the window; the window event still covers a
+  // zoom that changes devicePixelRatio without resizing the box.
+  const onResize=()=>{fit();drawn=-1;draw(progress)};
+  const observer=new ResizeObserver(onResize);
+  observer.observe(surface);
   window.addEventListener('resize',onResize);
+  fit();
   update(0);
-  const teardown=()=>{live=false;window.removeEventListener('resize',onResize)};
+  // Abort whatever is still in flight: an unmounted stage (back to résumé, or
+  // a rebuild across LIGHT_QUERY) should not keep downloading frames.
+  const teardown=()=>{live=false;observer.disconnect();window.removeEventListener('resize',onResize);images.forEach((img,i)=>{if(!loaded[i])img.removeAttribute('src')})};
   // Reduced motion holds the first frame; a heatmap preview must not move at
   // all while it is being screenshotted.
   if(reduced||preview)return teardown;

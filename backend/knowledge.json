@@ -142,9 +142,6 @@
         "availability",
         "notice period",
         "open to work",
-        "open to relocation",
-        "relocate",
-        "relocation",
         "joining",
         "buyout",
         "job change",
@@ -153,12 +150,6 @@
         "join immediately",
         "immediate joiner",
         "when can he join",
-        "hybrid",
-        "work from home",
-        "wfh",
-        "onsite",
-        "in office",
-        "open to remote",
         "contract",
         "contract role",
         "contract to hire",
@@ -201,7 +192,82 @@
         "move abroad",
         "relocate abroad"
       ],
-      "answer": "Holds a valid passport; open to sponsored relocation to the UK, EU, Canada or Australia. For roles in the US no sponsorship is required; for the UK, EU or Australia he would need visa sponsorship. Within the US he is open to Austin · Denver · Seattle · Remote.",
+      "answer": "Abroad, he holds a valid passport and is open to sponsored relocation to the UK, EU, Canada or Australia. For roles in the US no sponsorship is required; for the UK, EU or Australia he would need visa sponsorship. Within the US he is open to Austin · Denver · Seattle · Remote.",
+      "href": "/#contact"
+    },
+    {
+      "id": "relocation-affect",
+      "patterns": [
+        "affect relocation",
+        "affect his relocation",
+        "affect relocating",
+        "affect his ability to relocate",
+        "stop him relocating",
+        "stop him from relocating",
+        "prevent him from relocating",
+        "problem relocating",
+        "issue relocating",
+        "issues with relocation",
+        "restrictions on his relocation",
+        "restriction on relocation",
+        "restrictions on relocation"
+      ],
+      "answer": "No. Alex is ready to relocate to Denver or Seattle. For Austin no move is needed: he lives there and can commute to the office daily. He is open to remote, hybrid or five-days-a-week office work.",
+      "href": "/#contact"
+    },
+    {
+      "id": "relocation",
+      "patterns": [
+        "relocate",
+        "relocation",
+        "relocating",
+        "open to relocation",
+        "willing to relocate",
+        "ready to relocate",
+        "shift to",
+        "denver",
+        "seattle",
+        "commute",
+        "commuting",
+        "daily travel",
+        "travel daily",
+        "travel to office",
+        "travel to the office",
+        "up and down",
+        "up-down"
+      ],
+      "answer": "Alex is ready to relocate to Denver or Seattle. For Austin no move is needed: he lives there and can commute to the office daily. He is open to remote, hybrid or five-days-a-week office work. Abroad, he holds a valid passport and is open to sponsored relocation to the UK, EU, Canada or Australia.",
+      "href": "/#contact"
+    },
+    {
+      "id": "work-mode",
+      "patterns": [
+        "hybrid",
+        "remote",
+        "remotely",
+        "open to remote",
+        "work from home",
+        "wfh",
+        "work from office",
+        "wfo",
+        "onsite",
+        "on-site",
+        "on site",
+        "in office",
+        "in-office",
+        "office days",
+        "five days",
+        "5 days",
+        "five day",
+        "5 day",
+        "five-day",
+        "5-day",
+        "days a week",
+        "days in office",
+        "work mode",
+        "working mode"
+      ],
+      "answer": "He is open to remote, hybrid or five-days-a-week office work. In Austin he can commute to the office daily; for Denver or Seattle he is ready to relocate.",
       "href": "/#contact"
     },
     {
@@ -223,13 +289,38 @@
       "href": "/#recommendations"
     },
     {
+      "id": "nextjs",
+      "patterns": [
+        "next.js",
+        "nextjs",
+        "next js"
+      ],
+      "answer": "Yes.",
+      "href": "/#skills"
+    },
+    {
       "id": "why-hire",
       "patterns": [
         "why hire",
         "why should we hire",
+        "why should i hire",
+        "why should anyone hire",
+        "why should you hire",
+        "why should they hire",
+        "why would we hire",
+        "why would i hire",
+        "why would you hire",
         "why hire alex",
+        "why hire him",
         "why choose alex",
+        "why choose him",
+        "why pick him",
         "why him",
+        "reasons to hire",
+        "reason to hire",
+        "should i hire",
+        "worth hiring",
+        "convince me",
         "what makes him",
         "makes him stand out",
         "stand out",
@@ -237,15 +328,47 @@
         "strength",
         "sell him",
         "elevator pitch",
+        "pitch him",
         "recommend hiring",
         "should we hire",
         "what sets him apart",
         "best thing about him",
+        "good fit",
+        "right fit",
+        "great fit",
+        "perfect fit",
+        "strong fit",
+        "good candidate",
+        "strong candidate",
+        "right candidate",
+        "ideal candidate",
+        "best candidate",
+        "suitable for",
+        "suited for",
+        "fit for",
+        "hire him for",
+        "hire alex for",
+        "work in a startup",
+        "work at a startup",
+        "work for a startup",
+        "startup environment",
+        "what value",
+        "value will he",
+        "value would he",
+        "value can he",
+        "value does he",
+        "add value",
+        "bring to the table",
+        "bring to the team",
+        "add to the team",
+        "usp",
+        "rate him",
+        "score him",
         "problem solving",
         "problem-solving",
         "solve complex"
       ],
-      "answer": "Judge it from measured work rather than adjectives. At Meridian he led a Playwright TypeScript migration that cut regression time by 50% and reached 90% automation coverage on critical features. At Northwind he has 7 live internal workflows on Frappe and ERPNext and 11 operational dashboards. Lumen runs publicly at lumen.example with the frontend, mobile UI and first-party analytics pipeline he built. 5 LinkedIn recommendations, 1 of them from people who reported to him, and 3 awards. He came into development through quality engineering, which is why this portfolio ships with its own unit, chatbot and analytics test suites.",
+      "answer": "Four reasons, each one checkable on this site.\n\n1. He ships software that is tested. He spent his first years in QA automation before moving to full stack, so verification is part of how he builds: at Meridian he led a Playwright TypeScript migration that cut regression time by 50% and reached 90% automation coverage on critical features.\n\n2. He delivers end to end. At Northwind he built 7 internal workflows on Frappe and ERPNext that are live in production, plus 11 operational dashboards. Lumen runs publicly at lumen.example with the frontend, mobile UI and analytics pipeline he built.\n\n3. He builds AI features and measures them. Alongside the voice agent and MCP RAG work, he has built Python evaluation pipelines with LangSmith and RAGAs, so model output is tested rather than assumed.\n\n4. The people he worked with vouch for him: 5 LinkedIn recommendations, 1 of them from people who reported to him, and 3 awards.\n\nAvailability: Open to opportunities · 60-day notice, buyout available. Reach him at alex@example.com or +1 555 0142.",
       "href": "/#work"
     },
     {
@@ -289,7 +412,7 @@
         "cross functional",
         "cross-functional"
       ],
-      "answer": "Yes, and it is the shape of the job rather than an occasional extra: Northwind is a consulting firm, so the delivery is client delivery. Publicly named engagements include Lumen, Halcyon, Tixly and Taxwise. The internal systems he built are themselves stakeholder machinery, BRD submission with review, approval and rework, RCA documents with version history, and project documents routed through manager and client approval. 5 LinkedIn recommendations back it, 1 of them from people who reported to him.",
+      "answer": "Yes, and it is the shape of the job rather than an occasional extra: Northwind is a consulting firm, so the delivery is client delivery. Publicly named engagements include Lumen, Halcyon, Tixly and Planmytax.ai. The internal systems he built are themselves stakeholder machinery, BRD submission with review, approval and rework, RCA documents with version history, and project documents routed through manager and client approval. 5 LinkedIn recommendations back it, 1 of them from people who reported to him.",
       "href": "/#recommendations"
     },
     {
@@ -310,12 +433,20 @@
         "where does he see himself",
         "motivation"
       ],
-      "answer": "What is on record: Open to opportunities · 60-day notice, buyout available, open to Austin · Denver · Seattle · Remote, and Holds a valid passport; open to sponsored relocation to the UK, EU, Canada or Australia. On direction, his own summary is the closest thing documented: \"I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped.\" The specifics of what he wants next, team, domain and scope, are worth putting to him directly at alex@example.com or +1 555 0142.",
+      "answer": "What is on record: Open to opportunities · 60-day notice, buyout available, open to Austin · Denver · Seattle · Remote. Abroad, he holds a valid passport and is open to sponsored relocation to the UK, EU, Canada or Australia. On direction, his own summary is the closest thing documented: \"I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped.\" The specifics of what he wants next, team, domain and scope, are worth putting to him directly at alex@example.com or +1 555 0142.",
       "href": "/#contact"
     },
     {
       "id": "behavioural",
       "patterns": [
+        "not hire",
+        "why not hire",
+        "reasons not to hire",
+        "red flag",
+        "red flags",
+        "drawback",
+        "drawbacks",
+        "concerns about him",
         "time he failed",
         "a failure",
         "his failure",
@@ -391,6 +522,9 @@
         "speak english",
         "fluent",
         "communication skills",
+        "communication",
+        "communicator",
+        "communicate",
         "soft skills",
         "presentation skills"
       ],
@@ -407,7 +541,7 @@
         "engagements",
         "customer names"
       ],
-      "answer": "Publicly named engagements: Lumen, Northwind ERP, Halcyon, Tixly, Taxwise, Cadence Labs, Vega, Helix AI, alongside Northwind’s own internal ERP. Client names behind the operational dashboards are withheld throughout. Those carry positional labels only, and the same letter always means the same client.",
+      "answer": "Publicly named engagements: Lumen, Northwind ERP, Halcyon Demand Forecasting, Halcyon, Tixly, Taxwise, Cadence Labs, Vega, Helix AI, alongside Northwind’s own internal ERP. Client names behind the operational dashboards are withheld throughout. Those carry positional labels only, and the same letter always means the same client.",
       "href": "/#products"
     },
     {
@@ -437,6 +571,9 @@
       "id": "analytics",
       "patterns": [
         "portfolio analytics",
+        "portfolio website",
+        "this portfolio website",
+        "this portfolio",
         "analytics system",
         "analytics behind this site",
         "click heatmap",
@@ -448,8 +585,6 @@
         "cloudflare",
         "cloudflare workers",
         "vinext",
-        "next.js",
-        "nextjs",
         "how is this site built",
         "how was this site built",
         "how is this portfolio built",
@@ -457,7 +592,7 @@
         "static rendering",
         "tech stack of this site"
       ],
-      "answer": "A first-party analytics system built for this portfolio and running on Cloudflare Workers with a D1 database. It records page views, section dwell time, click heatmaps and conversion funnels, behind an admin dashboard gated by Google sign-in with HMAC-signed sessions. Visitors are identified by a rotating salted hash rather than an IP address. The site around it runs on vinext, a Next.js App Router reimplementation on Vite, with a statically rendered homepage and a chatbot that degrades through three tiers so it keeps answering with the server down. The dashboard is demonstrated publicly on synthetic data at /analytics.",
+      "answer": "This portfolio, running on Cloudflare Workers. It is built on vinext, a Next.js App Router reimplementation on Vite, with a statically rendered homepage and a scroll-driven photo turntable. The chatbot answers from the portfolio’s own approved content and degrades through four tiers, so it keeps answering with the server down. A first-party analytics system on a D1 database records page views, section dwell time, click heatmaps and conversion funnels, behind an admin dashboard gated by Google sign-in with HMAC-signed sessions. Visitors are identified by a rotating salted hash rather than an IP address. The code is public as a fork-ready template with sample data, and the dashboard is demonstrated on synthetic data at /analytics.",
       "href": "/analytics"
     },
     {
@@ -556,7 +691,7 @@
         "okr dashboard",
         "organisation okr dashboard"
       ],
-      "answer": "Organisation OKR dashboard. OKRs were set per employee and reviewed per manager, which meant the organisation-level questions (how many people have actually submitted, which departments are behind, who has had no manager review) could only be answered by opening every record. At a hundred-plus employees that stopped being possible. What it shows: The quarter for the whole organisation: submission and achievement rates, average progress and its status distribution, department averages flagged on track, at risk or off track, top and lowest performers, and a searchable employee table with manager, targets set, achieved and latest review. Built with Frappe / ERPNext, Python, MariaDB, Jinja + JS page, Role-based permissions. Audience: internal; scale: 108 employees; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
+      "answer": "Organisation OKR dashboard. OKRs were set per employee and reviewed per manager, which meant the organisation-level questions (how many people have actually submitted, which departments are behind, who has had no manager review) could only be answered by opening every record. At a hundred-plus employees that stopped being possible. What it shows: The quarter for the whole organisation: submission and achievement rates, average progress and its status distribution, department averages flagged on track, at risk or off track, top and lowest performers, manager review coverage per reporting manager (monthly reviews marked in the picked month, and at period end achievement submitted against OKRs marked Completed), and a searchable employee table with manager, targets set, achieved and latest review. Built with Frappe / ERPNext, Python, MariaDB, Jinja + JS page, Role-based permissions. Audience: internal; scale: 108 employees; active. It is rebuilt on invented data. The layout and calculations are the original's, the people, clients and numbers are not.",
       "href": "/dashboards/okr-dashboard"
     },
     {
@@ -848,7 +983,7 @@
         "python experience",
         "experience in python"
       ],
-      "answer": "2 years 8 months of substantial Python, since 2024: evaluation pipelines with LangSmith and RAGAs, FastAPI services, and Frappe/ERPNext business logic at Northwind. His earlier automation work at Meridian was mainly Playwright with TypeScript.",
+      "answer": "{{tenure:2024-01-01}} of substantial Python, since 2024: evaluation pipelines with LangSmith and RAGAs, FastAPI services, and Frappe/ERPNext business logic at Northwind. His earlier automation work at Meridian was mainly Playwright with TypeScript.",
       "href": "/#skills"
     },
     {
@@ -954,7 +1089,7 @@
         "fresher",
         "fresher or experienced"
       ],
-      "answer": "3 years 10 months of professional engineering since November 2022: 2 years 4 months in QA automation at Meridian Fintech, then full stack development at Northwind Systems from March 2025. Before that, a PG Diploma in Advanced Computing at Brookfield Institute in 2022.",
+      "answer": "{{tenure:2022-11-01}} of professional engineering since November 2022: 2 years 4 months in QA automation at Meridian Fintech, then full stack development at Northwind Systems from March 2025. Before that, a PG Diploma in Advanced Computing at Brookfield Institute in 2022.",
       "href": "/#about"
     },
     {
@@ -1147,7 +1282,7 @@
         "github repos",
         "read his code"
       ],
-      "answer": "Public repositories: MCP RAG server, Realtime voice agent, Notesgen, Scheme automation. Client and employer work is private. The dashboard from this site’s analytics system is demonstrated publicly on synthetic data at /analytics.",
+      "answer": "Public repositories: Demand forecasting, Scheme automation, Realtime voice agent, This portfolio website, Notesgen, MCP RAG server. Client and employer work is private. The dashboard from this site’s analytics system is demonstrated publicly on synthetic data at /analytics.",
       "href": "https://github.com/example-dev"
     },
     {
@@ -1192,6 +1327,12 @@
       "id": "leaving",
       "patterns": [
         "why is he leaving",
+        "want to switch",
+        "wants to switch",
+        "why switch",
+        "why change jobs",
+        "why does he want to change",
+        "why is he looking",
         "why leave",
         "why did he leave",
         "why he left",
@@ -1272,6 +1413,21 @@
         "astro fin"
       ],
       "answer": "Lumen: Rebuilt the customer-facing product in React and TypeScript: landing page, mobile-first rework, a sectioned admin console, and an analytics dashboard with click heatmaps, funnel reporting and session timelines. Built the first-party analytics pipeline end to end, from browser instrumentation through a Supabase edge function to the reporting views behind the dashboard, alongside authorisation hardening, freshness monitoring for the data pipeline, a page-weight pass on the landing page, and Vitest, Playwright and Deno test suites. Integrated Google Analytics and Microsoft Clarity, ran the social media campaign, and contributed to product thinking. Focus: React, TypeScript, Vite, Supabase, PostgreSQL, GA4 / GTM, Clarity.",
+      "href": "/#products"
+    },
+    {
+      "id": "work-halcyon-demand-forecasting",
+      "patterns": [
+        "halcyon demand forecasting",
+        "halcyon forecasting",
+        "halcyon forecast",
+        "demand forecasting",
+        "demand forecast",
+        "sales forecasting",
+        "sales forecast",
+        "forecasting"
+      ],
+      "answer": "Halcyon Demand Forecasting: A proof of concept that forecasts monthly sales volume for every product at every sales location from historical sales. A global LightGBM model pooled across all product and location series, with lag, rolling, seasonal, weather and holiday features, demand segmentation, and rolling-origin backtests scored on volume-weighted error against a statistical baseline. Focus: Python, pandas, LightGBM, statsmodels, scikit-learn.",
       "href": "/#products"
     },
     {
@@ -1640,7 +1796,7 @@
         "his github",
         "your github"
       ],
-      "answer": "Alex’s GitHub: https://github.com/example-dev\n\nThe public repositories are MCP RAG server, Realtime voice agent, Notesgen, Scheme automation.",
+      "answer": "Alex’s GitHub: https://github.com/example-dev\n\nThe public repositories are Demand forecasting, Scheme automation, Realtime voice agent, This portfolio website, Notesgen, MCP RAG server.",
       "href": "https://github.com/example-dev"
     },
     {
@@ -1728,7 +1884,7 @@
         "helix ai",
         "lumen site"
       ],
-      "answer": "Live sites Alex has worked on:\n\nLumen. Frontend & mobile UI, first-party analytics pipeline, admin console, GA4 & Microsoft Clarity, social campaign, product thinking. https://lumen.example\n\nTixly. User journey improvements & product flow testing. https://tixly.example\n\nTaxwise. AI, API, performance & UI testing. https://taxwise.example\n\nHelix AI. AI application testing. https://helixai.example\n\nThe rest of his client work is under NDA, so it is described on this site without links: Northwind ERP, Halcyon, Cadence Labs, Vega.",
+      "answer": "Live sites Alex has worked on:\n\nLumen. Frontend & mobile UI, first-party analytics pipeline, admin console, GA4 & Microsoft Clarity, social campaign, product thinking. https://lumen.example\n\nTixly. User journey improvements & product flow testing. https://tixly.example\n\nTaxwise. AI, API, performance & UI testing. https://taxwise.example\n\nHelix AI. AI application testing. https://helixai.example\n\nThe rest of his client work is under NDA, so it is described on this site without links: Northwind ERP, Halcyon Demand Forecasting, Halcyon, Cadence Labs, Vega.",
       "href": "/#products"
     },
     {
@@ -1744,7 +1900,7 @@
         "portfolio",
         "work samples"
       ],
-      "answer": "Featured projects, each with its repository:\n\nPortfolio analytics. The analytics behind this site: event ingest, section dwell, click heatmaps, conversion funnels, and a dashboard behind Google sign-in. No visitor IP is ever stored.\n\nMCP RAG server. Give AI assistants a searchable memory. Ingest documents, retrieve context, and ask grounded questions through MCP. https://github.com/example-dev/mcp-rag-server\n\nRealtime voice agent. A voice assistant built around realtime conversation, interruption handling, and configurable prompts. https://github.com/example-dev/realtime-voice-agent\n\nNotesgen. Turn course material into structured notes, with a local web interface, browser extension, and flexible exports. https://github.com/example-dev/Utility_With_UI_for_notes\n\nScheme automation. A workflow that turns spreadsheets into structured data, connecting a React interface with validation and cloud pipeline orchestration. https://github.com/example-dev/scheme-automation\n\nVoice Agent is a prototype and Scheme Automation is a sanitized reference. Enterprise work includes Northwind ERP automation: seven live Frappe/ERPNext workflows. Products contributed to include Lumen, Northwind ERP, Halcyon, Tixly, Taxwise, Cadence Labs, Vega, Helix AI.",
+      "answer": "Featured projects, each with its repository:\n\nDemand forecasting. Forecast monthly sales volume for every product at every sales location, three months ahead, from past sales. https://github.com/example-dev/demand-forecasting-reference\n\nScheme automation. A workflow that turns spreadsheets into structured data, connecting a React interface with validation and cloud pipeline orchestration. https://github.com/example-dev/scheme-automation\n\nRealtime voice agent. A voice assistant built around realtime conversation, interruption handling, and configurable prompts. https://github.com/example-dev/realtime-voice-agent\n\nThis portfolio website. The site you are on: a statically rendered résumé, a scroll-driven turntable, a chatbot that answers only from approved content and keeps working offline, and first-party analytics behind Google sign-in. https://github.com/example-dev/portfolio-template\n\nNotesgen. Turn course material into structured notes, with a local web interface, browser extension, and flexible exports. https://github.com/example-dev/Utility_With_UI_for_notes\n\nMCP RAG server. Give AI assistants a searchable memory. Ingest documents, retrieve context, and ask grounded questions through MCP. https://github.com/example-dev/mcp-rag-server\n\nVoice Agent is a prototype and Scheme Automation is a sanitized reference. Enterprise work includes Northwind ERP automation: seven live Frappe/ERPNext workflows. Products contributed to include Lumen, Northwind ERP, Halcyon Demand Forecasting, Halcyon, Tixly, Taxwise, Cadence Labs, Vega, Helix AI.",
       "href": "https://github.com/example-dev"
     },
     {
@@ -1867,7 +2023,7 @@
         "where does he stay",
         "current city"
       ],
-      "answer": "Alex lives in Austin, Texas 78701, and is based in the greater Austin area. He is open to Austin · Denver · Seattle · Remote. Holds a valid passport; open to sponsored relocation to the UK, EU, Canada or Australia.",
+      "answer": "Alex lives in Austin, Texas 78701, and is based in the greater Austin area. He is open to Austin · Denver · Seattle · Remote. Abroad, he holds a valid passport and is open to sponsored relocation to the UK, EU, Canada or Australia.",
       "href": "https://www.linkedin.com/in/example-dev/"
     },
     {
@@ -1896,19 +2052,22 @@
         "summary",
         "tell me about alex",
         "tell me about him",
+        "tell me about yourself",
+        "about yourself",
         "his profile",
         "bio",
         "overview"
       ],
-      "answer": "Alex Morgan Rivera is a Full Stack Developer at Northwind Systems, based in Austin. He previously worked in AI QA at Northwind. I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped. His professional background is in quality engineering and AI evaluation.",
+      "answer": "Alex Morgan Rivera is a Full Stack Developer at Northwind Systems, based in Austin. He previously worked in AI QA at Northwind. In his own words: “I build connected experiences, from the interface you touch to the intelligence behind it. I came into development through quality engineering. Two and a half years of test automation before moving to full stack is why I build systems meant to be verified, not just shipped.” His professional background is in quality engineering and AI evaluation.",
       "href": "https://www.linkedin.com/in/example-dev/"
     }
   ],
   "guard": {
     "abuse": "\\b(?:ignore|disregard|override|jailbreak|system prompt|developer message|secret|api key|passwords?(?! management)|pretend|roleplay|role-play|act as|insult|hate|stupid|idiot|dumb|useless|worthless|nonsense|rubbish|shut up|garbage bot|trash bot|bakwas|chut(?:i)?ya|chutya|gandu|madarch(?:o|oo)d|b(?:e|he)henchod|bhenchod|bsdk|harami|kamina|nalayak|ghatiya|faltu|bewakoof|pagal|fuck|sex|your (?:instructions|rules|guidelines|prompt|training data)|instructions verbatim|repeat after me|forget (?:your|the|all|previous|everything)|you are (?:now )?dan|dan mode|(?:no|without|bypass|remove|ignore) (?:your |all |any )?restrictions?|unrestricted)\\b",
     "sensitive": "\\b(?:api[ _-]?keys?|access[ _-]?keys?|secrets?|(?:auth|access|refresh|bearer|session|admin|github|api)[ _-]?tokens?|private[ _-]?keys?|ssh[ _-]?keys?|connection strings?|database (?:urls?|uris?|credentials?)|(?:login|admin|database|db|server) credentials?|env(?:ironment)? (?:vars?|variables?)|service accounts?|internal (?:urls?|endpoints?|hosts?)|production (?:urls?|endpoints?|hosts?)|private (?:repo(?:sitory)? )?(?:links?|urls?|access)|github clones?|clone commands?|(?:n8n )?workflow exports?|enterprise client [a-d]|(?:real|actual) names?|names? of the (?:people|employees|staff|users|clients))\\b|\\.env\\b|ip[ _-]?salt\\b|\\b(?:give|send|show|share|provide|paste|dump|upload|download|export|leak|reveal|expose|hand over|access to|see|view|get|have)\\b[^.?!]{0,40}?\\b(?:source (?:code|files?)|file contents?|test (?:data|cases?|plans?)|client (?:data|lists?)|customer (?:data|lists?)|user data|security vulnerabilit(?:y|ies)|exploits?|attack payloads?)\\b|\\b(?:source (?:code|files?)|file contents?|test (?:data|cases?|plans?)|client (?:data|lists?)|customer (?:data|lists?)|user data|security vulnerabilit(?:y|ies)|exploits?|attack payloads?)\\b[^.?!]{0,40}?\\b(?:give|send|show|share|provide|paste|dump|upload|download|export|leak|reveal|expose|hand over|access to|see|view|get|have)\\b",
-    "personal": "\\b(?:caste|reserved category|sc/st|obc|religion|religious|politic\\w*|marital status|married|unmarried|spouse|wife|husband|girlfriend|boyfriend|dating|children|kids|pregnan\\w*|his age|your age|age of alex|how old|date of birth|dob|birthday|gender|male or (?:a )?female|man or (?:a )?woman|woman or (?:a )?man|sexuality|sexual orientation|disabilit\\w*|disabled|handicap\\w*|blood group|mental health|medical history|aadhaa?r|pan (?:card|number|details)|passport number|bank (?:account|details)|drinks?|smoke[sr]?|smoking|alcohol)\\b",
-    "unknown": "\\b(?:salary|salaries|ctc|compensation|pay(?: package| scale)?|stock options?|esops?|expected package|current package|hike|payslip|salary slip)\\b|\\byears?\\b[^.?!]{0,25}?\\b(?:of|in|with|using)\\s+(?!(?:experience|engineering|professional|industry|the\\b|work|working|career|qa|quality|automation|testing|test|development|dev|software|full[ -]?stack|coding|programming|it\\b|total|python))[a-z][\\w+#.]*",
+    "personal": "\\b(?:caste|reserved category|sc/st|obc|religion|religious|politic\\w*|marital status|married|unmarried|spouse|wife|husband|siblings?|brothers?|sisters?|girlfriend|is (?:he|alex) single|parents|father|mother|dad|mom|mum|(?:his|alex'?s) family|family (?:background|members?)|boyfriend|dating|children|kids|pregnan\\w*|his age|your age|age of alex|how old|date of birth|dob|birthday|gender|male or (?:a )?female|man or (?:a )?woman|woman or (?:a )?man|sexuality|sexual orientation|disabilit\\w*|disabled|handicap\\w*|blood group|mental health|medical history|aadhaa?r|pan (?:card|number|details)|passport number|bank (?:account|details)|drinks?|smoke[sr]?|smoking|alcohol)\\b",
+    "compensation": "\\b(?:salary|salaries|ctc|cost to company|compensation|remuneration|wages?|stipend|pay(?: package| scale| range| expectations?)?|stock options?|esops?|(?:expected|current|salary|pay) package|what package|package (?:is he|does he|he is|he's) expect\\w*|hike|increment|payslip|salary slip|lpa|lakhs?|lacs?|per annum|in[- ]hand|take[- ]home|(?:hourly|daily|day|billing|freelance|contract|consulting) rates?|what(?:'s| is) his rate|how much (?:does|would|will|should|did|do|is|can) (?:he|alex|we|i|you)\\b[^.?!]{0,20}?\\b(?:earn|make|get|paid|pay|charge|cost|expect|ask|draw|want)\\w*|earn(?:s|ing|ings)?|income|negotiable|within (?:our|the|my) budget)\\b",
+    "unknown": "\\byears?\\b[^.?!]{0,25}?\\b(?:of|in|with|using)\\s+(?!(?:experience|engineering|professional|industry|the\\b|work|working|career|qa|quality|automation|testing|test|development|dev|software|full[ -]?stack|coding|programming|it\\b|total|python))[a-z][\\w+#.]*",
     "offTopic": "\\b(?:weather|recipe|capital of|president of|prime minister|(?:^|can you |could you |would you |will you |please |now )write\\b[^.?!]{0,30}?\\b(?:function|program|script|query|class|snippet|regex|poem|song|story|essay|sql|code)|solve (?:this|that|the following|for x)|algorithms? (?:question|round|problem|challenge)|leetcode|dsa|bitcoin|crypto price|stock market|medical|diagnos\\w*|poem|joke|calculate (?:this|that|the following)|explain how to|teach me (?:python|java|javascript|to code|how to code)|what is python|explain python|what is javascript|explain javascript|what is java|explain java)\\b"
   },
   "homoglyphs": {
@@ -1941,5 +2100,51 @@
     "τ": "t",
     "υ": "u",
     "χ": "x"
+  },
+  "replies": {
+    "guards": [
+      {
+        "guard": "sensitive",
+        "answer": "I can share only safe public summaries of Alex’s work. I do not provide credentials, internal infrastructure, client data, source code, test data, security findings, or private links.",
+        "source": "Safety boundary"
+      },
+      {
+        "guard": "abuse",
+        "answer": "I can help with professional questions about Alex’s projects, skills, certifications, and experience.",
+        "source": "Portfolio guide"
+      },
+      {
+        "guard": "personal",
+        "answer": "That is personal information, and not something this portfolio covers. I can answer questions about Alex’s work, skills, experience, education and availability.",
+        "source": "Out of scope"
+      },
+      {
+        "guard": "compensation",
+        "answer": "Alex does not disclose his current or expected salary publicly, so this chat cannot share it. For compensation, please ask him directly at alex@example.com or +1 555 0142. What is on record: Open to opportunities · 60-day notice, buyout available.",
+        "href": "/#contact",
+        "source": "Not documented"
+      },
+      {
+        "guard": "unknown",
+        "answer": "That detail is not in the portfolio. Please ask Alex directly at alex@example.com or +1 555 0142.",
+        "href": "https://www.linkedin.com/in/example-dev/",
+        "source": "Not documented"
+      },
+      {
+        "guard": "offTopic",
+        "answer": "I answer questions about Alex’s work. Ask about his projects, skills, certifications, or experience.",
+        "source": "Portfolio guide"
+      }
+    ],
+    "greeting": {
+      "pattern": "^(hi|hello|hey|thanks|thank you)[!. ]*$",
+      "answer": "Hello! I can help you explore Alex’s AI projects, full stack work, skills, certifications, and engineering experience.",
+      "source": "Portfolio guide"
+    },
+    "fallback": {
+      "answer": "I don’t have a documented answer to that question. Try asking about Alex’s projects, skills, certifications, education, availability or experience. You can also reach him directly at alex@example.com or +1 555 0142.",
+      "href": "https://www.linkedin.com/in/example-dev/",
+      "source": "Not documented"
+    }
   }
 }

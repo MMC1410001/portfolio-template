@@ -50,7 +50,6 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let hooksInstalled = false;
 /** See QueuedEvent.seq. Never reset outside the test seam. */
 let seqCounter = 0;
-let sessionEnded = false;
 /** An exit was recorded for the current hidden period. See installFlushHooks. */
 let exitRecorded = false;
 
@@ -94,9 +93,8 @@ function sessionStartedAt(): number {
 /**
  * Drop the persisted session start, with the queue, for the /privacy
  * opt-out. The next session measures its duration from its own first event,
- * not from one the visitor asked to have forgotten. Unlike
- * endAnalyticsSession() this does not end recording for the page: opting back
- * in has to work without a reload.
+ * not from one the visitor asked to have forgotten. It does not end
+ * recording for the page: opting back in has to work without a reload.
  */
 export function forgetSessionClock(): void {
   queue = [];
@@ -129,7 +127,7 @@ export function queueEvent(
   event: AnalyticsEvent,
   extra: Partial<Omit<QueuedEvent, 'event'>> = {},
 ): void {
-  if (sessionEnded || disabled()) return;
+  if (disabled()) return;
 
   try {
     sessionStartedAt(); // start the clock on the session's first event
@@ -279,7 +277,7 @@ export function installFlushHooks(): void {
    * views and clicks but never a session_end, dropping the queued tail.
    */
   const finalise = () => {
-    if (sessionEnded || disabled()) return;
+    if (disabled()) return;
     // One exit per hidden period. On desktop, closing a tab fires both
     // visibilitychange and pagehide, and the second used to queue a second
     // session_end; every tab switch then produced its own pair. Anything
@@ -321,28 +319,6 @@ export function installFlushHooks(): void {
   });
 }
 
-/**
- * End the session and record nothing further.
- *
- * No caller today. There is no sign-out. Kept as the documented escape hatch
- * and the test seam, because the failure it prevents is subtle: anything
- * queued after the session's keys are cleared mints a fresh id and files the
- * departing session's tail under it.
- */
-export function endAnalyticsSession(): void {
-  sessionEnded = true;
-  queue = [];
-  if (timer !== null) {
-    clearTimeout(timer);
-    timer = null;
-  }
-  try {
-    sessionStorage.removeItem(SESSION_START_KEY);
-  } catch {
-    /* private mode. Nothing was stored to begin with */
-  }
-}
-
 /** Test seam. Not for application code. */
 export function __resetQueue(): void {
   queue = [];
@@ -353,7 +329,6 @@ export function __resetQueue(): void {
   }
   hooksInstalled = false;
   seqCounter = 0;
-  sessionEnded = false;
   exitRecorded = false;
   exitHooks.length = 0;
 }

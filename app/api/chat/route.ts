@@ -5,9 +5,27 @@ import { applyQuota, chargeChatQuota, chargeModelCall, chatExemption, UNLIMITED_
 import { ensureSchema, getDb } from '@/lib/analytics/db';
 import { DAILY_LIMIT_CODE } from '@/lib/chat/quota';
 import { modelEligible as isModelEligible, screenHistory, translationTarget } from '@/lib/chat/gate';
+import { FIT_ID, isFitQuestion, withFitFallback } from '@/lib/chat/fit';
 import { composeAnswer, nimConfigured, streamAnswer, streamTranslation, translateAnswer, type ChatTurn } from '@/lib/chat/nim';
 import { readCapped } from '@/lib/read-capped';
 import { signTurn, verifyHistory, type IncomingTurn } from '@/lib/chat/turn-sig';
+/**
+ * PYTHON_CHAT_URL, if it is safe to send a question and the backend token to.
+ *
+ * https only, with http allowed for a loopback host, which is `uvicorn
+ * --reload` on this machine. Anything else is refused rather than used, and
+ * that is not pedantry: CHAT_BACKEND_TOKEN goes in the Authorization header,
+ * and over plain http it is readable by every hop between here and there.
+ */
+const LOOPBACK=new Set(['localhost','127.0.0.1','[::1]']);
+let warnedBackend=false;
+function backendUrl():string|null{
+ const raw=process.env.PYTHON_CHAT_URL?.trim();if(!raw)return null;
+ let url:URL|null=null;try{url=new URL(raw)}catch{/* not a URL at all: refused below */}
+ if(url&&(url.protocol==='https:'||url.protocol==='http:'&&LOOPBACK.has(url.hostname)))return url.href;
+ if(!warnedBackend){warnedBackend=true;console.warn('[chat] PYTHON_CHAT_URL ignored: it must be https, or http to localhost')}
+ return null;
+}
 /**
  * X-Client-Bucket, and why the backend may believe it.
  *
@@ -24,6 +42,15 @@ import { signTurn, verifyHistory, type IncomingTurn } from '@/lib/chat/turn-sig'
  * configured the backend ignores the header entirely and behaves as before.
  */
 export async function POST(request:Request) {
+ // A browser on another site can send this a "simple" POST (text/plain, no
+ // preflight) with the visitor's cookies, and every question is charged to
+ // that visitor's allowance and to the model bill. The panel always sends
+ // JSON from this origin, so both checks cost it nothing. Sec-Fetch-Site is
+ // the same check /api/track makes; the content type is what stops a browser
+ // that does not send it, because a cross-site application/json POST needs a
+ // CORS preflight this route never answers.
+ if(request.headers.get('sec-fetch-site')==='cross-site')return Response.json({error:'Cross-site requests are not accepted.'},{status:403,headers:{'Cache-Control':'private, no-store'}});
+ if(!/^application\/json\b/i.test(request.headers.get('content-type')??''))return Response.json({error:'Send the message as application/json.'},{status:415,headers:{'Cache-Control':'private, no-store'}});
  if(Number(request.headers.get('content-length')||0)>4096)return Response.json({error:'Message too large.'},{status:413});
  // The same 4096 BYTES as the content-length check above, enforced on the
  // stream too: a chunked body carries no content-length to check.
@@ -71,10 +98,11 @@ export async function POST(request:Request) {
  const allowance=exempt?UNLIMITED_VERDICT:await chargeChatQuota(request,client.bucket,ready);
  const answered=(response:Response)=>applyQuota(response,allowance);
  if(!allowance.allowed)return answered(Response.json({error:allowance.refusedBy==='network'?'This network has reached today\u2019s question limit.':'You have reached today\u2019s question limit.',code:DAILY_LIMIT_CODE,refusedBy:allowance.refusedBy,limit:allowance.quota?.limit,resetAt:allowance.quota?.resetAt},{status:429,headers:{'Retry-After':String(Math.max(60,Math.ceil(((allowance.quota?.resetAt??0)-Date.now())/1000))),'Cache-Control':'private, no-store'}}));
- const fallback=answerQuestion(body.message);
+ // An unmatched fit question falls back to the pitch, not "not documented". See lib/chat/fit.ts.
+ const fallback=withFitFallback(body.message,answerQuestion(body.message));
  // Sites currently packages this JavaScript Worker. A separately deployed Python
  // service is optional; no external connection or model is implied by the fallback.
- const backend=process.env.PYTHON_CHAT_URL;
+ const backend=backendUrl();
  let backendOk=false;let backendFailed=false;let modelFailed=false;
  // Only a documented match may be enriched. An allow-list, not a deny-list:
  // a new source string in faq.ts would otherwise default to "forward it", and
@@ -118,12 +146,15 @@ export async function POST(request:Request) {
  const modelEligible=isModelEligible(fallback,history,body.message);
  // The Python tier picks an answer id and serves that entry's approved text,
  // so its reply is labelled for what it is, "AI matched", not the NIM tier's
- // "grounded" (which composes prose). The link and the carried id come from
- // the entry it chose, looked up in our own answer set: its choice can differ
- // from the regex match here, and the old code paired the backend's answer
- // with the local match's link. An id we do not recognise is not served.
+ // "grounded" (which composes prose). The text, the link and the carried id
+ // all come from the entry it chose, looked up in our own answer set: its
+ // choice can differ from the regex match here, and an id we do not
+ // recognise is not served. Its `answer` field is never served, nor signed:
+ // the id-only rule is the backend's promise, and this Worker does not take
+ // a remote service's word for it. A non-AI reply is a yes/no signal only,
+ // and the local match answers.
  if(backend&&enrichable){
-  try{const response=await fetch(backend,{method:'POST',headers:{'Content-Type':'application/json',...(process.env.CHAT_BACKEND_TOKEN?{'Authorization':`Bearer ${process.env.CHAT_BACKEND_TOKEN}`}:{}),...(client.bucket?{'X-Client-Bucket':client.bucket}:{})},body:JSON.stringify({message:body.message}),signal:AbortSignal.timeout(7000)});if(response.ok){const data=await response.json() as {answer?:string;mode?:string;id?:unknown};const ai=data.mode==='ai';const chosen=ai&&typeof data.id==='string'?answers.find(entry=>entry.id===data.id):undefined;if(typeof data.answer==='string'&&(!ai||chosen?.id)){backendOk=true;recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return answered(Response.json(await signed(chosen?.id?{answer:data.answer.slice(0,4000),mode:'ai',source:'AI matched · portfolio facts',href:chosen.href,ids:[chosen.id]}:{answer:data.answer.slice(0,4000),mode:'faq',source:fallback.source,href:fallback.href,...(fallback.id?{ids:[fallback.id]}:{})})))}}backendFailed=!backendOk}catch{backendFailed=true;/* An unavailable model must never block portfolio answers. */}
+  try{const response=await fetch(backend,{method:'POST',headers:{'Content-Type':'application/json',...(process.env.CHAT_BACKEND_TOKEN?{'Authorization':`Bearer ${process.env.CHAT_BACKEND_TOKEN}`}:{}),...(client.bucket?{'X-Client-Bucket':client.bucket}:{})},body:JSON.stringify({message:body.message}),redirect:'manual',signal:AbortSignal.timeout(7000)});if(response.ok){const data=await response.json() as {answer?:string;mode?:string;id?:unknown};const ai=data.mode==='ai';const chosen=ai&&typeof data.id==='string'?answers.find(entry=>entry.id===data.id):undefined;if(typeof data.answer==='string'&&(!ai||chosen?.id)){backendOk=true;recordChatHealth({configured:true,ok:true,failed:false,guarded:false});return answered(Response.json(await signed(chosen?.id?{answer:chosen.answer,mode:'ai',source:'AI matched · portfolio facts',href:chosen.href,ids:[chosen.id]}:{answer:fallback.answer,mode:'faq',source:fallback.source,href:fallback.href,...(fallback.id?{ids:[fallback.id]}:{})})))}}backendFailed=!backendOk}catch{backendFailed=true;/* An unavailable model must never block portfolio answers. */}
  }
  // NVIDIA NIM, called straight from this Worker.
  //
@@ -149,17 +180,24 @@ export async function POST(request:Request) {
  // calls per 24 hours, one chat_quota row (chargeModelCall). Charged only
  // when the model is about to be called, and past it the curated answer is
  // served as though the model had not been configured: no error, no
- // "offline" label. Exempt callers are counted and never refused.
+ // "offline" label. Exempt callers are counted and never refused at the cap.
+ // A cap that cannot be read (no database, or the count failed) refuses
+ // everyone, exempt or not: it is the only bound on a paid API, so it fails
+ // closed where the free limits above fail open.
  //
  // A matched first question in another language is a translation, not a
  // composition: the model gets the curated answer and the language name and
  // never the visitor's words (translationTarget in gate.ts). Mid-conversation
  // the question and history go out as before.
  const wantsModel=modelEligible&&!backendOk&&nimConfigured();
- const capped=wantsModel&&!(await chargeModelCall(ready))&&!exempt;
- if(capped)console.warn('[chat] model daily cap reached; serving the curated answer');
+ const charge=wantsModel?await chargeModelCall(ready):'unavailable';
+ const capped=wantsModel&&(charge==='unavailable'||charge==='capped'&&!exempt);
+ if(capped)console.warn(`[chat] ${charge==='unavailable'?'model cap unreadable':'model daily cap reached'}; serving the curated answer`);
  const language=wantsModel?translationTarget(fallback,history,body.message):null;
- const ids=fallback.id?[fallback.id,...carried]:carried;
+ // A fit question carries the pitch beside whatever it matched, or "Why
+ // Alex?" is answered from the bio and "suitable for a Java role?" from the
+ // skills list alone. See lib/chat/fit.ts.
+ const ids=[...(fallback.id?[fallback.id]:[]),...(isFitQuestion(body.message)?[FIT_ID]:[]),...carried];
  if(body.stream===true&&wantsModel&&!capped){
   const encoder=new TextEncoder();
   const curated=await signed(fallback.id?{...fallback,ids:[fallback.id]}:fallback);
